@@ -36,6 +36,41 @@ prefect deployment run 'engine-run/engine-run' \
   -p entrypoint='["/bin/sh","-lc","echo hello-prefect"]'
 ```
 
+`engine_run_flow` supports optional checkpoint resume parameters:
+
+- `resume_key`: stable key for restart/continue
+- `checkpoint_dir`: directory where step state is persisted (`<resume_key>.json`)
+
+Example:
+
+```bash
+prefect deployment run 'engine-run/engine-run' \
+  -p repo_url='https://github.com/octocat/Hello-World.git' \
+  -p ref='master' \
+  -p entrypoint='["/bin/sh","-lc","echo hello-prefect"]' \
+  -p resume_key='job-001' \
+  -p checkpoint_dir='/content/drive/MyDrive/orchestrator/checkpoints'
+```
+
+## Colab worker quickstart
+
+Colab notebook is provided at `notebooks/worker_colab.ipynb`.
+
+For scripted startup in Colab:
+
+```bash
+PYTHONPATH=src uv run python scripts/colab_worker_runner.py start \
+  --checkpoint-dir /content/drive/MyDrive/orchestrator/checkpoints
+```
+
+Other commands:
+
+```bash
+PYTHONPATH=src uv run python scripts/colab_worker_runner.py status
+PYTHONPATH=src uv run python scripts/colab_worker_runner.py logs --tail 80
+PYTHONPATH=src uv run python scripts/colab_worker_runner.py stop
+```
+
 ## Storage-only production profile
 
 Use this when this machine is dedicated storage node:
