@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from storage.domain.services.storage_service import StorageService
+from storage.application.service import StorageApplicationService
 
 
 class DummyStore:
@@ -13,14 +13,23 @@ class DummyStore:
         return f"PUT::{object_uri}::{ttl_seconds}"
 
 
+class DummySigner:
+    def mint(self, method: str, object_uri: str, ttl_seconds: int) -> str:
+        return f"TOKEN::{method}::{object_uri}::{ttl_seconds}"
+
+    def decode(self, token: str, expected_method: str) -> str:
+        _ = expected_method
+        return token
+
+
 def test_build_object_uri() -> None:
-    svc = StorageService(DummyStore(), ttl_default=900, ttl_max=3600)
-    uri = svc.build_object_uri("bucket-a", "flow-1", 2, "stdout.log")
+    svc = StorageApplicationService(DummyStore(), DummySigner(), bucket="bucket-a", ttl_default=900, ttl_max=3600)
+    uri = svc.build_object_uri("flow-1", 2, "stdout.log")
     assert uri == "s3://bucket-a/jobs/flow-1/attempt-2/stdout.log"
 
 
 def test_validate_ttl_range() -> None:
-    svc = StorageService(DummyStore(), ttl_default=900, ttl_max=3600)
+    svc = StorageApplicationService(DummyStore(), DummySigner(), bucket="bucket-a", ttl_default=900, ttl_max=3600)
     assert svc.validate_ttl(None) == 900
     assert svc.validate_ttl(120) == 120
     with pytest.raises(ValueError):
