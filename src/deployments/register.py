@@ -32,6 +32,8 @@ def main() -> None:
             "repo_url": "https://github.com/example/repo.git",
             "ref": "main",
             "entrypoint": ["/bin/sh", "-lc", "echo hello"],
+            "resume_key": None,
+            "checkpoint_dir": None,
         },
     )
 
