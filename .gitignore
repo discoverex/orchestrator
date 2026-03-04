@@ -13,3 +13,5 @@ wheels/
 .env
 .env.storage.prod
 backups/
+
+**/.cloudflared/*.json
