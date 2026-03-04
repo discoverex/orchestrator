@@ -22,6 +22,11 @@ docker compose --env-file infra/storage-node/.env -f infra/storage-node/docker-c
 
 - Public exposure: Cloudflare Tunnel -> storage-gateway only
 - Direct exposure forbidden: MinIO API and console must stay localhost-bound
+- Presign URL mode: `PRESIGN_MODE=gateway` (gateway proxy URL issuance for external clients)
+- Optional local explorer:
+  - `STORAGE_EXPLORER_ENABLED=true`
+  - `STORAGE_EXPLORER_LOCAL_ONLY=true`
+  - open `http://127.0.0.1:${STORAGE_GATEWAY_PORT}/explorer`
 - Request auth on gateway:
 
 1. Bearer token (`Authorization`)
