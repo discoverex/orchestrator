@@ -28,10 +28,23 @@
 - `POST /v1/presign/get`
 - `POST /v1/presign/batch`
 - `POST /v1/object/head`
+- `PUT /v1/object/proxy?token=...`
+- `GET /v1/object/proxy?token=...`
 
 All endpoints require bearer auth:
 
 - `Authorization: Bearer <STORAGE_GATEWAY_TOKEN>`
+
+## Local Explorer APIs
+
+Local-only operator explorer (disabled by default):
+
+- `POST /v1/explorer/session`
+- `DELETE /v1/explorer/session`
+- `GET /v1/explorer/buckets`
+- `GET /v1/explorer/objects`
+- `GET /v1/explorer/download`
+- `GET /explorer`
 
 ## Flow Result Metadata
 

@@ -7,7 +7,7 @@ from pathlib import Path
 from minio import Minio
 from minio.error import S3Error
 
-from storage.domain.models.object_ref import ObjectStat
+from storage.domain.models.object_ref import ObjectListEntry, ObjectStat
 
 
 def parse_s3_uri(uri: str) -> tuple[str, str]:
@@ -37,6 +37,39 @@ class MinioObjectStore:
         if self.auto_create_bucket and not self.client.bucket_exists(bucket):
             self.client.make_bucket(bucket)
 
+    def list_buckets(self) -> list[str]:
+        return sorted(bucket.name for bucket in self.client.list_buckets())
+
+    def list_objects(
+        self,
+        bucket: str,
+        prefix: str = "",
+        start_after: str | None = None,
+        limit: int = 200,
+    ) -> tuple[list[ObjectListEntry], str | None]:
+        if limit <= 0:
+            raise ValueError("limit must be > 0")
+        rows: list[ObjectListEntry] = []
+        for item in self.client.list_objects(
+            bucket_name=bucket,
+            prefix=prefix,
+            recursive=False,
+            start_after=start_after,
+        ):
+            key = str(item.object_name)
+            rows.append(
+                ObjectListEntry(
+                    object_uri=f"s3://{bucket}/{key}",
+                    object_key=key,
+                    size=int(item.size or 0),
+                    last_modified=getattr(item, "last_modified", None),
+                )
+            )
+            if len(rows) >= limit:
+                break
+        next_cursor = rows[-1].object_key if len(rows) >= limit else None
+        return rows, next_cursor
+
     def upload_file(self, local_path: str | Path, object_uri: str) -> ObjectStat:
         bucket, object_key = parse_s3_uri(object_uri)
         self._ensure_bucket(bucket)
@@ -54,6 +87,15 @@ class MinioObjectStore:
     def download_file(self, object_uri: str, local_path: str | Path) -> None:
         bucket, object_key = parse_s3_uri(object_uri)
         self.client.fget_object(bucket, object_key, str(local_path))
+
+    def download_bytes(self, object_uri: str) -> bytes:
+        bucket, object_key = parse_s3_uri(object_uri)
+        resp = self.client.get_object(bucket, object_key)
+        try:
+            return resp.read()
+        finally:
+            resp.close()
+            resp.release_conn()
 
     def exists(self, object_uri: str) -> bool:
         return self.stat(object_uri) is not None
