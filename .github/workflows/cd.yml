@@ -73,6 +73,7 @@ jobs:
         with:
           sparse-checkout: |
             infra/stacks/prefect-server/docker-compose.yml
+            infra/stacks/prefect-server/deploy.sh
           sparse-checkout-cone-mode: false
 
       - name: Prepare deploy compose
@@ -87,45 +88,41 @@ jobs:
           source: docker-compose.yml
           target: ${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}
 
+      - name: Setup SSH key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.REMOTE_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "${{ vars.REMOTE_PORT || '22' }}" "${{ secrets.REMOTE_HOST }}" >> ~/.ssh/known_hosts
+
       - name: Deploy prefect stack
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USERNAME }}
-          key: ${{ secrets.REMOTE_SSH_KEY }}
-          port: ${{ vars.REMOTE_PORT || '22' }}
-          script: |
-            set -euo pipefail
-            export DOCKER_CONFIG="$(mktemp -d)"
-            trap 'rm -rf "$DOCKER_CONFIG"' EXIT
-
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-            DEPLOY_PATH="${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}"
-            mkdir -p "${DEPLOY_PATH}"
-            cd "${DEPLOY_PATH}"
-
-            export PREFECT_SERVER_IMAGE="${{ needs.build-images.outputs.image }}"
-            export PREFECT_PORT="${{ vars.PREFECT_PORT }}"
-            export PREFECT_BIND_PORT="${{ vars.PREFECT_BIND_PORT }}"
-            export PREFECT_BIND_ADDRESS="${{ vars.PREFECT_BIND_ADDRESS }}"
-            export PREFECT_API_PUBLIC_URL="${{ vars.PREFECT_API_PUBLIC_URL }}"
-            export PREFECT_DB_NAME="${{ vars.PREFECT_DB_NAME }}"
-            export PREFECT_DB_USER="${{ vars.PREFECT_DB_USER }}"
-            export PREFECT_DB_PASSWORD="${{ secrets.PREFECT_DB_PASSWORD }}"
-            export PREFECT_DB_DATA_DIR="${{ vars.PREFECT_DB_DATA_DIR }}"
-            export FLUSH_TARGET_URL="${{ vars.FLUSH_TARGET_URL }}"
-            export FLUSH_GATEWAY_TOKEN="${{ secrets.FLUSH_GATEWAY_TOKEN }}"
-            export FLUSH_CF_ACCESS_CLIENT_ID="${{ secrets.FLUSH_CF_ACCESS_CLIENT_ID }}"
-            export FLUSH_CF_ACCESS_CLIENT_SECRET="${{ secrets.FLUSH_CF_ACCESS_CLIENT_SECRET }}"
-            export PREFECT_MAINT_DATA_DIR="${{ vars.PREFECT_MAINT_DATA_DIR }}"
-            export FLUSH_INTERVAL_SEC="${{ vars.FLUSH_INTERVAL_SEC }}"
-            export PRUNE_INTERVAL_SEC="${{ vars.PRUNE_INTERVAL_SEC }}"
-            export PRUNE_TTL_HOURS="${{ vars.PRUNE_TTL_HOURS }}"
-            export FLUSH_PAGE_SIZE="${{ vars.FLUSH_PAGE_SIZE }}"
-            export FLUSH_MAX_RUNS="${{ vars.FLUSH_MAX_RUNS }}"
-            export PRUNE_PAGE_SIZE="${{ vars.PRUNE_PAGE_SIZE }}"
-            export PRUNE_MAX_RUNS="${{ vars.PRUNE_MAX_RUNS }}"
-
-            docker compose pull
-            docker compose up -d prefect-db prefect-server prefect-maintenance
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_deploy -p "${{ vars.REMOTE_PORT || '22' }}" "${{ secrets.REMOTE_USERNAME }}@${{ secrets.REMOTE_HOST }}" \
+            "set -euo pipefail; \
+            export REMOTE_DEPLOY_PATH='${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}'; \
+            export PREFECT_SERVER_IMAGE='${{ needs.build-images.outputs.image }}'; \
+            export PREFECT_PORT='${{ vars.PREFECT_PORT }}'; \
+            export PREFECT_BIND_PORT='${{ vars.PREFECT_BIND_PORT }}'; \
+            export PREFECT_BIND_ADDRESS='${{ vars.PREFECT_BIND_ADDRESS }}'; \
+            export PREFECT_API_PUBLIC_URL='${{ vars.PREFECT_API_PUBLIC_URL }}'; \
+            export PREFECT_DB_NAME='${{ vars.PREFECT_DB_NAME }}'; \
+            export PREFECT_DB_USER='${{ vars.PREFECT_DB_USER }}'; \
+            export PREFECT_DB_PASSWORD='${{ secrets.PREFECT_DB_PASSWORD }}'; \
+            export PREFECT_DB_DATA_DIR='${{ vars.PREFECT_DB_DATA_DIR }}'; \
+            export FLUSH_TARGET_URL='${{ vars.FLUSH_TARGET_URL }}'; \
+            export FLUSH_GATEWAY_TOKEN='${{ secrets.FLUSH_GATEWAY_TOKEN }}'; \
+            export FLUSH_CF_ACCESS_CLIENT_ID='${{ secrets.FLUSH_CF_ACCESS_CLIENT_ID }}'; \
+            export FLUSH_CF_ACCESS_CLIENT_SECRET='${{ secrets.FLUSH_CF_ACCESS_CLIENT_SECRET }}'; \
+            export PREFECT_MAINT_DATA_DIR='${{ vars.PREFECT_MAINT_DATA_DIR }}'; \
+            export FLUSH_INTERVAL_SEC='${{ vars.FLUSH_INTERVAL_SEC }}'; \
+            export PRUNE_INTERVAL_SEC='${{ vars.PRUNE_INTERVAL_SEC }}'; \
+            export PRUNE_TTL_HOURS='${{ vars.PRUNE_TTL_HOURS }}'; \
+            export FLUSH_PAGE_SIZE='${{ vars.FLUSH_PAGE_SIZE }}'; \
+            export FLUSH_MAX_RUNS='${{ vars.FLUSH_MAX_RUNS }}'; \
+            export PRUNE_PAGE_SIZE='${{ vars.PRUNE_PAGE_SIZE }}'; \
+            export PRUNE_MAX_RUNS='${{ vars.PRUNE_MAX_RUNS }}'; \
+            export GHCR_USERNAME='${{ github.actor }}'; \
+            export GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}'; \
+            bash -s" < infra/stacks/prefect-server/deploy.sh
