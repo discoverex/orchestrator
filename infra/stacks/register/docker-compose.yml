@@ -1,0 +1,20 @@
+services:
+  base-runtime:
+    build:
+      context: ../../..
+      dockerfile: infra/images/base.Dockerfile
+    image: orchestrator-base:local
+    command: ["true"]
+
+  register:
+    build:
+      context: ../../..
+      dockerfile: infra/images/register.Dockerfile
+    image: orchestrator-register:local
+    container_name: orchestrator-register
+    environment:
+      PREFECT_API_URL: ${PREFECT_API_URL}
+      PREFECT_WORK_POOL: ${PREFECT_WORK_POOL:-colab-gpu}
+      PREFECT_WORK_QUEUE: ${PREFECT_WORK_QUEUE:-default}
+      REGISTER_DEPLOYMENT_NAME: ${REGISTER_DEPLOYMENT_NAME:-engine-run}
+      REGISTER_DEPLOYMENT_VERSION: ${REGISTER_DEPLOYMENT_VERSION:-}

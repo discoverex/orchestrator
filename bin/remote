@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ -f "${ROOT_DIR}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${ROOT_DIR}/.env"
+  set +a
+fi
+
+COMMAND="${1:-}"
+shift || true
+
+REMOTE_USERNAME="${REMOTE_USERNAME:-}"
+REMOTE_HOST="${REMOTE_HOST:-}"
+GITHUB_DEPLOY_KEY_PATH="${GITHUB_DEPLOY_KEY_PATH:-}"
+REMOTE_PROJECT_PATH="${REMOTE_PROJECT_PATH:-}"
+
+if [[ -n "${GITHUB_DEPLOY_KEY_PATH}" && "${GITHUB_DEPLOY_KEY_PATH}" == "~/"* ]]; then
+  GITHUB_DEPLOY_KEY_PATH="${HOME}/${GITHUB_DEPLOY_KEY_PATH#~/}"
+fi
+
+if [[ -z "${REMOTE_PROJECT_PATH}" && -n "${REMOTE_USERNAME}" ]]; then
+  REMOTE_PROJECT_PATH="/home/${REMOTE_USERNAME}/discoverex/orchestrator"
+fi
+
+PREFECT_ENV="infra/stacks/prefect-server/.env"
+PREFECT_COMPOSE="infra/stacks/prefect-server/docker-compose.yml"
+
+require_remote_env() {
+  : "${REMOTE_USERNAME:?REMOTE_USERNAME is required}"
+  : "${REMOTE_HOST:?REMOTE_HOST is required}"
+  : "${GITHUB_DEPLOY_KEY_PATH:?GITHUB_DEPLOY_KEY_PATH is required}"
+}
+
+remote_exec() {
+  require_remote_env
+  ssh -i "${GITHUB_DEPLOY_KEY_PATH}" "${REMOTE_USERNAME}@${REMOTE_HOST}" "$@"
+}
+
+remote_project_exec() {
+  local cmd="$1"
+  : "${REMOTE_PROJECT_PATH:?REMOTE_PROJECT_PATH is required}"
+  local qpath
+  qpath="${REMOTE_PROJECT_PATH//\'/\'\\\'\'}"
+  remote_exec "cd '${qpath}' && ${cmd}"
+}
+
+join_quoted() {
+  local out=""
+  local arg
+  for arg in "$@"; do
+    out+=" $(printf "%q" "${arg}")"
+  done
+  printf "%s" "${out}"
+}
+
+usage() {
+  cat <<'EOF'
+Usage:
+  remote connect
+  remote postgres
+  remote dump
+  remote prefect-install
+  remote prefect <docker-compose-args...>
+
+Examples:
+  remote prefect up -d --build
+  remote prefect down
+  remote prefect ps
+  remote prefect logs --tail=200 prefect-server
+EOF
+}
+
+case "${COMMAND}" in
+  connect)
+    require_remote_env
+    exec ssh -i "${GITHUB_DEPLOY_KEY_PATH}" "${REMOTE_USERNAME}@${REMOTE_HOST}"
+    ;;
+  postgres)
+    remote_exec "docker exec -it postgres psql -U gtrpgm -d gtrpgm"
+    ;;
+  dump)
+    OUTPUT_FILE="dump_$(date +%Y%m%d_%H%M%S).sql"
+    echo "Dumping remote database to ${OUTPUT_FILE}..."
+    remote_exec "docker exec postgres pg_dump -U gtrpgm -d gtrpgm" > "${OUTPUT_FILE}"
+    echo "Success: Dump saved to ${OUTPUT_FILE}"
+    ;;
+  prefect-install)
+    remote_project_exec "scripts/ops/prefect_vm_bootstrap.sh"
+    ;;
+  prefect)
+    if [[ "$#" -eq 0 ]]; then
+      echo "missing prefect compose args" >&2
+      usage
+      exit 1
+    fi
+    remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE}$(join_quoted "$@")"
+    ;;
+  # Backward-compatible aliases
+  prefect-up)
+    remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE} up -d --build"
+    ;;
+  prefect-down)
+    remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE} down"
+    ;;
+  prefect-ps)
+    remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE} ps"
+    ;;
+  prefect-logs)
+    remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE} logs --tail=120$(join_quoted "$@")"
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac

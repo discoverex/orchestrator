@@ -1,0 +1,45 @@
+services:
+  prefect-server:
+    build:
+      context: ../../..
+      dockerfile: infra/images/prefect-server.Dockerfile
+    image: orchestrator-prefect-server:local
+    container_name: orchestrator-prefect-server
+    restart: unless-stopped
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: ${PREFECT_API_DATABASE_CONNECTION_URL}
+      PREFECT_API_URL: ${PREFECT_API_PUBLIC_URL:-}
+    command: prefect server start --host 0.0.0.0 --port ${PREFECT_PORT:-4200}
+    ports:
+      - "127.0.0.1:${PREFECT_BIND_PORT:-14200}:${PREFECT_PORT:-4200}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import os, urllib.request; p=os.environ.get('PREFECT_PORT','4200'); urllib.request.urlopen(f'http://localhost:{p}/api/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.2.0
+    container_name: orchestrator-prefect-cloudflared
+    restart: unless-stopped
+    command:
+      - sh
+      - -lc
+      - >
+        sed -e "s/__CF_TUNNEL_ID__/${CF_TUNNEL_ID}/g"
+        -e "s#__CF_CREDENTIALS_FILE__#${CF_CREDENTIALS_FILE}#g"
+        -e "s/__PREFECT_HOSTNAME__/${PREFECT_HOSTNAME}/g"
+        -e "s/__PREFECT_PORT__/${PREFECT_PORT:-4200}/g"
+        /etc/cloudflared/config.yml > /tmp/config.yml &&
+        cloudflared tunnel --config /tmp/config.yml run
+    volumes:
+      - ./.cloudflared:/etc/cloudflared:ro
+    depends_on:
+      prefect-server:
+        condition: service_healthy

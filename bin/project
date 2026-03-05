@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+LOCAL_COMPOSE="${ROOT_DIR}/docker-compose.local.yml"
+STORAGE_ENV="${ROOT_DIR}/infra/stacks/storage-node/.env"
+STORAGE_COMPOSE="${ROOT_DIR}/infra/stacks/storage-node/docker-compose.yml"
+REGISTER_ENV="${ROOT_DIR}/infra/stacks/register/.env"
+REGISTER_COMPOSE="${ROOT_DIR}/infra/stacks/register/docker-compose.yml"
+PREFECT_ENV="${ROOT_DIR}/infra/stacks/prefect-server/.env"
+PREFECT_COMPOSE="${ROOT_DIR}/infra/stacks/prefect-server/docker-compose.yml"
+E2E_SCRIPT="${ROOT_DIR}/scripts/e2e/e2e_orchestrator.sh"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  project e2e [core|mlflow|full] [--keep-on-fail] [--timeout-sec N]
+  project storage <up|down|ps|logs|build> [args...]
+  project prefect <up|down|ps|logs|build> [args...]
+  project local <up|down|ps|logs|build> [args...]
+  project register <run|build> [args...]
+
+Examples:
+  project e2e
+  project e2e full --keep-on-fail
+  project storage up
+  project storage down
+  project storage logs --tail=120
+  project prefect up
+  project local up
+  project register run
+EOF
+}
+
+run_storage() {
+  docker compose --env-file "${STORAGE_ENV}" -f "${STORAGE_COMPOSE}" "$@"
+}
+
+run_local() {
+  docker compose -f "${LOCAL_COMPOSE}" "$@"
+}
+
+run_register() {
+  docker compose --env-file "${REGISTER_ENV}" -f "${REGISTER_COMPOSE}" "$@"
+}
+
+run_prefect() {
+  docker compose --env-file "${PREFECT_ENV}" -f "${PREFECT_COMPOSE}" "$@"
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "${cmd}" in
+  help|-h|--help)
+    usage
+    ;;
+
+  e2e)
+    if [[ ! -x "${E2E_SCRIPT}" ]]; then
+      echo "missing executable: ${E2E_SCRIPT}" >&2
+      exit 1
+    fi
+    mode="${1:-}"
+    case "${mode}" in
+      core|mlflow|full)
+        shift
+        exec "${E2E_SCRIPT}" --mode "${mode}" "$@"
+        ;;
+      "")
+        exec "${E2E_SCRIPT}" --mode core "$@"
+        ;;
+      *)
+        exec "${E2E_SCRIPT}" "$mode" "$@"
+        ;;
+    esac
+    ;;
+
+  storage)
+    sub="${1:-}"
+    shift || true
+    case "${sub}" in
+      up) run_storage up -d --build "$@" ;;
+      down) run_storage down "$@" ;;
+      ps) run_storage ps "$@" ;;
+      logs) run_storage logs --tail=120 "$@" ;;
+      build) run_storage build base-runtime storage-gateway mlflow "$@" ;;
+      *)
+        echo "unknown storage command: ${sub}" >&2
+        usage
+        exit 2
+        ;;
+    esac
+    ;;
+
+  prefect)
+    sub="${1:-}"
+    shift || true
+    case "${sub}" in
+      up) run_prefect up -d --build "$@" ;;
+      down) run_prefect down "$@" ;;
+      ps) run_prefect ps "$@" ;;
+      logs) run_prefect logs --tail=120 "$@" ;;
+      build) run_prefect build prefect-server "$@" ;;
+      *)
+        echo "unknown prefect command: ${sub}" >&2
+        usage
+        exit 2
+        ;;
+    esac
+    ;;
+
+  local)
+    sub="${1:-}"
+    shift || true
+    case "${sub}" in
+      up) run_local up -d --build "$@" ;;
+      down) run_local down "$@" ;;
+      ps) run_local ps "$@" ;;
+      logs) run_local logs --tail=120 "$@" ;;
+      build) run_local build base-runtime storage-gateway worker register "$@" ;;
+      *)
+        echo "unknown local command: ${sub}" >&2
+        usage
+        exit 2
+        ;;
+    esac
+    ;;
+
+  register)
+    sub="${1:-}"
+    shift || true
+    case "${sub}" in
+      run) run_register run --rm register "$@" ;;
+      build) run_register build base-runtime register "$@" ;;
+      *)
+        echo "unknown register command: ${sub}" >&2
+        usage
+        exit 2
+        ;;
+    esac
+    ;;
+
+  *)
+    echo "unknown command: ${cmd}" >&2
+    usage
+    exit 2
+    ;;
+esac
