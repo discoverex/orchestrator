@@ -36,6 +36,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -46,22 +48,16 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/prefect-server
-          tags: |
-            type=sha,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Set image tag
+        id: image
+        run: echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/prefect-server:sha-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
       - name: Build and (optionally) push
         uses: docker/build-push-action@v6
         with:
           context: .
           file: infra/images/prefect-server.Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.image.outputs.image }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -69,7 +65,28 @@ jobs:
     needs: build-images
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' && vars.ENABLE_PREFECT_DEPLOY == 'true' }}
+    permissions:
+      contents: read
+      packages: read
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            infra/stacks/prefect-server/docker-compose.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Prepare deploy compose
+        run: cp infra/stacks/prefect-server/docker-compose.yml docker-compose.yml
+
+      - name: Upload docker-compose.yml
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USERNAME }}
+          key: ${{ secrets.REMOTE_SSH_KEY }}
+          source: docker-compose.yml
+          target: ${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}
+
       - name: Deploy prefect stack
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -79,37 +96,36 @@ jobs:
           port: ${{ vars.REMOTE_PORT || '22' }}
           script: |
             set -euo pipefail
-            cd "${{ vars.REMOTE_PROJECT_PATH }}"
-            mkdir -p infra/stacks/prefect-server
-            cat > infra/stacks/prefect-server/.ci.env <<'EOF'
-            PREFECT_PORT=${{ vars.PREFECT_PORT }}
-            PREFECT_BIND_PORT=${{ vars.PREFECT_BIND_PORT }}
-            PREFECT_HOSTNAME=${{ vars.PREFECT_HOSTNAME }}
-            PREFECT_API_PUBLIC_URL=${{ vars.PREFECT_API_PUBLIC_URL }}
-            PREFECT_DB_NAME=${{ vars.PREFECT_DB_NAME }}
-            PREFECT_DB_USER=${{ vars.PREFECT_DB_USER }}
-            PREFECT_DB_PASSWORD=${{ secrets.PREFECT_DB_PASSWORD }}
-            PREFECT_DB_DATA_DIR=${{ vars.PREFECT_DB_DATA_DIR }}
-            CF_CREDENTIALS_FILE=${{ vars.PREFECT_CF_CREDENTIALS_FILE }}
-            CF_TUNNEL_ID=${{ secrets.PREFECT_CF_TUNNEL_ID }}
-            CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }}
-            CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-            FLUSH_TARGET_URL=${{ vars.FLUSH_TARGET_URL }}
-            FLUSH_GATEWAY_TOKEN=${{ secrets.FLUSH_GATEWAY_TOKEN }}
-            FLUSH_CF_ACCESS_CLIENT_ID=${{ secrets.FLUSH_CF_ACCESS_CLIENT_ID }}
-            FLUSH_CF_ACCESS_CLIENT_SECRET=${{ secrets.FLUSH_CF_ACCESS_CLIENT_SECRET }}
-            PREFECT_MAINT_DATA_DIR=${{ vars.PREFECT_MAINT_DATA_DIR }}
-            FLUSH_INTERVAL_SEC=${{ vars.FLUSH_INTERVAL_SEC }}
-            PRUNE_INTERVAL_SEC=${{ vars.PRUNE_INTERVAL_SEC }}
-            PRUNE_TTL_HOURS=${{ vars.PRUNE_TTL_HOURS }}
-            FLUSH_PAGE_SIZE=${{ vars.FLUSH_PAGE_SIZE }}
-            FLUSH_MAX_RUNS=${{ vars.FLUSH_MAX_RUNS }}
-            PRUNE_PAGE_SIZE=${{ vars.PRUNE_PAGE_SIZE }}
-            PRUNE_MAX_RUNS=${{ vars.PRUNE_MAX_RUNS }}
-            EOF
-            mkdir -p infra/stacks/prefect-server/.cloudflared
-            cat > infra/stacks/prefect-server/.cloudflared/${{ vars.PREFECT_CF_CREDENTIALS_FILE }} <<'EOF'
-            ${{ secrets.PREFECT_CF_CREDENTIALS_JSON }}
-            EOF
-            docker compose --env-file infra/stacks/prefect-server/.ci.env -f infra/stacks/prefect-server/docker-compose.yml up -d --build
-            rm -f infra/stacks/prefect-server/.ci.env
+            export DOCKER_CONFIG="$(mktemp -d)"
+            trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            DEPLOY_PATH="${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}"
+            mkdir -p "${DEPLOY_PATH}"
+            cd "${DEPLOY_PATH}"
+
+            export PREFECT_SERVER_IMAGE="${{ needs.build-images.outputs.image }}"
+            export PREFECT_PORT="${{ vars.PREFECT_PORT }}"
+            export PREFECT_BIND_PORT="${{ vars.PREFECT_BIND_PORT }}"
+            export PREFECT_BIND_ADDRESS="${{ vars.PREFECT_BIND_ADDRESS }}"
+            export PREFECT_API_PUBLIC_URL="${{ vars.PREFECT_API_PUBLIC_URL }}"
+            export PREFECT_DB_NAME="${{ vars.PREFECT_DB_NAME }}"
+            export PREFECT_DB_USER="${{ vars.PREFECT_DB_USER }}"
+            export PREFECT_DB_PASSWORD="${{ secrets.PREFECT_DB_PASSWORD }}"
+            export PREFECT_DB_DATA_DIR="${{ vars.PREFECT_DB_DATA_DIR }}"
+            export FLUSH_TARGET_URL="${{ vars.FLUSH_TARGET_URL }}"
+            export FLUSH_GATEWAY_TOKEN="${{ secrets.FLUSH_GATEWAY_TOKEN }}"
+            export FLUSH_CF_ACCESS_CLIENT_ID="${{ secrets.FLUSH_CF_ACCESS_CLIENT_ID }}"
+            export FLUSH_CF_ACCESS_CLIENT_SECRET="${{ secrets.FLUSH_CF_ACCESS_CLIENT_SECRET }}"
+            export PREFECT_MAINT_DATA_DIR="${{ vars.PREFECT_MAINT_DATA_DIR }}"
+            export FLUSH_INTERVAL_SEC="${{ vars.FLUSH_INTERVAL_SEC }}"
+            export PRUNE_INTERVAL_SEC="${{ vars.PRUNE_INTERVAL_SEC }}"
+            export PRUNE_TTL_HOURS="${{ vars.PRUNE_TTL_HOURS }}"
+            export FLUSH_PAGE_SIZE="${{ vars.FLUSH_PAGE_SIZE }}"
+            export FLUSH_MAX_RUNS="${{ vars.FLUSH_MAX_RUNS }}"
+            export PRUNE_PAGE_SIZE="${{ vars.PRUNE_PAGE_SIZE }}"
+            export PRUNE_MAX_RUNS="${{ vars.PRUNE_MAX_RUNS }}"
+
+            docker compose pull
+            docker compose up -d prefect-db prefect-server prefect-maintenance

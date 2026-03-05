@@ -14,14 +14,14 @@ fi
 
 while true; do
   echo "[maint] flush started $(date -u +%FT%TZ)"
-  python /workspace/scripts/ops/prefect_flush_completed.py --once || echo "[maint] flush failed"
+  python /opt/orchestrator/scripts/ops/prefect_flush_completed.py --once || echo "[maint] flush failed"
 
   now_epoch="$(date +%s)"
   last_prune_epoch="$(cat "${PRUNE_STAMP}" 2>/dev/null || echo 0)"
   elapsed="$((now_epoch - last_prune_epoch))"
   if (( elapsed >= PRUNE_INTERVAL_SEC )); then
     echo "[maint] prune started $(date -u +%FT%TZ) ttl_hours=${PRUNE_TTL_HOURS}"
-    python /workspace/scripts/ops/prefect_prune_completed.py --apply --ttl-hours "${PRUNE_TTL_HOURS}" || echo "[maint] prune failed"
+    python /opt/orchestrator/scripts/ops/prefect_prune_completed.py --apply --ttl-hours "${PRUNE_TTL_HOURS}" || echo "[maint] prune failed"
     echo "${now_epoch}" > "${PRUNE_STAMP}"
   fi
 

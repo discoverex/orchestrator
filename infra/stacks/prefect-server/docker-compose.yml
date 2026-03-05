@@ -16,10 +16,7 @@ services:
       retries: 10
 
   prefect-server:
-    build:
-      context: ../../..
-      dockerfile: infra/images/prefect-server.Dockerfile
-    image: orchestrator-prefect-server:local
+    image: ${PREFECT_SERVER_IMAGE:-orchestrator-prefect-server:local}
     container_name: orchestrator-prefect-server
     restart: unless-stopped
     environment:
@@ -34,7 +31,7 @@ services:
         export PREFECT_API_DATABASE_CONNECTION_URL="postgresql+asyncpg://${PREFECT_DB_USER}:${PREFECT_DB_PASSWORD}@prefect-db:5432/${PREFECT_DB_NAME}" &&
         prefect server start --host 0.0.0.0 --port ${PREFECT_PORT:-4200}
     ports:
-      - "127.0.0.1:${PREFECT_BIND_PORT:-14200}:${PREFECT_PORT:-4200}"
+      - "${PREFECT_BIND_ADDRESS:-127.0.0.1}:${PREFECT_BIND_PORT:-14200}:${PREFECT_PORT:-4200}"
     depends_on:
       prefect-db:
         condition: service_healthy
@@ -51,7 +48,7 @@ services:
       retries: 12
 
   prefect-maintenance:
-    image: orchestrator-prefect-server:local
+    image: ${PREFECT_SERVER_IMAGE:-orchestrator-prefect-server:local}
     container_name: orchestrator-prefect-maintenance
     restart: unless-stopped
     depends_on:
@@ -74,27 +71,6 @@ services:
     command:
       - bash
       - -lc
-      - /workspace/scripts/ops/prefect_maintenance_loop.sh
+      - /opt/orchestrator/scripts/ops/prefect_maintenance_loop.sh
     volumes:
-      - ../../..:/workspace:ro
       - ${PREFECT_MAINT_DATA_DIR:-/srv/orchestrator/prefect-maint}:/var/lib/orchestrator/prefect-flush
-
-  cloudflared:
-    image: cloudflare/cloudflared:2026.2.0
-    container_name: orchestrator-prefect-cloudflared
-    restart: unless-stopped
-    command:
-      - sh
-      - -lc
-      - >
-        sed -e "s/__CF_TUNNEL_ID__/${CF_TUNNEL_ID}/g"
-        -e "s#__CF_CREDENTIALS_FILE__#${CF_CREDENTIALS_FILE}#g"
-        -e "s/__PREFECT_HOSTNAME__/${PREFECT_HOSTNAME}/g"
-        -e "s/__PREFECT_PORT__/${PREFECT_PORT:-4200}/g"
-        /etc/cloudflared/config.yml > /tmp/config.yml &&
-        cloudflared tunnel --config /tmp/config.yml run
-    volumes:
-      - ./.cloudflared:/etc/cloudflared:ro
-    depends_on:
-      prefect-server:
-        condition: service_healthy
