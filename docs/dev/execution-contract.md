@@ -59,3 +59,27 @@ Local-only operator explorer (disabled by default):
 - `exit_code`
 
 `Prefect flow result` is the source of truth for run metadata.
+
+## E2E Acceptance (Register -> Worker -> Storage)
+
+The deterministic script `scripts/e2e_orchestrator.sh` verifies the full orchestration chain in three modes:
+
+- `core`: deployment register, worker execution, object persistence in MinIO
+- `mlflow`: `core` + MLflow run tag linkage (`artifact_*_uri`)
+- `full`: `mlflow` + external domain/Cloudflare Access path checks
+
+`full` mode includes prereq gating before MLflow tag checks:
+
+1. required env keys exist (`MLFLOW_TRACKING_URI`, `MLFLOW_PUBLIC_URL`, `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET`)
+2. DNS resolves for tracking/public MLflow hostnames
+
+Core pass criteria:
+
+1. `engine-run/engine-run` deployment exists after register.
+2. Submitted flow run reaches `COMPLETED`.
+3. All required objects exist:
+   - `stdout.log`
+   - `stderr.log`
+   - `result.json`
+   - `artifacts.json`
+4. `artifacts.json` metadata matches expected `flow_run_id`, `attempt`, and object URIs.
