@@ -71,5 +71,5 @@ if [[ -n "${GHCR_TOKEN:-}" ]]; then
 fi
 
 docker compose pull
-docker compose up -d prefect-db prefect-server prefect-maintenance
+docker compose up -d --wait prefect-db prefect-server prefect-maintenance
 docker compose ps
