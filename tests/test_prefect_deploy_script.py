@@ -28,6 +28,7 @@ def _base_env(deploy_dir: Path, bin_dir: Path) -> dict[str, str]:
         {
             "REMOTE_DEPLOY_PATH": str(deploy_dir),
             "PREFECT_SERVER_IMAGE": "ghcr.io/org/orchestrator/prefect-server:sha-test",
+            "PREFECT_HOSTNAME": "prefect.example.com",
             "PREFECT_API_PUBLIC_URL": "https://prefect.example.com/api",
             "PREFECT_DB_PASSWORD": "pw",
             "FLUSH_TARGET_URL": "https://storage.example.com",
@@ -80,5 +81,5 @@ def test_deploy_script_applies_defaults_and_runs_compose(tmp_path: Path) -> None
     assert proc.returncode == 0, proc.stderr
     lines = log_path.read_text(encoding="utf-8").strip().splitlines()
     assert any(line.startswith("compose pull") for line in lines)
-    assert any("compose up -d --wait prefect-db prefect-server prefect-maintenance" in line for line in lines)
+    assert any("compose up -d --wait prefect-db prefect-server prefect-maintenance caddy" in line for line in lines)
     assert any(line.startswith("compose ps") for line in lines)
