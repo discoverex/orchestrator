@@ -1,0 +1,12 @@
+{
+  email {$CADDY_ACME_EMAIL}
+}
+
+http://{$PREFECT_HOSTNAME} {
+  redir https://{$PREFECT_HOSTNAME}{uri} permanent
+}
+
+https://{$PREFECT_HOSTNAME} {
+  encode zstd gzip
+  reverse_proxy prefect-server:{$PREFECT_PORT}
+}

@@ -74,3 +74,22 @@ services:
       - /opt/orchestrator/scripts/ops/prefect_maintenance_loop.sh
     volumes:
       - ${PREFECT_MAINT_DATA_DIR:-/srv/orchestrator/prefect-maint}:/var/lib/orchestrator/prefect-flush
+
+  caddy:
+    image: caddy:2.10
+    container_name: orchestrator-prefect-caddy
+    restart: unless-stopped
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    environment:
+      PREFECT_HOSTNAME: ${PREFECT_HOSTNAME}
+      PREFECT_PORT: ${PREFECT_PORT:-4200}
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${CADDY_DATA_DIR:-/srv/orchestrator/caddy/data}:/data
+      - ${CADDY_CONFIG_DIR:-/srv/orchestrator/caddy/config}:/config

@@ -74,18 +74,21 @@ jobs:
           sparse-checkout: |
             infra/stacks/prefect-server/docker-compose.yml
             infra/stacks/prefect-server/deploy.sh
+            infra/stacks/prefect-server/Caddyfile
           sparse-checkout-cone-mode: false
 
-      - name: Prepare deploy compose
-        run: cp infra/stacks/prefect-server/docker-compose.yml docker-compose.yml
+      - name: Prepare deploy assets
+        run: |
+          cp infra/stacks/prefect-server/docker-compose.yml docker-compose.yml
+          cp infra/stacks/prefect-server/Caddyfile Caddyfile
 
-      - name: Upload docker-compose.yml
+      - name: Upload deploy assets
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USERNAME }}
           key: ${{ secrets.REMOTE_SSH_KEY }}
-          source: docker-compose.yml
+          source: docker-compose.yml,Caddyfile
           target: ${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}
 
       - name: Setup SSH key
@@ -103,6 +106,7 @@ jobs:
             "set -euo pipefail; \
             export REMOTE_DEPLOY_PATH='${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}'; \
             export PREFECT_SERVER_IMAGE='${{ needs.build-images.outputs.image }}'; \
+            export PREFECT_HOSTNAME='${{ vars.PREFECT_HOSTNAME }}'; \
             export PREFECT_PORT='${{ vars.PREFECT_PORT }}'; \
             export PREFECT_BIND_PORT='${{ vars.PREFECT_BIND_PORT }}'; \
             export PREFECT_BIND_ADDRESS='${{ vars.PREFECT_BIND_ADDRESS }}'; \
@@ -123,6 +127,9 @@ jobs:
             export FLUSH_MAX_RUNS='${{ vars.FLUSH_MAX_RUNS }}'; \
             export PRUNE_PAGE_SIZE='${{ vars.PRUNE_PAGE_SIZE }}'; \
             export PRUNE_MAX_RUNS='${{ vars.PRUNE_MAX_RUNS }}'; \
+            export CADDY_ACME_EMAIL='${{ vars.CADDY_ACME_EMAIL }}'; \
+            export CADDY_DATA_DIR='${{ vars.CADDY_DATA_DIR }}'; \
+            export CADDY_CONFIG_DIR='${{ vars.CADDY_CONFIG_DIR }}'; \
             export GHCR_USERNAME='${{ github.actor }}'; \
             export GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}'; \
             bash -s" < infra/stacks/prefect-server/deploy.sh

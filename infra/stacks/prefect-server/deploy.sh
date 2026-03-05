@@ -11,6 +11,7 @@ require_env() {
 
 require_env REMOTE_DEPLOY_PATH
 require_env PREFECT_SERVER_IMAGE
+require_env PREFECT_HOSTNAME
 require_env PREFECT_API_PUBLIC_URL
 require_env PREFECT_DB_PASSWORD
 require_env FLUSH_TARGET_URL
@@ -30,8 +31,11 @@ require_env FLUSH_GATEWAY_TOKEN
 : "${FLUSH_MAX_RUNS:=500}"
 : "${PRUNE_PAGE_SIZE:=200}"
 : "${PRUNE_MAX_RUNS:=1000}"
+: "${CADDY_DATA_DIR:=/srv/orchestrator/caddy/data}"
+: "${CADDY_CONFIG_DIR:=/srv/orchestrator/caddy/config}"
 
 export PREFECT_SERVER_IMAGE
+export PREFECT_HOSTNAME
 export PREFECT_PORT
 export PREFECT_BIND_PORT
 export PREFECT_BIND_ADDRESS
@@ -50,6 +54,8 @@ export FLUSH_PAGE_SIZE
 export FLUSH_MAX_RUNS
 export PRUNE_PAGE_SIZE
 export PRUNE_MAX_RUNS
+export CADDY_DATA_DIR
+export CADDY_CONFIG_DIR
 
 # Optional Cloudflare Access headers for flush target.
 if [[ -n "${FLUSH_CF_ACCESS_CLIENT_ID:-}" ]]; then
@@ -57,6 +63,9 @@ if [[ -n "${FLUSH_CF_ACCESS_CLIENT_ID:-}" ]]; then
 fi
 if [[ -n "${FLUSH_CF_ACCESS_CLIENT_SECRET:-}" ]]; then
   export FLUSH_CF_ACCESS_CLIENT_SECRET
+fi
+if [[ -n "${CADDY_ACME_EMAIL:-}" ]]; then
+  export CADDY_ACME_EMAIL
 fi
 
 mkdir -p "${REMOTE_DEPLOY_PATH}"
@@ -71,5 +80,5 @@ if [[ -n "${GHCR_TOKEN:-}" ]]; then
 fi
 
 docker compose pull
-docker compose up -d --wait prefect-db prefect-server prefect-maintenance
+docker compose up -d --wait prefect-db prefect-server prefect-maintenance caddy
 docker compose ps
