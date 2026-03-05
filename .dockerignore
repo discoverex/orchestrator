@@ -1,0 +1,14 @@
+.git
+.gitignore
+.venv
+.pytest_cache
+.ruff_cache
+.vscode
+artifacts
+notebooks
+.context
+*.pyc
+__pycache__
+*.log
+infra/storage-node/.env
+infra/register/.env
