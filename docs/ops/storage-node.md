@@ -12,13 +12,14 @@ Prefect server must run on another node.
 ## 1) Deploy (production profile)
 
 ```bash
-cp infra/storage-node/.env.example infra/storage-node/.env
+cp infra/stacks/storage-node/.env.example infra/stacks/storage-node/.env
 # fill strong secrets, MLflow DB, and Cloudflare values
-set -a; source infra/storage-node/.env; set +a
+set -a; source infra/stacks/storage-node/.env; set +a
 mkdir -p "${MINIO_DATA_DIR}" "${MLFLOW_DB_DATA_DIR}" "${BACKUP_ROOT}"
 
-docker compose --env-file infra/storage-node/.env -f infra/storage-node/docker-compose.yml build storage-gateway
-docker compose --env-file infra/storage-node/.env -f infra/storage-node/docker-compose.yml up -d
+docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml build base-runtime
+docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml build storage-gateway
+docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml up -d
 ```
 
 ## 2) Access model
@@ -43,22 +44,26 @@ docker compose --env-file infra/storage-node/.env -f infra/storage-node/docker-c
 Cloudflare side requirements for MLflow:
 
 1. Create DNS/route for `mlflow.discoverex.qzz.io` in the same tunnel
-2. Add/verify tunnel ingress for `mlflow.discoverex.qzz.io -> http://mlflow:5000`
+2. Add/verify tunnel ingress for `mlflow.discoverex.qzz.io -> http://mlflow:${MLFLOW_PORT}`
 3. Create Cloudflare Access application for `mlflow.discoverex.qzz.io`
 4. Issue Service Token and distribute only to trusted workers/clients
+
+Note: `infra/stacks/storage-node/.cloudflared/config.yml` is template-style (`__MLFLOW_PORT__`).
+`docker-compose` starts cloudflared with runtime substitution from `MLFLOW_PORT`.
 
 ## 3) Health checks
 
 ```bash
 curl -fsS http://127.0.0.1:${STORAGE_GATEWAY_PORT}/healthz
 curl -fsS http://127.0.0.1:${MINIO_API_PORT}/minio/health/live
-docker compose --env-file infra/storage-node/.env -f infra/storage-node/docker-compose.yml exec -T mlflow curl -fsS http://localhost:5000/
+docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml exec -T mlflow \
+  python -c "import os, urllib.request; p=os.environ.get('MLFLOW_PORT','5000'); urllib.request.urlopen(f'http://localhost:{p}/', timeout=3)"
 ```
 
 ## 4) MLflow verification
 
 ```bash
-set -a; source infra/storage-node/.env; set +a
+set -a; source infra/stacks/storage-node/.env; set +a
 
 # 0) DNS resolution must work before E2E full mode
 getent ahosts mlflow.discoverex.qzz.io
@@ -80,7 +85,7 @@ export MLFLOW_TRACKING_URI=https://mlflow.discoverex.qzz.io
 # - save returned object_uri values as MLflow tags (artifact_manifest_uri, artifact_stdout_uri, ...)
 ```
 
-If `scripts/e2e_orchestrator.sh --mode full` fails at `verify-full-prereqs`,
+If `scripts/e2e/e2e_orchestrator.sh --mode full` fails at `verify-full-prereqs`,
 fix `.env` keys and DNS resolution first before retrying.
 
 If it fails at `verify-mlflow-tags` with `mlflow runs/create failed: HTTP 403`,
@@ -89,21 +94,21 @@ Cloudflare Access policy is still blocking MLflow write APIs for the service tok
 ## 5) Backup (daily, retain 30 days)
 
 ```bash
-set -a; source infra/storage-node/.env; set +a
-uv run python scripts/storage_backup.py
+set -a; source infra/stacks/storage-node/.env; set +a
+uv run python scripts/ops/storage_backup.py
 ```
 
 Recommend cron:
 
 ```cron
-15 2 * * * cd /home/esillileu/discoverex/orchestrator && /usr/bin/env bash -lc 'set -a; source infra/storage-node/.env; set +a; uv run python scripts/storage_backup.py >> /home/esillileu/discoverex/data/backups/backup.log 2>&1'
+15 2 * * * cd /home/esillileu/discoverex/orchestrator && /usr/bin/env bash -lc 'set -a; source infra/stacks/storage-node/.env; set +a; uv run python scripts/ops/storage_backup.py >> /home/esillileu/discoverex/data/backups/backup.log 2>&1'
 ```
 
 ## 6) Restore drill (weekly)
 
 ```bash
-set -a; source infra/storage-node/.env; set +a
-uv run python scripts/storage_restore_drill.py
+set -a; source infra/stacks/storage-node/.env; set +a
+uv run python scripts/ops/storage_restore_drill.py
 ```
 
 This creates a temporary `restore-drill-*` bucket and verifies sampled checksums.

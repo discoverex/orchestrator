@@ -5,15 +5,16 @@ This profile registers `engine_run_flow` deployment through a one-shot container
 ## 1) Configure
 
 ```bash
-cp infra/register/.env.example infra/register/.env
-# edit infra/register/.env
+cp infra/stacks/register/.env.example infra/stacks/register/.env
+# edit infra/stacks/register/.env
 ```
 
 ## 2) Register deployment
 
 ```bash
 docker compose -f docker-compose.local.yml exec -T prefect prefect work-pool create ${PREFECT_WORK_POOL:-colab-gpu} --type process || true
-docker compose --env-file infra/register/.env -f infra/register/docker-compose.yml run --rm register
+docker compose --env-file infra/stacks/register/.env -f infra/stacks/register/docker-compose.yml build base-runtime
+docker compose --env-file infra/stacks/register/.env -f infra/stacks/register/docker-compose.yml run --rm register
 ```
 
 ## 3) Verify (optional)

@@ -25,21 +25,23 @@
 ## 2) 이미 반영된 핵심 변경
 
 1. 이미지 기반 런타임 구성
-- `infra/images/runtime.Dockerfile` (storage-gateway/worker/register targets)
-- `infra/images/worker-entrypoint.sh`
+- `infra/images/base.Dockerfile` (공통 의존성 베이스)
+- `infra/images/storage-gateway.Dockerfile`
+- `infra/images/worker.Dockerfile`
+- `infra/images/register.Dockerfile`
 - `.dockerignore`
 
 2. 컴포즈 전환
 - `docker-compose.local.yml`: storage-gateway/worker/register 이미지 기반 실행
-- `infra/storage-node/docker-compose.yml`: storage-gateway 이미지 기반 실행
+- `infra/stacks/storage-node/docker-compose.yml`: storage-gateway 이미지 기반 실행
 
 3. MLflow 기동 안정화 보강
 - `infra/images/mlflow.Dockerfile` 추가 (`psycopg2-binary` 포함)
-- `infra/storage-node/docker-compose.yml`의 `mlflow`를 위 이미지로 변경
+- `infra/stacks/storage-node/docker-compose.yml`의 `mlflow`를 위 이미지로 변경
 - `mlflow` healthcheck를 `curl` -> `python urllib`로 변경
 
 4. E2E 오케스트레이터 개선
-- `scripts/e2e_orchestrator.sh`를 컨테이너 기반 실행으로 정렬
+- `scripts/e2e/e2e_orchestrator.sh`를 컨테이너 기반 실행으로 정렬
 - `core/mlflow/full` 모드와 결과 요약(`artifacts/e2e/.../summary.json`) 유지
 
 ## 3) 지금부터 해야 할 일 (우선순위)
@@ -60,8 +62,8 @@
 
 5. 문서/운영 체크리스트 확정 (진행중)
 - `.env` 필수키와 실행 순서를 README/ops 문서에 최종 고정
-- `scripts/e2e_orchestrator.sh`에 `full` 모드 사전검증(`verify-full-prereqs`) 추가
-- `scripts/e2e_orchestrator.sh`에 `verify-mlflow-tracking-access` 추가
+- `scripts/e2e/e2e_orchestrator.sh`에 `full` 모드 사전검증(`verify-full-prereqs`) 추가
+- `scripts/e2e/e2e_orchestrator.sh`에 `verify-mlflow-tracking-access` 추가
 
 ## 4) 실행 방법 (상세)
 
@@ -85,14 +87,14 @@ rg -n '^(MLFLOW_TRACKING_URI|MLFLOW_PUBLIC_URL|CF_ACCESS_CLIENT_ID|CF_ACCESS_CLI
 ### 4.2 스토리지/터널 스택 기동
 
 ```bash
-docker compose --env-file infra/storage-node/.env -f infra/storage-node/docker-compose.yml up -d --build
+docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml up -d --build
 ```
 
 상태 확인:
 
 ```bash
-docker compose --env-file infra/storage-node/.env -f infra/storage-node/docker-compose.yml ps
-docker compose --env-file infra/storage-node/.env -f infra/storage-node/docker-compose.yml logs cloudflared --tail=80
+docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml ps
+docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml logs cloudflared --tail=80
 ```
 
 ### 4.3 DNS/접속 확인
@@ -117,13 +119,13 @@ curl -svI https://mlflow.discoverex.qzz.io \
 코어 경로:
 
 ```bash
-scripts/e2e_orchestrator.sh --mode core
+scripts/e2e/e2e_orchestrator.sh --mode core
 ```
 
 전체 경로:
 
 ```bash
-scripts/e2e_orchestrator.sh --mode full
+scripts/e2e/e2e_orchestrator.sh --mode full
 ```
 
 결과 확인:
@@ -154,4 +156,4 @@ cat "$latest/summary.json"
 - CF Access 정책에서 write API가 차단되었거나 토큰 권한이 부족
 
 4. `mlflow` unhealthy
-- `infra/storage-node/docker-compose.yml`의 `mlflow` 이미지/healthcheck 설정 확인
+- `infra/stacks/storage-node/docker-compose.yml`의 `mlflow` 이미지/healthcheck 설정 확인
