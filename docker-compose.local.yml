@@ -6,6 +6,8 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - ${MINIO_DATA_DIR:-/home/esillileu/discoverex/data/minio}:/data
     ports:
       - "${MINIO_API_PORT:-19000}:9000"
       - "${MINIO_CONSOLE_PORT:-19001}:9001"
@@ -22,7 +24,76 @@ services:
     ports:
       - "${PREFECT_API_PORT:-14200}:4200"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4200/api/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
       interval: 5s
       timeout: 3s
       retries: 30
+
+  storage-gateway:
+    build:
+      context: .
+      dockerfile: infra/images/runtime.Dockerfile
+      target: storage-gateway
+    image: orchestrator-storage-gateway:local
+    container_name: orchestrator-storage-gateway-local
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      MINIO_AUTO_CREATE_BUCKET: ${MINIO_AUTO_CREATE_BUCKET:-true}
+      ARTIFACT_BUCKET: ${ARTIFACT_BUCKET:-orchestrator-artifacts}
+      PRESIGN_TTL_DEFAULT: ${PRESIGN_TTL_DEFAULT:-900}
+      PRESIGN_TTL_MAX: ${PRESIGN_TTL_MAX:-3600}
+      PRESIGN_MODE: ${PRESIGN_MODE:-gateway}
+      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-}
+      STORAGE_URL_SIGNING_SECRET: ${STORAGE_URL_SIGNING_SECRET:-dev-url-signing-secret}
+      STORAGE_GATEWAY_TOKEN: ${STORAGE_GATEWAY_TOKEN:-dev-storage-token}
+      GATEWAY_REQUIRE_CF_ACCESS: ${GATEWAY_REQUIRE_CF_ACCESS:-false}
+      CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-}
+      CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-}
+    ports:
+      - "${STORAGE_GATEWAY_PORT:-18100}:8100"
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/images/runtime.Dockerfile
+      target: worker
+    image: orchestrator-worker:local
+    container_name: orchestrator-prefect-worker-local
+    environment:
+      PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_WORK_POOL: ${PREFECT_WORK_POOL:-colab-gpu}
+      STORAGE_GATEWAY_URL: http://storage-gateway:8100
+      STORAGE_GATEWAY_TOKEN: ${STORAGE_GATEWAY_TOKEN:-dev-storage-token}
+    depends_on:
+      prefect:
+        condition: service_healthy
+      storage-gateway:
+        condition: service_healthy
+
+  register:
+    build:
+      context: .
+      dockerfile: infra/images/runtime.Dockerfile
+      target: register
+    image: orchestrator-register:local
+    container_name: orchestrator-register-local
+    environment:
+      PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_WORK_POOL: ${PREFECT_WORK_POOL:-colab-gpu}
+      PREFECT_WORK_QUEUE: ${PREFECT_WORK_QUEUE:-default}
+      REGISTER_DEPLOYMENT_NAME: ${REGISTER_DEPLOYMENT_NAME:-engine-run}
+      REGISTER_DEPLOYMENT_VERSION: ${REGISTER_DEPLOYMENT_VERSION:-}
+    depends_on:
+      prefect:
+        condition: service_healthy
