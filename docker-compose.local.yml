@@ -1,4 +1,11 @@
 services:
+  base-runtime:
+    build:
+      context: .
+      dockerfile: infra/images/base.Dockerfile
+    image: orchestrator-base:local
+    command: ["true"]
+
   minio:
     image: minio/minio:latest
     container_name: orchestrator-minio
@@ -32,8 +39,7 @@ services:
   storage-gateway:
     build:
       context: .
-      dockerfile: infra/images/runtime.Dockerfile
-      target: storage-gateway
+      dockerfile: infra/images/storage-gateway.Dockerfile
     image: orchestrator-storage-gateway:local
     container_name: orchestrator-storage-gateway-local
     environment:
@@ -66,8 +72,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: infra/images/runtime.Dockerfile
-      target: worker
+      dockerfile: infra/images/worker.Dockerfile
     image: orchestrator-worker:local
     container_name: orchestrator-prefect-worker-local
     environment:
@@ -84,8 +89,7 @@ services:
   register:
     build:
       context: .
-      dockerfile: infra/images/runtime.Dockerfile
-      target: register
+      dockerfile: infra/images/register.Dockerfile
     image: orchestrator-register:local
     container_name: orchestrator-register-local
     environment:
