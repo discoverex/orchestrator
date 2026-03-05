@@ -10,6 +10,34 @@ require_env() {
 }
 
 require_env REMOTE_DEPLOY_PATH
+ENV_FILE_NAME="${ENV_FILE_NAME:-.env.runtime}"
+ENV_FILE_PATH="${REMOTE_DEPLOY_PATH}/${ENV_FILE_NAME}"
+
+mkdir -p "${REMOTE_DEPLOY_PATH}"
+cd "${REMOTE_DEPLOY_PATH}"
+
+if [[ ! -f "${ENV_FILE_PATH}" ]]; then
+  echo "missing env file: ${ENV_FILE_PATH}" >&2
+  exit 1
+fi
+
+cleanup_env_file() {
+  rm -f "${ENV_FILE_PATH}"
+}
+
+cleanup_all() {
+  cleanup_env_file
+  if [[ -n "${DOCKER_CONFIG:-}" ]]; then
+    rm -rf "${DOCKER_CONFIG}"
+  fi
+}
+trap cleanup_all EXIT
+
+set -a
+# shellcheck disable=SC1090
+source "${ENV_FILE_PATH}"
+set +a
+
 require_env PREFECT_SERVER_IMAGE
 require_env PREFECT_HOSTNAME
 require_env PREFECT_API_PUBLIC_URL
@@ -17,68 +45,12 @@ require_env PREFECT_DB_PASSWORD
 require_env FLUSH_TARGET_URL
 require_env FLUSH_GATEWAY_TOKEN
 
-: "${PREFECT_PORT:=4200}"
-: "${PREFECT_BIND_PORT:=14200}"
-: "${PREFECT_BIND_ADDRESS:=127.0.0.1}"
-: "${PREFECT_DB_NAME:=prefect}"
-: "${PREFECT_DB_USER:=prefect_user}"
-: "${PREFECT_DB_DATA_DIR:=/srv/orchestrator/prefect-db}"
-: "${PREFECT_MAINT_DATA_DIR:=/srv/orchestrator/prefect-maint}"
-: "${FLUSH_INTERVAL_SEC:=600}"
-: "${PRUNE_INTERVAL_SEC:=43200}"
-: "${PRUNE_TTL_HOURS:=72}"
-: "${FLUSH_PAGE_SIZE:=100}"
-: "${FLUSH_MAX_RUNS:=500}"
-: "${PRUNE_PAGE_SIZE:=200}"
-: "${PRUNE_MAX_RUNS:=1000}"
-: "${CADDY_DATA_DIR:=/srv/orchestrator/caddy/data}"
-: "${CADDY_CONFIG_DIR:=/srv/orchestrator/caddy/config}"
-
-export PREFECT_SERVER_IMAGE
-export PREFECT_HOSTNAME
-export PREFECT_PORT
-export PREFECT_BIND_PORT
-export PREFECT_BIND_ADDRESS
-export PREFECT_API_PUBLIC_URL
-export PREFECT_DB_NAME
-export PREFECT_DB_USER
-export PREFECT_DB_PASSWORD
-export PREFECT_DB_DATA_DIR
-export FLUSH_TARGET_URL
-export FLUSH_GATEWAY_TOKEN
-export PREFECT_MAINT_DATA_DIR
-export FLUSH_INTERVAL_SEC
-export PRUNE_INTERVAL_SEC
-export PRUNE_TTL_HOURS
-export FLUSH_PAGE_SIZE
-export FLUSH_MAX_RUNS
-export PRUNE_PAGE_SIZE
-export PRUNE_MAX_RUNS
-export CADDY_DATA_DIR
-export CADDY_CONFIG_DIR
-
-# Optional Cloudflare Access headers for flush target.
-if [[ -n "${FLUSH_CF_ACCESS_CLIENT_ID:-}" ]]; then
-  export FLUSH_CF_ACCESS_CLIENT_ID
-fi
-if [[ -n "${FLUSH_CF_ACCESS_CLIENT_SECRET:-}" ]]; then
-  export FLUSH_CF_ACCESS_CLIENT_SECRET
-fi
-if [[ -n "${CADDY_ACME_EMAIL:-}" ]]; then
-  export CADDY_ACME_EMAIL
-fi
-
-mkdir -p "${REMOTE_DEPLOY_PATH}"
-cd "${REMOTE_DEPLOY_PATH}"
-
 if [[ -n "${GHCR_TOKEN:-}" ]]; then
   require_env GHCR_USERNAME
-  export DOCKER_CONFIG
-  DOCKER_CONFIG="$(mktemp -d)"
-  trap 'rm -rf "${DOCKER_CONFIG}"' EXIT
+  export DOCKER_CONFIG="$(mktemp -d)"
   echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 fi
 
-docker compose pull
-docker compose up -d --wait prefect-db prefect-server prefect-maintenance caddy
-docker compose ps
+docker compose --env-file "${ENV_FILE_PATH}" pull
+docker compose --env-file "${ENV_FILE_PATH}" up -d --wait prefect-db prefect-server prefect-maintenance caddy
+docker compose --env-file "${ENV_FILE_PATH}" ps

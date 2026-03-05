@@ -81,6 +81,33 @@ jobs:
         run: |
           cp infra/stacks/prefect-server/docker-compose.yml docker-compose.yml
           cp infra/stacks/prefect-server/Caddyfile Caddyfile
+          cat > .env.runtime <<'EOF'
+          PREFECT_SERVER_IMAGE=${{ needs.build-images.outputs.image }}
+          PREFECT_HOSTNAME=${{ vars.PREFECT_HOSTNAME }}
+          PREFECT_PORT=${{ vars.PREFECT_PORT }}
+          PREFECT_BIND_PORT=${{ vars.PREFECT_BIND_PORT }}
+          PREFECT_BIND_ADDRESS=${{ vars.PREFECT_BIND_ADDRESS }}
+          PREFECT_API_PUBLIC_URL=${{ vars.PREFECT_API_PUBLIC_URL }}
+          PREFECT_DB_NAME=${{ vars.PREFECT_DB_NAME }}
+          PREFECT_DB_USER=${{ vars.PREFECT_DB_USER }}
+          PREFECT_DB_PASSWORD=${{ secrets.PREFECT_DB_PASSWORD }}
+          PREFECT_DB_DATA_DIR=${{ vars.PREFECT_DB_DATA_DIR }}
+          FLUSH_TARGET_URL=${{ vars.FLUSH_TARGET_URL }}
+          FLUSH_GATEWAY_TOKEN=${{ secrets.FLUSH_GATEWAY_TOKEN }}
+          FLUSH_CF_ACCESS_CLIENT_ID=${{ secrets.FLUSH_CF_ACCESS_CLIENT_ID }}
+          FLUSH_CF_ACCESS_CLIENT_SECRET=${{ secrets.FLUSH_CF_ACCESS_CLIENT_SECRET }}
+          PREFECT_MAINT_DATA_DIR=${{ vars.PREFECT_MAINT_DATA_DIR }}
+          FLUSH_INTERVAL_SEC=${{ vars.FLUSH_INTERVAL_SEC }}
+          PRUNE_INTERVAL_SEC=${{ vars.PRUNE_INTERVAL_SEC }}
+          PRUNE_TTL_HOURS=${{ vars.PRUNE_TTL_HOURS }}
+          FLUSH_PAGE_SIZE=${{ vars.FLUSH_PAGE_SIZE }}
+          FLUSH_MAX_RUNS=${{ vars.FLUSH_MAX_RUNS }}
+          PRUNE_PAGE_SIZE=${{ vars.PRUNE_PAGE_SIZE }}
+          PRUNE_MAX_RUNS=${{ vars.PRUNE_MAX_RUNS }}
+          CADDY_ACME_EMAIL=${{ vars.CADDY_ACME_EMAIL }}
+          CADDY_DATA_DIR=${{ vars.CADDY_DATA_DIR }}
+          CADDY_CONFIG_DIR=${{ vars.CADDY_CONFIG_DIR }}
+          EOF
 
       - name: Upload deploy assets
         uses: appleboy/scp-action@v1
@@ -88,7 +115,7 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USERNAME }}
           key: ${{ secrets.REMOTE_SSH_KEY }}
-          source: docker-compose.yml,Caddyfile
+          source: docker-compose.yml,Caddyfile,.env.runtime
           target: ${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}
 
       - name: Setup SSH key
@@ -105,31 +132,7 @@ jobs:
           ssh -i ~/.ssh/id_deploy -p "${{ vars.REMOTE_PORT || '22' }}" "${{ secrets.REMOTE_USERNAME }}@${{ secrets.REMOTE_HOST }}" \
             "set -euo pipefail; \
             export REMOTE_DEPLOY_PATH='${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}'; \
-            export PREFECT_SERVER_IMAGE='${{ needs.build-images.outputs.image }}'; \
-            export PREFECT_HOSTNAME='${{ vars.PREFECT_HOSTNAME }}'; \
-            export PREFECT_PORT='${{ vars.PREFECT_PORT }}'; \
-            export PREFECT_BIND_PORT='${{ vars.PREFECT_BIND_PORT }}'; \
-            export PREFECT_BIND_ADDRESS='${{ vars.PREFECT_BIND_ADDRESS }}'; \
-            export PREFECT_API_PUBLIC_URL='${{ vars.PREFECT_API_PUBLIC_URL }}'; \
-            export PREFECT_DB_NAME='${{ vars.PREFECT_DB_NAME }}'; \
-            export PREFECT_DB_USER='${{ vars.PREFECT_DB_USER }}'; \
-            export PREFECT_DB_PASSWORD='${{ secrets.PREFECT_DB_PASSWORD }}'; \
-            export PREFECT_DB_DATA_DIR='${{ vars.PREFECT_DB_DATA_DIR }}'; \
-            export FLUSH_TARGET_URL='${{ vars.FLUSH_TARGET_URL }}'; \
-            export FLUSH_GATEWAY_TOKEN='${{ secrets.FLUSH_GATEWAY_TOKEN }}'; \
-            export FLUSH_CF_ACCESS_CLIENT_ID='${{ secrets.FLUSH_CF_ACCESS_CLIENT_ID }}'; \
-            export FLUSH_CF_ACCESS_CLIENT_SECRET='${{ secrets.FLUSH_CF_ACCESS_CLIENT_SECRET }}'; \
-            export PREFECT_MAINT_DATA_DIR='${{ vars.PREFECT_MAINT_DATA_DIR }}'; \
-            export FLUSH_INTERVAL_SEC='${{ vars.FLUSH_INTERVAL_SEC }}'; \
-            export PRUNE_INTERVAL_SEC='${{ vars.PRUNE_INTERVAL_SEC }}'; \
-            export PRUNE_TTL_HOURS='${{ vars.PRUNE_TTL_HOURS }}'; \
-            export FLUSH_PAGE_SIZE='${{ vars.FLUSH_PAGE_SIZE }}'; \
-            export FLUSH_MAX_RUNS='${{ vars.FLUSH_MAX_RUNS }}'; \
-            export PRUNE_PAGE_SIZE='${{ vars.PRUNE_PAGE_SIZE }}'; \
-            export PRUNE_MAX_RUNS='${{ vars.PRUNE_MAX_RUNS }}'; \
-            export CADDY_ACME_EMAIL='${{ vars.CADDY_ACME_EMAIL }}'; \
-            export CADDY_DATA_DIR='${{ vars.CADDY_DATA_DIR }}'; \
-            export CADDY_CONFIG_DIR='${{ vars.CADDY_CONFIG_DIR }}'; \
+            export ENV_FILE_NAME='.env.runtime'; \
             export GHCR_USERNAME='${{ github.actor }}'; \
             export GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}'; \
             bash -s" < infra/stacks/prefect-server/deploy.sh
