@@ -98,8 +98,8 @@ collect_logs() {
   log "collecting diagnostic logs"
   docker compose -f docker-compose.local.yml ps >"${LOG_DIR}/docker-local-ps.log" 2>&1 || true
   docker compose -f docker-compose.local.yml logs --no-color >"${LOG_DIR}/docker-local.log" 2>&1 || true
-  docker compose --env-file infra/storage-node/.env -f infra/storage-node/docker-compose.yml ps >"${LOG_DIR}/docker-storage-ps.log" 2>&1 || true
-  docker compose --env-file infra/storage-node/.env -f infra/storage-node/docker-compose.yml logs --no-color >"${LOG_DIR}/docker-storage.log" 2>&1 || true
+  docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml ps >"${LOG_DIR}/docker-storage-ps.log" 2>&1 || true
+  docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml logs --no-color >"${LOG_DIR}/docker-storage.log" 2>&1 || true
   docker compose -f docker-compose.local.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls >"${LOG_DIR}/prefect-deployments.log" 2>&1 || true
 }
 
@@ -389,6 +389,7 @@ verify_full_prereqs() {
   getent ahosts "${public_host}" >/dev/null
 }
 
+run_step "build-runtime-base" docker compose -f docker-compose.local.yml build base-runtime
 run_step "build-and-up-local-services" docker compose -f docker-compose.local.yml up -d --build minio prefect storage-gateway worker
 run_step "wait-minio-health" wait_health orchestrator-minio 90
 run_step "wait-prefect-health" wait_health orchestrator-prefect 90
