@@ -95,10 +95,12 @@ Use this when this machine is dedicated Prefect control plane:
 
 ```bash
 cp infra/stacks/prefect-server/.env.example infra/stacks/prefect-server/.env
-# fill DB URL + Cloudflare values, then place tunnel credentials json under:
+# fill VM-local DB + flush + Cloudflare values, then place tunnel credentials json under:
 # infra/stacks/prefect-server/.cloudflared/
 ./bin/project prefect up
 ./bin/project prefect ps
+./bin/project prefect flush
+./bin/project prefect prune
 ```
 
 Runbook: `docs/ops/prefect-server.md`
@@ -113,6 +115,8 @@ Runbook: `docs/ops/prefect-server.md`
 ./bin/project storage down
 ./bin/project prefect up
 ./bin/project prefect logs
+./bin/project prefect flush
+./bin/project prefect prune
 ./bin/project register run
 ```
 

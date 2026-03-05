@@ -3,26 +3,23 @@
 This node runs control-plane services only:
 
 - Prefect API/UI server
+- Prefect metadata Postgres (VM-local, temporary retention)
+- Prefect maintenance worker (flush + prune)
 - Cloudflare Tunnel sidecar
 
 Workers stay fully separate and poll work from Prefect over HTTPS.
 
-## 1) Database setup (once)
+## 1) Data policy
 
-Use shared Postgres with logical separation:
-
-```sql
-\i scripts/ops/prefect_db_init.sql
-```
-
-Then set `PREFECT_API_DATABASE_CONNECTION_URL` in
-`infra/stacks/prefect-server/.env`.
+- VM is not long-term SSOT.
+- Completed flow runs are exported as full JSON snapshots to storage-node.
+- VM retention default: `PRUNE_TTL_HOURS=72` with prune twice per day.
 
 ## 2) Deploy on VM
 
 ```bash
 cp infra/stacks/prefect-server/.env.example infra/stacks/prefect-server/.env
-# set hostname, tunnel id, credentials filename, DB URL
+# set hostname, tunnel id, credentials filename, DB + flush values
 # place tunnel credentials json under infra/stacks/prefect-server/.cloudflared/
 
 ./bin/project prefect up
@@ -37,14 +34,21 @@ Remote helper flow:
 ./bin/remote prefect-ps
 ```
 
-## 3) Cloudflare model
+## 3) Manual maintenance commands
+
+```bash
+./bin/project prefect flush
+./bin/project prefect prune
+```
+
+## 4) Cloudflare model
 
 - Single tunnel can expose multiple hostnames (for example Prefect + MLflow).
 - Keep Prefect bound to localhost on VM (`127.0.0.1:${PREFECT_BIND_PORT}`).
 - Enforce Cloudflare Access app for `PREFECT_HOSTNAME`.
 - Distribute Access Service Token only to trusted workers/clients.
 
-## 4) Validation
+## 5) Validation
 
 ```bash
 curl -fsS "http://127.0.0.1:${PREFECT_BIND_PORT}/api/health"
