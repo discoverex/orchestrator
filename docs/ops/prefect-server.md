@@ -5,7 +5,6 @@ This node runs control-plane services only:
 - Prefect API/UI server
 - Prefect metadata Postgres (VM-local, temporary retention)
 - Prefect maintenance worker (flush + prune)
-- Cloudflare Tunnel sidecar
 
 Workers stay fully separate and poll work from Prefect over HTTPS.
 
@@ -19,8 +18,7 @@ Workers stay fully separate and poll work from Prefect over HTTPS.
 
 ```bash
 cp infra/stacks/prefect-server/.env.example infra/stacks/prefect-server/.env
-# set hostname, tunnel id, credentials filename, DB + flush values
-# place tunnel credentials json under infra/stacks/prefect-server/.cloudflared/
+# set PREFECT_SERVER_IMAGE + API URL + DB + flush values
 
 ./bin/project prefect up
 ./bin/project prefect ps
@@ -41,12 +39,13 @@ Remote helper flow:
 ./bin/project prefect prune
 ```
 
-## 4) Cloudflare model
+## 4) Network model
 
-- Single tunnel can expose multiple hostnames (for example Prefect + MLflow).
-- Keep Prefect bound to localhost on VM (`127.0.0.1:${PREFECT_BIND_PORT}`).
-- Enforce Cloudflare Access app for `PREFECT_HOSTNAME`.
-- Distribute Access Service Token only to trusted workers/clients.
+- Route Prefect domain with DNS A record to VM public IP.
+- Set `PREFECT_API_PUBLIC_URL` to external endpoint (`https://<domain>/api`).
+- Keep `PREFECT_BIND_ADDRESS=127.0.0.1` if reverse proxy terminates TLS on same VM.
+- If exposing Prefect container port directly, set `PREFECT_BIND_ADDRESS=0.0.0.0` and apply firewall allowlist.
+- If Cloudflare Access is used, distribute service token only to trusted workers/clients.
 
 ## 5) Validation
 
@@ -57,4 +56,4 @@ curl -fsS "http://127.0.0.1:${PREFECT_BIND_PORT}/api/health"
 
 Expected external API endpoint:
 
-`https://${PREFECT_HOSTNAME}/api`
+`https://<domain>/api`

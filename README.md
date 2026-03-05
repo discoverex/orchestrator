@@ -95,8 +95,7 @@ Use this when this machine is dedicated Prefect control plane:
 
 ```bash
 cp infra/stacks/prefect-server/.env.example infra/stacks/prefect-server/.env
-# fill VM-local DB + flush + Cloudflare values, then place tunnel credentials json under:
-# infra/stacks/prefect-server/.cloudflared/
+# fill PREFECT_SERVER_IMAGE + VM-local DB + flush values
 ./bin/project prefect up
 ./bin/project prefect ps
 ./bin/project prefect flush
