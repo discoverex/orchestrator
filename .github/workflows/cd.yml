@@ -36,22 +36,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: base
-            dockerfile: infra/images/base.Dockerfile
-          - name: storage-gateway
-            dockerfile: infra/images/storage-gateway.Dockerfile
-          - name: worker
-            dockerfile: infra/images/worker.Dockerfile
-          - name: register
-            dockerfile: infra/images/register.Dockerfile
-          - name: mlflow
-            dockerfile: infra/images/mlflow.Dockerfile
-          - name: prefect-server
-            dockerfile: infra/images/prefect-server.Dockerfile
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -66,7 +50,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.name }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/prefect-server
           tags: |
             type=sha,format=short
             type=raw,value=latest,enable={{is_default_branch}}
@@ -74,73 +58,12 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          file: infra/images/prefect-server.Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  deploy-storage-node:
-    needs: build-images
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' && vars.ENABLE_STORAGE_DEPLOY == 'true' }}
-    steps:
-      - name: Deploy storage stack
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USERNAME }}
-          key: ${{ secrets.REMOTE_SSH_KEY }}
-          port: ${{ vars.REMOTE_PORT || '22' }}
-          script: |
-            set -euo pipefail
-            cd "${{ vars.REMOTE_PROJECT_PATH }}"
-            mkdir -p infra/stacks/storage-node
-            cat > infra/stacks/storage-node/.ci.env <<'EOF'
-            MINIO_API_PORT=${{ vars.MINIO_API_PORT }}
-            MINIO_CONSOLE_PORT=${{ vars.MINIO_CONSOLE_PORT }}
-            STORAGE_GATEWAY_PORT=${{ vars.STORAGE_GATEWAY_PORT }}
-            MLFLOW_PORT=${{ vars.MLFLOW_PORT }}
-            MINIO_DATA_DIR=${{ vars.MINIO_DATA_DIR }}
-            BACKUP_ROOT=${{ vars.BACKUP_ROOT }}
-            MLFLOW_DB_DATA_DIR=${{ vars.MLFLOW_DB_DATA_DIR }}
-            MINIO_ENDPOINT=${{ vars.MINIO_ENDPOINT }}
-            MINIO_SECURE=${{ vars.MINIO_SECURE }}
-            MINIO_AUTO_CREATE_BUCKET=${{ vars.MINIO_AUTO_CREATE_BUCKET }}
-            ARTIFACT_BUCKET=${{ vars.ARTIFACT_BUCKET }}
-            PRESIGN_MODE=${{ vars.PRESIGN_MODE }}
-            PRESIGN_TTL_DEFAULT=${{ vars.PRESIGN_TTL_DEFAULT }}
-            PRESIGN_TTL_MAX=${{ vars.PRESIGN_TTL_MAX }}
-            STORAGE_EXPLORER_ENABLED=${{ vars.STORAGE_EXPLORER_ENABLED }}
-            STORAGE_EXPLORER_LOCAL_ONLY=${{ vars.STORAGE_EXPLORER_LOCAL_ONLY }}
-            STORAGE_EXPLORER_LOCAL_HOSTS=${{ vars.STORAGE_EXPLORER_LOCAL_HOSTS }}
-            STORAGE_EXPLORER_COOKIE_NAME=${{ vars.STORAGE_EXPLORER_COOKIE_NAME }}
-            STORAGE_EXPLORER_SESSION_TTL=${{ vars.STORAGE_EXPLORER_SESSION_TTL }}
-            STORAGE_EXPLORER_PAGE_SIZE=${{ vars.STORAGE_EXPLORER_PAGE_SIZE }}
-            STORAGE_PUBLIC_BASE_URL=${{ vars.STORAGE_PUBLIC_BASE_URL }}
-            BACKUP_RETENTION_DAYS=${{ vars.BACKUP_RETENTION_DAYS }}
-            GATEWAY_REQUIRE_CF_ACCESS=${{ vars.GATEWAY_REQUIRE_CF_ACCESS }}
-            MLFLOW_TRACKING_URI=${{ vars.MLFLOW_TRACKING_URI }}
-            MLFLOW_PUBLIC_URL=${{ vars.MLFLOW_PUBLIC_URL }}
-            MLFLOW_DB_NAME=${{ vars.MLFLOW_DB_NAME }}
-            MLFLOW_DB_USER=${{ secrets.MLFLOW_DB_USER }}
-            MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
-            MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
-            STORAGE_URL_SIGNING_SECRET=${{ secrets.STORAGE_URL_SIGNING_SECRET }}
-            STORAGE_GATEWAY_TOKEN=${{ secrets.STORAGE_GATEWAY_TOKEN }}
-            CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }}
-            CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-            MLFLOW_DB_PASSWORD=${{ secrets.MLFLOW_DB_PASSWORD }}
-            CF_TUNNEL_ID=${{ secrets.CF_TUNNEL_ID }}
-            CF_CREDENTIALS_FILE=${{ vars.CF_CREDENTIALS_FILE }}
-            EOF
-            mkdir -p infra/stacks/storage-node/.cloudflared
-            cat > infra/stacks/storage-node/.cloudflared/${{ vars.CF_CREDENTIALS_FILE }} <<'EOF'
-            ${{ secrets.CF_CREDENTIALS_JSON }}
-            EOF
-            docker compose --env-file infra/stacks/storage-node/.ci.env -f infra/stacks/storage-node/docker-compose.yml up -d --build
-            rm -f infra/stacks/storage-node/.ci.env
 
   deploy-prefect-server:
     needs: build-images
