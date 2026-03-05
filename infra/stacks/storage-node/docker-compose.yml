@@ -1,0 +1,131 @@
+services:
+  base-runtime:
+    build:
+      context: ../../..
+      dockerfile: infra/images/base.Dockerfile
+    image: orchestrator-base:local
+    command: ["true"]
+
+  minio:
+    image: minio/minio:latest
+    container_name: orchestrator-minio-storage
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - ${MINIO_DATA_DIR:-/srv/orchestrator/minio}:/data
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-19000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-19001}:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  storage-gateway:
+    build:
+      context: ../../..
+      dockerfile: infra/images/storage-gateway.Dockerfile
+    image: orchestrator-storage-gateway:local
+    container_name: orchestrator-storage-gateway
+    restart: unless-stopped
+    environment:
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      MINIO_AUTO_CREATE_BUCKET: ${MINIO_AUTO_CREATE_BUCKET:-true}
+      ARTIFACT_BUCKET: ${ARTIFACT_BUCKET:-orchestrator-artifacts}
+      PRESIGN_TTL_DEFAULT: ${PRESIGN_TTL_DEFAULT:-900}
+      PRESIGN_TTL_MAX: ${PRESIGN_TTL_MAX:-3600}
+      PRESIGN_MODE: ${PRESIGN_MODE:-gateway}
+      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-}
+      STORAGE_URL_SIGNING_SECRET: ${STORAGE_URL_SIGNING_SECRET:-}
+      STORAGE_GATEWAY_TOKEN: ${STORAGE_GATEWAY_TOKEN}
+      STORAGE_EXPLORER_ENABLED: ${STORAGE_EXPLORER_ENABLED:-false}
+      STORAGE_EXPLORER_LOCAL_ONLY: ${STORAGE_EXPLORER_LOCAL_ONLY:-true}
+      STORAGE_EXPLORER_LOCAL_HOSTS: ${STORAGE_EXPLORER_LOCAL_HOSTS:-127.0.0.1,::1,localhost}
+      STORAGE_EXPLORER_COOKIE_NAME: ${STORAGE_EXPLORER_COOKIE_NAME:-explorer_session}
+      STORAGE_EXPLORER_SESSION_TTL: ${STORAGE_EXPLORER_SESSION_TTL:-28800}
+      STORAGE_EXPLORER_PAGE_SIZE: ${STORAGE_EXPLORER_PAGE_SIZE:-200}
+      GATEWAY_REQUIRE_CF_ACCESS: ${GATEWAY_REQUIRE_CF_ACCESS:-true}
+      CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-}
+      CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-}
+    ports:
+      - "127.0.0.1:${STORAGE_GATEWAY_PORT:-18100}:8100"
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mlflow-db:
+    image: postgres:16
+    container_name: orchestrator-mlflow-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${MLFLOW_DB_NAME:-mlflow}
+      POSTGRES_USER: ${MLFLOW_DB_USER:-mlflow}
+      POSTGRES_PASSWORD: ${MLFLOW_DB_PASSWORD:-REPLACE_ME_DB_PASSWORD}
+    volumes:
+      - ${MLFLOW_DB_DATA_DIR:-/srv/orchestrator/mlflow-db}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MLFLOW_DB_USER:-mlflow} -d ${MLFLOW_DB_NAME:-mlflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mlflow:
+    build:
+      context: ../../..
+      dockerfile: infra/images/mlflow.Dockerfile
+    image: orchestrator-mlflow:local
+    container_name: orchestrator-mlflow
+    restart: unless-stopped
+    command:
+      - mlflow
+      - server
+      - --backend-store-uri
+      - postgresql+psycopg2://${MLFLOW_DB_USER:-mlflow}:${MLFLOW_DB_PASSWORD:-REPLACE_ME_DB_PASSWORD}@mlflow-db:5432/${MLFLOW_DB_NAME:-mlflow}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "${MLFLOW_PORT:-5000}"
+    depends_on:
+      mlflow-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import os, urllib.request; p=os.environ.get('MLFLOW_PORT','5000'); urllib.request.urlopen(f'http://localhost:{p}/', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.2.0
+    container_name: orchestrator-cloudflared
+    restart: unless-stopped
+    command:
+      - sh
+      - -lc
+      - >
+        sed "s/__MLFLOW_PORT__/${MLFLOW_PORT:-5000}/g" /etc/cloudflared/config.yml > /tmp/config.yml &&
+        cloudflared tunnel --config /tmp/config.yml run
+    volumes:
+      - ./.cloudflared:/etc/cloudflared:ro
+    depends_on:
+      storage-gateway:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy

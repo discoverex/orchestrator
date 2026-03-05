@@ -10,5 +10,7 @@ notebooks
 *.pyc
 __pycache__
 *.log
-infra/storage-node/.env
-infra/register/.env
+infra/stacks/storage-node/.env
+infra/stacks/register/.env
+infra/stacks/prefect-server/.env
+infra/stacks/*/.cloudflared/*.json

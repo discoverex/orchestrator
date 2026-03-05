@@ -12,6 +12,7 @@ Prefect-based orchestration workspace with three responsibilities:
 cp .env.example .env
 set -a; source .env; set +a
 mkdir -p "${MINIO_DATA_DIR}"
+docker compose -f docker-compose.local.yml build base-runtime
 docker compose -f docker-compose.local.yml up -d --build minio prefect storage-gateway worker
 ```
 
@@ -51,22 +52,22 @@ prefect deployment run 'engine-run/engine-run' \
 
 ## Colab worker quickstart
 
-Colab notebook is provided at `notebooks/worker_colab.ipynb`.
-
-For scripted startup in Colab:
+Primary operation should be script-first:
 
 ```bash
-PYTHONPATH=src uv run python scripts/colab_worker_runner.py start \
+PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py start \
   --checkpoint-dir /content/drive/MyDrive/orchestrator/checkpoints
 ```
 
 Other commands:
 
 ```bash
-PYTHONPATH=src uv run python scripts/colab_worker_runner.py status
-PYTHONPATH=src uv run python scripts/colab_worker_runner.py logs --tail 80
-PYTHONPATH=src uv run python scripts/colab_worker_runner.py stop
+PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py status
+PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py logs --tail 80
+PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py stop
 ```
+
+Optional notebook: `infra/stacks/worker/colab/worker_colab.ipynb`
 
 Artifact and experiment policy:
 
@@ -80,12 +81,50 @@ Artifact and experiment policy:
 Use this when this machine is dedicated storage node:
 
 ```bash
-cp infra/storage-node/.env.example infra/storage-node/.env
-set -a; source infra/storage-node/.env; set +a
-docker compose --env-file infra/storage-node/.env -f infra/storage-node/docker-compose.yml up -d
+cp infra/stacks/storage-node/.env.example infra/stacks/storage-node/.env
+set -a; source infra/stacks/storage-node/.env; set +a
+docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml build base-runtime
+docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml up -d
 ```
 
 Operational runbook: `docs/ops/storage-node.md`
+
+## Prefect server production profile (VM)
+
+Use this when this machine is dedicated Prefect control plane:
+
+```bash
+cp infra/stacks/prefect-server/.env.example infra/stacks/prefect-server/.env
+# fill DB URL + Cloudflare values, then place tunnel credentials json under:
+# infra/stacks/prefect-server/.cloudflared/
+./bin/project prefect up
+./bin/project prefect ps
+```
+
+Runbook: `docs/ops/prefect-server.md`
+
+## Project command shortcuts
+
+`bin/project` is the canonical local operator command:
+
+```bash
+./bin/project e2e full --keep-on-fail
+./bin/project storage up
+./bin/project storage down
+./bin/project prefect up
+./bin/project prefect logs
+./bin/project register run
+```
+
+`bin/remote` provides remote VM control for Prefect stack:
+
+```bash
+./bin/remote connect
+./bin/remote prefect-install
+./bin/remote prefect-up
+./bin/remote prefect-ps
+./bin/remote prefect-logs
+```
 
 ## Test
 
@@ -98,17 +137,17 @@ E2E (register -> worker -> storage, optional MLflow/external):
 
 ```bash
 # core chain (local)
-scripts/e2e_orchestrator.sh --mode core
+scripts/e2e/e2e_orchestrator.sh --mode core
 
 # core + mlflow metadata verification
-MLFLOW_TRACKING_URI=http://127.0.0.1:5000 scripts/e2e_orchestrator.sh --mode mlflow
+MLFLOW_TRACKING_URI=http://127.0.0.1:5000 scripts/e2e/e2e_orchestrator.sh --mode mlflow
 
 # full external path (Cloudflare Access)
 MLFLOW_TRACKING_URI=https://mlflow.discoverex.qzz.io \
 MLFLOW_PUBLIC_URL=https://mlflow.discoverex.qzz.io \
 CF_ACCESS_CLIENT_ID=... \
 CF_ACCESS_CLIENT_SECRET=... \
-scripts/e2e_orchestrator.sh --mode full
+scripts/e2e/e2e_orchestrator.sh --mode full
 ```
 
 `full` mode now fails fast when required env keys are missing or DNS does not resolve for
