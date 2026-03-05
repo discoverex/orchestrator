@@ -86,11 +86,26 @@ jobs:
             PREFECT_BIND_PORT=${{ vars.PREFECT_BIND_PORT }}
             PREFECT_HOSTNAME=${{ vars.PREFECT_HOSTNAME }}
             PREFECT_API_PUBLIC_URL=${{ vars.PREFECT_API_PUBLIC_URL }}
+            PREFECT_DB_NAME=${{ vars.PREFECT_DB_NAME }}
+            PREFECT_DB_USER=${{ vars.PREFECT_DB_USER }}
+            PREFECT_DB_PASSWORD=${{ secrets.PREFECT_DB_PASSWORD }}
+            PREFECT_DB_DATA_DIR=${{ vars.PREFECT_DB_DATA_DIR }}
             CF_CREDENTIALS_FILE=${{ vars.PREFECT_CF_CREDENTIALS_FILE }}
-            PREFECT_API_DATABASE_CONNECTION_URL=${{ secrets.PREFECT_API_DATABASE_CONNECTION_URL }}
             CF_TUNNEL_ID=${{ secrets.PREFECT_CF_TUNNEL_ID }}
             CF_ACCESS_CLIENT_ID=${{ secrets.CF_ACCESS_CLIENT_ID }}
             CF_ACCESS_CLIENT_SECRET=${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+            FLUSH_TARGET_URL=${{ vars.FLUSH_TARGET_URL }}
+            FLUSH_GATEWAY_TOKEN=${{ secrets.FLUSH_GATEWAY_TOKEN }}
+            FLUSH_CF_ACCESS_CLIENT_ID=${{ secrets.FLUSH_CF_ACCESS_CLIENT_ID }}
+            FLUSH_CF_ACCESS_CLIENT_SECRET=${{ secrets.FLUSH_CF_ACCESS_CLIENT_SECRET }}
+            PREFECT_MAINT_DATA_DIR=${{ vars.PREFECT_MAINT_DATA_DIR }}
+            FLUSH_INTERVAL_SEC=${{ vars.FLUSH_INTERVAL_SEC }}
+            PRUNE_INTERVAL_SEC=${{ vars.PRUNE_INTERVAL_SEC }}
+            PRUNE_TTL_HOURS=${{ vars.PRUNE_TTL_HOURS }}
+            FLUSH_PAGE_SIZE=${{ vars.FLUSH_PAGE_SIZE }}
+            FLUSH_MAX_RUNS=${{ vars.FLUSH_MAX_RUNS }}
+            PRUNE_PAGE_SIZE=${{ vars.PRUNE_PAGE_SIZE }}
+            PRUNE_MAX_RUNS=${{ vars.PRUNE_MAX_RUNS }}
             EOF
             mkdir -p infra/stacks/prefect-server/.cloudflared
             cat > infra/stacks/prefect-server/.cloudflared/${{ vars.PREFECT_CF_CREDENTIALS_FILE }} <<'EOF'

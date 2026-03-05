@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 MODE="core"
 KEEP_ON_FAIL="false"
@@ -389,6 +389,50 @@ verify_full_prereqs() {
   getent ahosts "${public_host}" >/dev/null
 }
 
+verify_prefect_flush() {
+  local out_json="${LOG_DIR}/prefect-flush.json"
+  PREFECT_API_URL="${PREFECT_API_URL}" \
+  FLUSH_TARGET_URL="${STORAGE_GATEWAY_URL}" \
+  FLUSH_GATEWAY_TOKEN="${STORAGE_GATEWAY_TOKEN}" \
+  FLUSH_CURSOR_PATH="${LOG_DIR}/prefect-flush-cursor.json" \
+  python3 scripts/ops/prefect_flush_completed.py --once --page-size 100 --max-runs 500 >"${out_json}"
+
+  python3 - <<'PY' "${out_json}" "${FLOW_RUN_ID}"
+import json
+import sys
+from pathlib import Path
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+flow_run_id = sys.argv[2]
+uploaded = payload.get("uploaded", [])
+if not any(row.get("flow_run_id") == flow_run_id for row in uploaded):
+    raise SystemExit("flush did not export current flow run")
+print("flush-ok")
+PY
+}
+
+verify_prefect_prune() {
+  local out_json="${LOG_DIR}/prefect-prune.json"
+  PREFECT_API_URL="${PREFECT_API_URL}" \
+  python3 scripts/ops/prefect_prune_completed.py --apply --ttl-hours 0 --page-size 200 --max-runs 1000 >"${out_json}"
+
+  python3 - <<'PY' "${PREFECT_API_URL}" "${FLOW_RUN_ID}"
+import sys
+from urllib import request, error
+
+api_url = sys.argv[1].rstrip("/")
+run_id = sys.argv[2]
+req = request.Request(f"{api_url}/flow_runs/{run_id}", method="GET")
+try:
+    with request.urlopen(req, timeout=10):
+        raise SystemExit("flow run still exists after prune")
+except error.HTTPError as exc:
+    if exc.code != 404:
+        raise
+print("prune-ok")
+PY
+}
+
 run_step "build-runtime-base" docker compose -f docker-compose.local.yml build base-runtime
 run_step "build-and-up-local-services" docker compose -f docker-compose.local.yml up -d --build minio prefect storage-gateway worker
 run_step "wait-minio-health" wait_health orchestrator-minio 90
@@ -420,6 +464,22 @@ if verify_storage_objects >>"${RUN_LOG}" 2>&1; then
   record_step "verify-storage-objects" "pass" "stdout/stderr/result/manifest present"
 else
   record_step "verify-storage-objects" "fail" "missing object or invalid manifest"
+  collect_logs
+  exit 1
+fi
+
+if verify_prefect_flush >>"${RUN_LOG}" 2>&1; then
+  record_step "verify-prefect-flush" "pass" "completed run snapshot uploaded"
+else
+  record_step "verify-prefect-flush" "fail" "flush missing or upload failed"
+  collect_logs
+  exit 1
+fi
+
+if verify_prefect_prune >>"${RUN_LOG}" 2>&1; then
+  record_step "verify-prefect-prune" "pass" "completed run pruned by ttl"
+else
+  record_step "verify-prefect-prune" "fail" "prune apply failed or run not deleted"
   collect_logs
   exit 1
 fi

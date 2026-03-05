@@ -29,7 +29,11 @@ set +a
 : "${CF_TUNNEL_ID:?CF_TUNNEL_ID is required}"
 : "${CF_CREDENTIALS_FILE:?CF_CREDENTIALS_FILE is required}"
 : "${PREFECT_HOSTNAME:?PREFECT_HOSTNAME is required}"
-: "${PREFECT_API_DATABASE_CONNECTION_URL:?PREFECT_API_DATABASE_CONNECTION_URL is required}"
+: "${PREFECT_DB_NAME:?PREFECT_DB_NAME is required}"
+: "${PREFECT_DB_USER:?PREFECT_DB_USER is required}"
+: "${PREFECT_DB_PASSWORD:?PREFECT_DB_PASSWORD is required}"
+: "${FLUSH_TARGET_URL:?FLUSH_TARGET_URL is required}"
+: "${FLUSH_GATEWAY_TOKEN:?FLUSH_GATEWAY_TOKEN is required}"
 
 if [[ ! -f "${STACK_DIR}/.cloudflared/${CF_CREDENTIALS_FILE}" ]]; then
   echo "missing cloudflared credentials file: ${STACK_DIR}/.cloudflared/${CF_CREDENTIALS_FILE}" >&2

@@ -17,7 +17,7 @@ usage() {
 Usage:
   project e2e [core|mlflow|full] [--keep-on-fail] [--timeout-sec N]
   project storage <up|down|ps|logs|build> [args...]
-  project prefect <up|down|ps|logs|build> [args...]
+  project prefect <up|down|ps|logs|build|flush|prune> [args...]
   project local <up|down|ps|logs|build> [args...]
   project register <run|build> [args...]
 
@@ -28,6 +28,8 @@ Examples:
   project storage down
   project storage logs --tail=120
   project prefect up
+  project prefect flush
+  project prefect prune
   project local up
   project register run
 EOF
@@ -103,6 +105,8 @@ case "${cmd}" in
       ps) run_prefect ps "$@" ;;
       logs) run_prefect logs --tail=120 "$@" ;;
       build) run_prefect build prefect-server "$@" ;;
+      flush) run_prefect run --rm prefect-maintenance python /workspace/scripts/ops/prefect_flush_completed.py --once "$@" ;;
+      prune) run_prefect run --rm prefect-maintenance python /workspace/scripts/ops/prefect_prune_completed.py --apply "$@" ;;
       *)
         echo "unknown prefect command: ${sub}" >&2
         usage

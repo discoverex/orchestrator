@@ -1,4 +1,20 @@
 services:
+  prefect-db:
+    image: postgres:16
+    container_name: orchestrator-prefect-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PREFECT_DB_NAME:-prefect}
+      POSTGRES_USER: ${PREFECT_DB_USER:-prefect_user}
+      POSTGRES_PASSWORD: ${PREFECT_DB_PASSWORD:-REPLACE_ME_PREFECT_DB_PASSWORD}
+    volumes:
+      - ${PREFECT_DB_DATA_DIR:-/srv/orchestrator/prefect-db}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PREFECT_DB_USER:-prefect_user} -d ${PREFECT_DB_NAME:-prefect}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   prefect-server:
     build:
       context: ../../..
@@ -7,11 +23,21 @@ services:
     container_name: orchestrator-prefect-server
     restart: unless-stopped
     environment:
-      PREFECT_API_DATABASE_CONNECTION_URL: ${PREFECT_API_DATABASE_CONNECTION_URL}
       PREFECT_API_URL: ${PREFECT_API_PUBLIC_URL:-}
-    command: prefect server start --host 0.0.0.0 --port ${PREFECT_PORT:-4200}
+      PREFECT_DB_NAME: ${PREFECT_DB_NAME:-prefect}
+      PREFECT_DB_USER: ${PREFECT_DB_USER:-prefect_user}
+      PREFECT_DB_PASSWORD: ${PREFECT_DB_PASSWORD:-REPLACE_ME_PREFECT_DB_PASSWORD}
+    command:
+      - sh
+      - -lc
+      - >
+        export PREFECT_API_DATABASE_CONNECTION_URL="postgresql+asyncpg://${PREFECT_DB_USER}:${PREFECT_DB_PASSWORD}@prefect-db:5432/${PREFECT_DB_NAME}" &&
+        prefect server start --host 0.0.0.0 --port ${PREFECT_PORT:-4200}
     ports:
       - "127.0.0.1:${PREFECT_BIND_PORT:-14200}:${PREFECT_PORT:-4200}"
+    depends_on:
+      prefect-db:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -23,6 +49,35 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+
+  prefect-maintenance:
+    image: orchestrator-prefect-server:local
+    container_name: orchestrator-prefect-maintenance
+    restart: unless-stopped
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    environment:
+      PREFECT_API_URL: http://prefect-server:${PREFECT_PORT:-4200}/api
+      FLUSH_TARGET_URL: ${FLUSH_TARGET_URL}
+      FLUSH_GATEWAY_TOKEN: ${FLUSH_GATEWAY_TOKEN}
+      FLUSH_CF_ACCESS_CLIENT_ID: ${FLUSH_CF_ACCESS_CLIENT_ID:-}
+      FLUSH_CF_ACCESS_CLIENT_SECRET: ${FLUSH_CF_ACCESS_CLIENT_SECRET:-}
+      FLUSH_INTERVAL_SEC: ${FLUSH_INTERVAL_SEC:-600}
+      PRUNE_INTERVAL_SEC: ${PRUNE_INTERVAL_SEC:-43200}
+      PRUNE_TTL_HOURS: ${PRUNE_TTL_HOURS:-72}
+      FLUSH_CURSOR_PATH: /var/lib/orchestrator/prefect-flush/cursor.json
+      FLUSH_PAGE_SIZE: ${FLUSH_PAGE_SIZE:-100}
+      FLUSH_MAX_RUNS: ${FLUSH_MAX_RUNS:-500}
+      PRUNE_PAGE_SIZE: ${PRUNE_PAGE_SIZE:-200}
+      PRUNE_MAX_RUNS: ${PRUNE_MAX_RUNS:-1000}
+    command:
+      - bash
+      - -lc
+      - /workspace/scripts/ops/prefect_maintenance_loop.sh
+    volumes:
+      - ../../..:/workspace:ro
+      - ${PREFECT_MAINT_DATA_DIR:-/srv/orchestrator/prefect-maint}:/var/lib/orchestrator/prefect-flush
 
   cloudflared:
     image: cloudflare/cloudflared:2026.2.0
