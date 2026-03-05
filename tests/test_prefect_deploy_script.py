@@ -27,27 +27,34 @@ def _base_env(deploy_dir: Path, bin_dir: Path) -> dict[str, str]:
     env.update(
         {
             "REMOTE_DEPLOY_PATH": str(deploy_dir),
-            "PREFECT_SERVER_IMAGE": "ghcr.io/org/orchestrator/prefect-server:sha-test",
-            "PREFECT_HOSTNAME": "prefect.example.com",
-            "PREFECT_API_PUBLIC_URL": "https://prefect.example.com/api",
-            "PREFECT_DB_PASSWORD": "pw",
-            "FLUSH_TARGET_URL": "https://storage.example.com",
-            "FLUSH_GATEWAY_TOKEN": "token",
         }
     )
     return env
+
+
+def _write_runtime_env(deploy_dir: Path, *, include_flush_token: bool = True) -> None:
+    lines = [
+        "PREFECT_SERVER_IMAGE=ghcr.io/org/orchestrator/prefect-server:sha-test",
+        "PREFECT_HOSTNAME=prefect.example.com",
+        "PREFECT_API_PUBLIC_URL=https://prefect.example.com/api",
+        "PREFECT_DB_PASSWORD=pw",
+        "FLUSH_TARGET_URL=https://storage.example.com",
+    ]
+    if include_flush_token:
+        lines.append("FLUSH_GATEWAY_TOKEN=token")
+    (deploy_dir / ".env.runtime").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def test_deploy_script_fails_when_required_env_missing(tmp_path: Path) -> None:
     deploy_dir = tmp_path / "deploy"
     deploy_dir.mkdir()
     (deploy_dir / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
+    _write_runtime_env(deploy_dir, include_flush_token=False)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     _write_fake_docker(bin_dir, tmp_path / "docker.log")
 
     env = _base_env(deploy_dir, bin_dir)
-    env.pop("FLUSH_GATEWAY_TOKEN", None)
 
     proc = subprocess.run(
         ["bash", str(SCRIPT)],
@@ -58,12 +65,14 @@ def test_deploy_script_fails_when_required_env_missing(tmp_path: Path) -> None:
     )
     assert proc.returncode != 0
     assert "missing required env: FLUSH_GATEWAY_TOKEN" in proc.stderr
+    assert not (deploy_dir / ".env.runtime").exists()
 
 
 def test_deploy_script_applies_defaults_and_runs_compose(tmp_path: Path) -> None:
     deploy_dir = tmp_path / "deploy"
     deploy_dir.mkdir()
     (deploy_dir / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
+    _write_runtime_env(deploy_dir, include_flush_token=True)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     log_path = tmp_path / "docker.log"
@@ -80,6 +89,10 @@ def test_deploy_script_applies_defaults_and_runs_compose(tmp_path: Path) -> None
 
     assert proc.returncode == 0, proc.stderr
     lines = log_path.read_text(encoding="utf-8").strip().splitlines()
-    assert any(line.startswith("compose pull") for line in lines)
-    assert any("compose up -d --wait prefect-db prefect-server prefect-maintenance caddy" in line for line in lines)
-    assert any(line.startswith("compose ps") for line in lines)
+    assert any(line.startswith("compose --env-file") and " pull" in line for line in lines)
+    assert any(
+        "compose --env-file" in line and "up -d --wait prefect-db prefect-server prefect-maintenance caddy" in line
+        for line in lines
+    )
+    assert any(line.startswith("compose --env-file") and " ps" in line for line in lines)
+    assert not (deploy_dir / ".env.runtime").exists()
