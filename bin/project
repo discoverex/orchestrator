@@ -8,10 +8,13 @@ STORAGE_ENV="${ROOT_DIR}/infra/stacks/storage-node/.env"
 STORAGE_COMPOSE="${ROOT_DIR}/infra/stacks/storage-node/docker-compose.yml"
 REGISTER_ENV="${ROOT_DIR}/infra/stacks/register/.env"
 REGISTER_COMPOSE="${ROOT_DIR}/infra/stacks/register/docker-compose.yml"
+WORKER_FIXED_ENV="${ROOT_DIR}/infra/stacks/worker/fixed/.env"
+WORKER_FIXED_COMPOSE="${ROOT_DIR}/infra/stacks/worker/fixed/docker-compose.yml"
 PREFECT_ENV="${ROOT_DIR}/infra/stacks/prefect-server/.env"
 PREFECT_COMPOSE="${ROOT_DIR}/infra/stacks/prefect-server/docker-compose.yml"
 E2E_SCRIPT="${ROOT_DIR}/scripts/e2e/e2e_orchestrator.sh"
 REMOTE_E2E_SCRIPT="${ROOT_DIR}/scripts/e2e/remote_prefect_storage_e2e.sh"
+SUBMIT_ROUTER_SCRIPT="${ROOT_DIR}/scripts/ops/prefect_submit_router.py"
 
 usage() {
   cat <<'EOF'
@@ -22,6 +25,9 @@ Usage:
   project prefect <up|down|ps|logs|build|flush|prune> [args...]
   project local <up|down|ps|logs|build> [args...]
   project register <run|build> [args...]
+  project worker fixed <up|down|ps|logs|build> [args...]
+  project worker register-gpu [args...]
+  project worker submit [router args...]
 
 Examples:
   project e2e
@@ -35,6 +41,9 @@ Examples:
   project prefect prune
   project local up
   project register run
+  project worker fixed up
+  project worker register-gpu
+  project worker submit --repo-url https://github.com/octocat/Hello-World.git --ref master
 EOF
 }
 
@@ -52,6 +61,10 @@ run_register() {
 
 run_prefect() {
   docker compose --env-file "${PREFECT_ENV}" -f "${PREFECT_COMPOSE}" "$@"
+}
+
+run_worker_fixed() {
+  docker compose --env-file "${WORKER_FIXED_ENV}" -f "${WORKER_FIXED_COMPOSE}" "$@"
 }
 
 cmd="${1:-help}"
@@ -151,6 +164,44 @@ case "${cmd}" in
       build) run_register build base-runtime register "$@" ;;
       *)
         echo "unknown register command: ${sub}" >&2
+        usage
+        exit 2
+        ;;
+    esac
+    ;;
+
+  worker)
+    sub="${1:-}"
+    shift || true
+    case "${sub}" in
+      fixed)
+        action="${1:-}"
+        shift || true
+        case "${action}" in
+          up) run_worker_fixed up -d --build "$@" ;;
+          down) run_worker_fixed down "$@" ;;
+          ps) run_worker_fixed ps "$@" ;;
+          logs) run_worker_fixed logs --tail=120 "$@" ;;
+          build) run_worker_fixed build base-runtime worker "$@" ;;
+          *)
+            echo "unknown worker fixed command: ${action}" >&2
+            usage
+            exit 2
+            ;;
+        esac
+        ;;
+      register-gpu)
+        run_register run --rm register "$@"
+        ;;
+      submit)
+        if [[ ! -x "${SUBMIT_ROUTER_SCRIPT}" ]]; then
+          echo "missing executable: ${SUBMIT_ROUTER_SCRIPT}" >&2
+          exit 1
+        fi
+        exec python3 "${SUBMIT_ROUTER_SCRIPT}" "$@"
+        ;;
+      *)
+        echo "unknown worker command: ${sub}" >&2
         usage
         exit 2
         ;;
