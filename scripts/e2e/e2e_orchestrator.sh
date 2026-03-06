@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
+source "./scripts/e2e/lib/common.sh"
 
 MODE="core"
 KEEP_ON_FAIL="false"
@@ -38,11 +39,7 @@ if ! [[ "$TIMEOUT_SEC" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-if [[ -f .env ]]; then
-  set -a
-  source .env
-  set +a
-fi
+load_env_file_if_exists ".env"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 ARTIFACT_DIR="artifacts/e2e/${STAMP}-${MODE}"
@@ -62,28 +59,9 @@ export PREFECT_API_URL PREFECT_WORK_POOL STORAGE_GATEWAY_URL STORAGE_GATEWAY_TOK
 FLOW_RUN_ID=""
 MLFLOW_RUN_ID=""
 
-log() {
-  echo "[$(date +%H:%M:%S)] $*" | tee -a "${RUN_LOG}"
-}
-
-record_step() {
-  local name="$1"
-  local status="$2"
-  local message="$3"
-  printf "%s\t%s\t%s\n" "$name" "$status" "$message" >> "${STEPS_FILE}"
-}
-
-run_step() {
-  local name="$1"
-  shift
-  log "STEP ${name}"
-  if "$@" >>"${RUN_LOG}" 2>&1; then
-    record_step "$name" "pass" "ok"
-  else
-    record_step "$name" "fail" "failed (see run.log)"
-    return 1
-  fi
-}
+log() { log_step_line "${RUN_LOG}" "$@"; }
+record_step() { record_step_line "${STEPS_FILE}" "$1" "$2" "$3"; }
+run_step() { run_step_cmd "${RUN_LOG}" "${STEPS_FILE}" "$@"; }
 
 require_env() {
   local key="$1"

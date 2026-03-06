@@ -7,20 +7,10 @@ cd "${ROOT_DIR}"
 REGISTER_ENV="${ROOT_DIR}/infra/stacks/register/.env"
 REGISTER_COMPOSE="${ROOT_DIR}/infra/stacks/register/docker-compose.yml"
 VERIFY_SCRIPT="${ROOT_DIR}/scripts/e2e/verify_remote_chain.py"
+source "${ROOT_DIR}/scripts/e2e/lib/common.sh"
 
-if [[ -f "${ROOT_DIR}/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "${ROOT_DIR}/.env"
-  set +a
-fi
-
-if [[ -f "${ROOT_DIR}/infra/stacks/storage-node/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "${ROOT_DIR}/infra/stacks/storage-node/.env"
-  set +a
-fi
+load_env_file_if_exists "${ROOT_DIR}/.env"
+load_env_file_if_exists "${ROOT_DIR}/infra/stacks/storage-node/.env"
 
 PREFECT_API_URL="${PREFECT_API_URL:-}"
 PREFECT_WORK_POOL="${PREFECT_WORK_POOL:-gpu-pool}"
@@ -175,28 +165,9 @@ SUMMARY_FILE="${ARTIFACT_DIR}/summary.json"
 mkdir -p "${LOG_DIR}"
 touch "${STEPS_FILE}"
 
-log() {
-  echo "[$(date +%H:%M:%S)] $*" | tee -a "${RUN_LOG}"
-}
-
-record_step() {
-  local name="$1"
-  local status="$2"
-  local message="$3"
-  printf "%s\t%s\t%s\n" "$name" "$status" "$message" >> "${STEPS_FILE}"
-}
-
-run_step() {
-  local name="$1"
-  shift
-  log "STEP ${name}"
-  if "$@" >>"${RUN_LOG}" 2>&1; then
-    record_step "${name}" "pass" "ok"
-    return 0
-  fi
-  record_step "${name}" "fail" "failed (see run.log)"
-  return 1
-}
+log() { log_step_line "${RUN_LOG}" "$@"; }
+record_step() { record_step_line "${STEPS_FILE}" "$1" "$2" "$3"; }
+run_step() { run_step_cmd "${RUN_LOG}" "${STEPS_FILE}" "$@"; }
 
 run_register_compose() {
   if [[ -f "${REGISTER_ENV}" ]]; then

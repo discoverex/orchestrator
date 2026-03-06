@@ -2,12 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-if [[ -f "${ROOT_DIR}/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "${ROOT_DIR}/.env"
-  set +a
-fi
+source "${ROOT_DIR}/bin/lib/remote_lib.sh"
+load_remote_env "${ROOT_DIR}"
 
 COMMAND="${1:-}"
 shift || true
@@ -18,44 +14,11 @@ GITHUB_DEPLOY_KEY_PATH="${GITHUB_DEPLOY_KEY_PATH:-}"
 REMOTE_PROJECT_PATH="${REMOTE_PROJECT_PATH:-}"
 REMOTE_PREFECT_PATH="${REMOTE_PREFECT_PATH:-/opt/services/orchestrator-prefect}"
 
-if [[ -n "${GITHUB_DEPLOY_KEY_PATH}" && "${GITHUB_DEPLOY_KEY_PATH}" == "~/"* ]]; then
-  GITHUB_DEPLOY_KEY_PATH="${HOME}/${GITHUB_DEPLOY_KEY_PATH#~/}"
-fi
-
-if [[ -z "${REMOTE_PROJECT_PATH}" && -n "${REMOTE_USERNAME}" ]]; then
-  REMOTE_PROJECT_PATH="/home/${REMOTE_USERNAME}/discoverex/orchestrator"
-fi
+GITHUB_DEPLOY_KEY_PATH="$(normalize_deploy_key_path "${GITHUB_DEPLOY_KEY_PATH}")"
+REMOTE_PROJECT_PATH="$(ensure_remote_project_path "${REMOTE_PROJECT_PATH}" "${REMOTE_USERNAME}")"
 
 PREFECT_ENV="infra/stacks/prefect-server/.env"
 PREFECT_COMPOSE="infra/stacks/prefect-server/docker-compose.yml"
-
-require_remote_env() {
-  : "${REMOTE_USERNAME:?REMOTE_USERNAME is required}"
-  : "${REMOTE_HOST:?REMOTE_HOST is required}"
-  : "${GITHUB_DEPLOY_KEY_PATH:?GITHUB_DEPLOY_KEY_PATH is required}"
-}
-
-remote_exec() {
-  require_remote_env
-  ssh -i "${GITHUB_DEPLOY_KEY_PATH}" "${REMOTE_USERNAME}@${REMOTE_HOST}" "$@"
-}
-
-remote_project_exec() {
-  local cmd="$1"
-  : "${REMOTE_PROJECT_PATH:?REMOTE_PROJECT_PATH is required}"
-  local qpath
-  qpath="${REMOTE_PROJECT_PATH//\'/\'\\\'\'}"
-  remote_exec "cd '${qpath}' && ${cmd}"
-}
-
-join_quoted() {
-  local out=""
-  local arg
-  for arg in "$@"; do
-    out+=" $(printf "%q" "${arg}")"
-  done
-  printf "%s" "${out}"
-}
 
 usage() {
   cat <<'EOF'
@@ -75,10 +38,6 @@ Examples:
   remote worker ps
   remote worker logs
 EOF
-}
-
-remote_prefect_worker_ls() {
-  remote_exec "cd '${REMOTE_PREFECT_PATH}' && if [[ -f '${PREFECT_ENV}' ]]; then set -a; source '${PREFECT_ENV}'; set +a; fi; pools=\"\${REMOTE_WORKER_POOLS:-gpu-pool,colab-gpu}\"; IFS=',' read -r -a arr <<< \"\$pools\"; for p in \"\${arr[@]}\"; do echo \"== \$p ==\"; curl -fsS -H 'Content-Type: application/json' -d '{\"limit\":100,\"offset\":0}' \"http://127.0.0.1:\${PREFECT_BIND_PORT:-14200}/api/work_pools/\$p/workers/filter\" || true; echo; echo; done"
 }
 
 case "${COMMAND}" in
