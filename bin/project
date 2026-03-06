@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_ROOT_DEFAULT="$(cd "${ROOT_DIR}/.." && pwd)/runtime"
 RUNTIME_ROOT="${RUNTIME_ROOT:-${RUNTIME_ROOT_DEFAULT}}"
+source "${ROOT_DIR}/bin/lib/project_lib.sh"
 
 LOCAL_COMPOSE="${ROOT_DIR}/docker-compose.local.yml"
 STORAGE_ENV="${ROOT_DIR}/infra/stacks/storage-node/.env"
@@ -53,57 +54,6 @@ Examples:
 EOF
 }
 
-run_storage() {
-  docker compose --env-file "${STORAGE_ENV}" -f "${STORAGE_COMPOSE}" "$@"
-}
-
-run_local() {
-  docker compose -f "${LOCAL_COMPOSE}" "$@"
-}
-
-run_register() {
-  docker compose --env-file "${REGISTER_ENV}" -f "${REGISTER_COMPOSE}" "$@"
-}
-
-run_prefect() {
-  docker compose --env-file "${PREFECT_ENV}" -f "${PREFECT_COMPOSE}" "$@"
-}
-
-run_worker_fixed() {
-  docker compose --env-file "${WORKER_FIXED_ENV}" -f "${WORKER_FIXED_COMPOSE}" "$@"
-}
-
-build_base_runtime() {
-  docker build -f "${ROOT_DIR}/infra/images/base.Dockerfile" -t orchestrator-base:local "$@" "${ROOT_DIR}"
-}
-
-runtime_init() {
-  local target="${1:-all}"
-  case "${target}" in
-    storage)
-      mkdir -p "${RUNTIME_ROOT}/storage/data/minio" \
-        "${RUNTIME_ROOT}/storage/data/mlflow-db" \
-        "${RUNTIME_ROOT}/storage/backup" \
-        "${RUNTIME_ROOT}/storage/logs"
-      echo "runtime storage initialized: ${RUNTIME_ROOT}/storage"
-      ;;
-    worker)
-      mkdir -p "${RUNTIME_ROOT}/worker/checkpoints" \
-        "${RUNTIME_ROOT}/worker/logs"
-      echo "runtime worker initialized: ${RUNTIME_ROOT}/worker"
-      ;;
-    all)
-      runtime_init storage
-      runtime_init worker
-      ;;
-    *)
-      echo "unknown runtime init target: ${target}" >&2
-      usage
-      exit 2
-      ;;
-  esac
-}
-
 cmd="${1:-help}"
 shift || true
 
@@ -113,10 +63,7 @@ case "${cmd}" in
     ;;
 
   e2e)
-    if [[ ! -x "${E2E_SCRIPT}" ]]; then
-      echo "missing executable: ${E2E_SCRIPT}" >&2
-      exit 1
-    fi
+    require_executable "${E2E_SCRIPT}" || exit 1
     mode="${1:-}"
     case "${mode}" in
       core|mlflow|full)
@@ -133,18 +80,8 @@ case "${cmd}" in
     ;;
 
   e2e-remote)
-    if [[ ! -x "${REMOTE_E2E_SCRIPT}" ]]; then
-      echo "missing executable: ${REMOTE_E2E_SCRIPT}" >&2
-      exit 1
-    fi
-    prune_arg_present="false"
-    for arg in "$@"; do
-      if [[ "${arg}" == "--prune-mode" || "${arg}" == --prune-mode=* ]]; then
-        prune_arg_present="true"
-        break
-      fi
-    done
-    if [[ "${prune_arg_present}" == "false" ]]; then
+    require_executable "${REMOTE_E2E_SCRIPT}" || exit 1
+    if ! has_prune_mode_arg "$@"; then
       exec "${REMOTE_E2E_SCRIPT}" --prune-mode dry-run "$@"
     fi
     exec "${REMOTE_E2E_SCRIPT}" "$@"
@@ -247,7 +184,11 @@ case "${cmd}" in
     shift || true
     case "${sub}" in
       init)
-        runtime_init "${1:-all}"
+        if ! runtime_init_target "${1:-all}"; then
+          echo "unknown runtime init target: ${1:-all}" >&2
+          usage
+          exit 2
+        fi
         ;;
       *)
         echo "unknown runtime command: ${sub}" >&2
@@ -284,10 +225,7 @@ case "${cmd}" in
         run_register run --rm register "$@"
         ;;
       submit)
-        if [[ ! -x "${SUBMIT_ROUTER_SCRIPT}" ]]; then
-          echo "missing executable: ${SUBMIT_ROUTER_SCRIPT}" >&2
-          exit 1
-        fi
+        require_executable "${SUBMIT_ROUTER_SCRIPT}" || exit 1
         exec python3 "${SUBMIT_ROUTER_SCRIPT}" "$@"
         ;;
       *)
