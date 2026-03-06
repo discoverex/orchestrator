@@ -16,6 +16,7 @@ REMOTE_USERNAME="${REMOTE_USERNAME:-}"
 REMOTE_HOST="${REMOTE_HOST:-}"
 GITHUB_DEPLOY_KEY_PATH="${GITHUB_DEPLOY_KEY_PATH:-}"
 REMOTE_PROJECT_PATH="${REMOTE_PROJECT_PATH:-}"
+REMOTE_PREFECT_PATH="${REMOTE_PREFECT_PATH:-/opt/services/orchestrator-prefect}"
 
 if [[ -n "${GITHUB_DEPLOY_KEY_PATH}" && "${GITHUB_DEPLOY_KEY_PATH}" == "~/"* ]]; then
   GITHUB_DEPLOY_KEY_PATH="${HOME}/${GITHUB_DEPLOY_KEY_PATH#~/}"
@@ -64,13 +65,20 @@ Usage:
   remote dump
   remote prefect-install
   remote prefect <docker-compose-args...>
+  remote worker <ps|logs> [args...]
 
 Examples:
   remote prefect up -d --build
   remote prefect down
   remote prefect ps
   remote prefect logs --tail=200 prefect-server
+  remote worker ps
+  remote worker logs
 EOF
+}
+
+remote_prefect_worker_ls() {
+  remote_exec "cd '${REMOTE_PREFECT_PATH}' && if [[ -f '${PREFECT_ENV}' ]]; then set -a; source '${PREFECT_ENV}'; set +a; fi; pools=\"\${REMOTE_WORKER_POOLS:-gpu-pool,colab-gpu}\"; IFS=',' read -r -a arr <<< \"\$pools\"; for p in \"\${arr[@]}\"; do echo \"== \$p ==\"; curl -fsS -H 'Content-Type: application/json' -d '{\"limit\":100,\"offset\":0}' \"http://127.0.0.1:\${PREFECT_BIND_PORT:-14200}/api/work_pools/\$p/workers/filter\" || true; echo; echo; done"
 }
 
 case "${COMMAND}" in
@@ -98,6 +106,25 @@ case "${COMMAND}" in
     fi
     remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE}$(join_quoted "$@")"
     ;;
+  worker)
+    sub="${1:-}"
+    shift || true
+    case "${sub}" in
+      ps)
+        remote_prefect_worker_ls
+        ;;
+      logs)
+        echo "Prefect API does not expose worker process logs directly."
+        echo "Showing current registered workers instead:"
+        remote_prefect_worker_ls
+        ;;
+      *)
+        echo "unknown worker command: ${sub}" >&2
+        usage
+        exit 1
+        ;;
+    esac
+    ;;
   # Backward-compatible aliases
   prefect-up)
     remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE} up -d --build"
@@ -110,6 +137,14 @@ case "${COMMAND}" in
     ;;
   prefect-logs)
     remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE} logs --tail=120$(join_quoted "$@")"
+    ;;
+  worker-ps)
+    remote_prefect_worker_ls
+    ;;
+  worker-logs)
+    echo "Prefect API does not expose worker process logs directly."
+    echo "Showing current registered workers instead:"
+    remote_prefect_worker_ls
     ;;
   *)
     usage
