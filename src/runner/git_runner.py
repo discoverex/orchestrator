@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+from hashlib import sha256
 from pathlib import Path
 from tempfile import mkdtemp
 
@@ -22,6 +23,51 @@ def _run(cmd: list[str], cwd: Path | None = None) -> str:
     if proc.returncode != 0:
         raise RunnerError(f"command failed: {' '.join(cmd)}\n{proc.stderr.strip()}")
     return proc.stdout.strip()
+
+
+def _repo_cache_root() -> Path:
+    return Path(os.getenv("ORCH_REPO_CACHE_DIR", "/tmp/orchestrator-repo-cache"))
+
+
+def _repo_cache_path(repo_url: str) -> Path:
+    key = sha256(repo_url.encode("utf-8")).hexdigest()[:16]
+    return _repo_cache_root() / key
+
+
+def _prepare_cached_repo(repo_url: str, resolved_commit: str) -> Path:
+    cache_root = _repo_cache_root()
+    cache_root.mkdir(parents=True, exist_ok=True)
+    cache_repo = _repo_cache_path(repo_url)
+
+    if (cache_repo / ".git").exists():
+        _run(["git", "fetch", "--all", "--tags", "--prune"], cwd=cache_repo)
+    else:
+        if cache_repo.exists():
+            shutil.rmtree(cache_repo, ignore_errors=True)
+        _run(["git", "clone", "--filter=blob:none", repo_url, str(cache_repo)])
+
+    _run(["git", "checkout", "--detach", resolved_commit], cwd=cache_repo)
+    _run(["git", "reset", "--hard"], cwd=cache_repo)
+    _run(["git", "clean", "-fdx"], cwd=cache_repo)
+    return cache_repo
+
+
+def _prepare_per_repo_venv(workdir: Path, merged_env: dict[str, str]) -> None:
+    uv_bin = shutil.which("uv")
+    if not uv_bin:
+        return
+
+    venv_dir = workdir / ".venv"
+    merged_env["UV_PROJECT_ENVIRONMENT"] = str(venv_dir)
+    merged_env["PATH"] = f"{venv_dir / 'bin'}:{merged_env.get('PATH', '')}"
+
+    if not (workdir / "pyproject.toml").exists():
+        return
+
+    sync_cmd = [uv_bin, "sync", "--frozen"] if (workdir / "uv.lock").exists() else [uv_bin, "sync"]
+    proc = subprocess.run(sync_cmd, cwd=workdir, env=merged_env, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RunnerError(f"venv setup failed: {' '.join(sync_cmd)}\n{proc.stderr.strip()}")
 
 
 def resolve_commit(repo_url: str, ref: str) -> str:
@@ -65,7 +111,8 @@ def run_entrypoint(
             raise RunnerError("repo_url is required when run_mode=repo")
         if not resolved_commit:
             raise RunnerError("resolved_commit is required when run_mode=repo")
-        _run(["git", "clone", "--filter=blob:none", repo_url, str(workdir)])
+        cached_repo = _prepare_cached_repo(repo_url, resolved_commit)
+        _run(["git", "clone", "--no-checkout", str(cached_repo), str(workdir)])
         _run(["git", "checkout", resolved_commit], cwd=workdir)
     elif run_mode == "inline":
         if config_rel_path:
@@ -105,6 +152,9 @@ def run_entrypoint(
 
     if env:
         merged_env.update(env)
+
+    if run_mode == "repo":
+        _prepare_per_repo_venv(workdir, merged_env)
 
     with (
         stdout_path.open("w", encoding="utf-8") as stdout_f,
