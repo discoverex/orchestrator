@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+from datetime import datetime
+from enum import Enum
+
+from pydantic import BaseModel, Field
+
+
+class ArtifactKind(str, Enum):
+    stdout = "stdout"
+    stderr = "stderr"
+    result = "result"
+    manifest = "manifest"
+    custom = "custom"
+
+
+DEFAULT_FILENAMES: dict[ArtifactKind, str] = {
+    ArtifactKind.stdout: "stdout.log",
+    ArtifactKind.stderr: "stderr.log",
+    ArtifactKind.result: "result.json",
+    ArtifactKind.manifest: "artifacts.json",
+    ArtifactKind.custom: "artifact.bin",
+}
+
+
+class PresignRequest(BaseModel):
+    flow_run_id: str = Field(min_length=1)
+    attempt: int = Field(ge=1)
+    kind: ArtifactKind
+    filename: str | None = None
+    ttl_seconds: int | None = Field(default=None, gt=0)
+
+
+class BatchPresignRequest(BaseModel):
+    flow_run_id: str = Field(min_length=1)
+    attempt: int = Field(ge=1)
+    entries: list[PresignRequest] = Field(min_length=1)
+
+
+class PresignResponse(BaseModel):
+    kind: ArtifactKind
+    object_uri: str
+    url: str
+    expires_at: datetime
+
+
+class HeadRequest(BaseModel):
+    object_uri: str
+
+
+class HeadResponse(BaseModel):
+    exists: bool
+    size: int | None = None

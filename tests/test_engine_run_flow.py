@@ -9,12 +9,12 @@ from flows.engine_run_flow import ArtifactLink, upload_outputs_task
 
 def test_upload_outputs_task_skips_already_uploaded(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
     uploads: list[Path] = []
-    engine_run_flow_module = importlib.import_module("flows.engine_run_flow")
+    tasks_module = importlib.import_module("flows.engine_run.tasks")
 
-    def _fake_upload(_url: str, path: Path) -> None:
-        uploads.append(path)
+    def _fake_upload(_url: str, payload: bytes) -> None:
+        uploads.append(tmp_path / f"payload-{len(payload)}")
 
-    monkeypatch.setattr(engine_run_flow_module, "_upload_file", _fake_upload)
+    monkeypatch.setattr(tasks_module, "upload_file", _fake_upload)
 
     stdout = tmp_path / "stdout.log"
     stderr = tmp_path / "stderr.log"
