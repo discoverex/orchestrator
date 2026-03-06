@@ -32,16 +32,16 @@ Core interaction path:
 cp .env.example .env
 set -a; source .env; set +a
 mkdir -p "${MINIO_DATA_DIR}"
-docker compose -f docker-compose.local.yml build base-runtime
-docker compose -f docker-compose.local.yml up -d --build minio prefect storage-gateway worker
+docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml build base-runtime
+docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml up -d --build minio prefect storage-gateway worker
 ```
 
 Register deployment and run:
 
 ```bash
-docker compose -f docker-compose.local.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect work-pool create ${PREFECT_WORK_POOL:-gpu-pool} --type process || true
-docker compose -f docker-compose.local.yml run --rm register
-docker compose -f docker-compose.local.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment run 'engine-run/engine-run' \
+docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect work-pool create colab-gpu --type process || true
+docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml run --rm register
+docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment run 'engine-run/engine-run' \
   -p repo_url='https://github.com/octocat/Hello-World.git' \
   -p ref='master' \
   -p entrypoint='["/bin/sh","-lc","echo hello-prefect"]'
@@ -50,8 +50,8 @@ docker compose -f docker-compose.local.yml exec -T -e PREFECT_API_URL=http://127
 Inspect deployment and workers:
 
 ```bash
-docker compose -f docker-compose.local.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls
-docker compose -f docker-compose.local.yml logs worker --tail=80
+docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls
+docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml logs worker --tail=80
 ```
 
 `engine_run_flow` supports optional checkpoint resume parameters:
@@ -175,17 +175,17 @@ E2E (register -> worker -> storage, optional MLflow/external):
 
 ```bash
 # core chain (local)
-scripts/e2e/e2e_orchestrator.sh --mode core
+scripts/e2e/e2e_local_orchestrator.sh --mode core
 
 # core + mlflow metadata verification
-MLFLOW_TRACKING_URI=http://127.0.0.1:5000 scripts/e2e/e2e_orchestrator.sh --mode mlflow
+MLFLOW_TRACKING_URI=http://127.0.0.1:5000 scripts/e2e/e2e_local_orchestrator.sh --mode mlflow
 
 # full external path (Cloudflare Access)
 MLFLOW_TRACKING_URI=https://mlflow.discoverex.qzz.io \
 MLFLOW_PUBLIC_URL=https://mlflow.discoverex.qzz.io \
 CF_ACCESS_CLIENT_ID=... \
 CF_ACCESS_CLIENT_SECRET=... \
-scripts/e2e/e2e_orchestrator.sh --mode full
+scripts/e2e/e2e_local_orchestrator.sh --mode full
 ```
 
 `full` mode now fails fast when required env keys are missing or DNS does not resolve for
@@ -201,7 +201,7 @@ curl -fsSI https://mlflow.discoverex.qzz.io \
   -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}"
 ```
 
-If `verify-mlflow-tags` fails with `mlflow runs/create failed: HTTP 403`, adjust
+If `mlflow.verify_tags` fails with `mlflow runs/create failed: HTTP 403`, adjust
 Cloudflare Access policy to allow MLflow write APIs for the configured service token.
 
 Remote Prefect + local storage E2E (production-worker oriented):

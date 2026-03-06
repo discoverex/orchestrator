@@ -57,7 +57,7 @@ Optional additional gateway protection:
 
 ## E2E Acceptance (Register -> Worker -> Storage)
 
-The deterministic script `scripts/e2e/e2e_orchestrator.sh` verifies the full orchestration chain in three modes:
+The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the full orchestration chain in three modes:
 
 - `core`: deployment register, worker execution, object persistence in MinIO
 - `mlflow`: `core` + MLflow run tag linkage (`artifact_*_uri`)
