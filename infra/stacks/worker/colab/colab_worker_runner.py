@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import os
 import signal
 import subprocess
@@ -10,6 +11,7 @@ from pathlib import Path
 DEFAULT_PID_PATH = Path("/tmp/orchestrator-colab-worker.pid")
 DEFAULT_LOG_PATH = Path("/tmp/orchestrator-colab-worker.log")
 DEFAULT_CHECKPOINT_DIR = Path("/content/drive/MyDrive/orchestrator/checkpoints")
+DEFAULT_REQUIREMENTS_PATH = Path("infra/stacks/worker/colab/requirements-colab.txt")
 
 REQUIRED_ENV = (
     "PREFECT_API_URL",
@@ -26,6 +28,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--log-file", default=str(DEFAULT_LOG_PATH))
     parser.add_argument("--tail", type=int, default=120, help="Used by logs command.")
     parser.add_argument("--checkpoint-dir", default=str(DEFAULT_CHECKPOINT_DIR))
+    parser.add_argument("--requirements-file", default=str(DEFAULT_REQUIREMENTS_PATH))
+    parser.add_argument("--skip-install", action="store_true", help="Skip pip bootstrap even if Prefect is missing.")
     return parser.parse_args()
 
 
@@ -47,11 +51,33 @@ def _prefect_env() -> dict[str, str]:
     env = os.environ.copy()
     pythonpath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = f"src:{pythonpath}" if pythonpath else "src"
+    env.setdefault("PREFECT_WORK_QUEUE", "gpu-colab")
     return env
 
 
 def _run(cmd: list[str], env: dict[str, str] | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
     return subprocess.run(cmd, check=check, text=True, capture_output=True, env=env)
+
+
+def _prefect_compatible_installed() -> bool:
+    try:
+        ver = importlib.metadata.version("prefect")
+    except importlib.metadata.PackageNotFoundError:
+        return False
+    major = ver.split(".", 1)[0]
+    return major.isdigit() and int(major) >= 3
+
+
+def _ensure_colab_dependencies(requirements_file: Path, skip_install: bool) -> None:
+    if _prefect_compatible_installed():
+        return
+    if skip_install:
+        raise RuntimeError("prefect>=3 is required but not installed (and --skip-install was set)")
+    if not requirements_file.exists():
+        raise RuntimeError(f"requirements file not found: {requirements_file}")
+    _run([sys.executable, "-m", "pip", "install", "-r", str(requirements_file)], check=True)
+    if not _prefect_compatible_installed():
+        raise RuntimeError("prefect>=3 install failed")
 
 
 def _read_pid(path: Path) -> int | None:
@@ -71,16 +97,17 @@ def _is_running(pid: int) -> bool:
         return False
 
 
-def start(pid_file: Path, log_file: Path, checkpoint_dir: Path) -> int:
+def start(pid_file: Path, log_file: Path, checkpoint_dir: Path, requirements_file: Path, skip_install: bool) -> int:
     _require_env()
     _ensure_drive_checkpoint_dir(checkpoint_dir)
+    _ensure_colab_dependencies(requirements_file, skip_install)
     env = _prefect_env()
 
-    _run(["uv", "run", "prefect", "config", "set", f"PREFECT_API_URL={env['PREFECT_API_URL']}"], env=env)
+    _run([sys.executable, "-m", "prefect", "config", "set", f"PREFECT_API_URL={env['PREFECT_API_URL']}"], env=env)
     _run(
         [
-            "uv",
-            "run",
+            sys.executable,
+            "-m",
             "prefect",
             "work-pool",
             "create",
@@ -101,13 +128,15 @@ def start(pid_file: Path, log_file: Path, checkpoint_dir: Path) -> int:
     with log_file.open("a", encoding="utf-8") as logf:
         proc = subprocess.Popen(
             [
-                "uv",
-                "run",
+                sys.executable,
+                "-m",
                 "prefect",
                 "worker",
                 "start",
                 "--pool",
                 env["PREFECT_WORK_POOL"],
+                "--work-queue",
+                env["PREFECT_WORK_QUEUE"],
                 "--type",
                 "process",
             ],
@@ -166,9 +195,10 @@ def main() -> int:
     pid_file = Path(args.pid_file)
     log_file = Path(args.log_file)
     checkpoint_dir = Path(args.checkpoint_dir)
+    requirements_file = Path(args.requirements_file)
     try:
         if args.command == "start":
-            return start(pid_file, log_file, checkpoint_dir)
+            return start(pid_file, log_file, checkpoint_dir, requirements_file, args.skip_install)
         if args.command == "status":
             return status(pid_file)
         if args.command == "logs":
