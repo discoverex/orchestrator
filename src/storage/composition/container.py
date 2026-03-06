@@ -16,7 +16,8 @@ def build_storage_app_from_env() -> StorageApplicationService:
         access_key=access_key,
         secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin"),
         secure=os.getenv("MINIO_SECURE", "false").lower() == "true",
-        auto_create_bucket=os.getenv("MINIO_AUTO_CREATE_BUCKET", "true").lower() == "true",
+        auto_create_bucket=os.getenv("MINIO_AUTO_CREATE_BUCKET", "true").lower()
+        == "true",
     )
     signer = HmacTokenSigner(secret=signer_secret)
     return StorageApplicationService(

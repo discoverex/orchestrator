@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
-from fastapi import FastAPI
-from fastapi import Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 
 
 class GatewayAuthState(Protocol):
@@ -26,16 +26,23 @@ def authorize(
         return
     if not app_state.cf_client_id or not app_state.cf_client_secret:
         raise HTTPException(status_code=500, detail="cf_access_not_configured")
-    if cf_access_client_id != app_state.cf_client_id or cf_access_client_secret != app_state.cf_client_secret:
+    if (
+        cf_access_client_id != app_state.cf_client_id
+        or cf_access_client_secret != app_state.cf_client_secret
+    ):
         raise HTTPException(status_code=403, detail="cf_access_forbidden")
 
 
-def authorize_dependency(app: FastAPI) -> Callable[[str | None, str | None, str | None], None]:
+def authorize_dependency(
+    app: FastAPI,
+) -> Callable[[str | None, str | None, str | None], None]:
     def _authorize(
         authorization: str | None = Header(default=None),
         cf_access_client_id: str | None = Header(default=None),
         cf_access_client_secret: str | None = Header(default=None),
     ) -> None:
-        authorize(app.state, authorization, cf_access_client_id, cf_access_client_secret)
+        authorize(
+            app.state, authorization, cf_access_client_id, cf_access_client_secret
+        )
 
     return _authorize

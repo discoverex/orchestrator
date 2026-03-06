@@ -5,8 +5,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any, cast
 
-import deployments.register as register
 import pytest
+
+import deployments.register as register
 
 
 class _FakeSourceFlow:
@@ -54,7 +55,9 @@ def test_dual_mode_registers_fixed_and_colab(monkeypatch: pytest.MonkeyPatch) ->
     assert fake.calls[1]["work_queue_name"] == "gpu-colab"
 
 
-def test_single_mode_registers_compat_deployment(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_single_mode_registers_compat_deployment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     fake = _FakeSourceFlow()
     monkeypatch.setattr(
         register,

@@ -18,7 +18,14 @@ class FakeMinio:
     def make_bucket(self, bucket: str) -> None:
         self.buckets.add(bucket)
 
-    def put_object(self, bucket: str, object_key: str, data: BinaryIO, length: int, content_type: str) -> None:
+    def put_object(
+        self,
+        bucket: str,
+        object_key: str,
+        data: BinaryIO,
+        length: int,
+        content_type: str,
+    ) -> None:
         _ = content_type
         self.objects.append((bucket, object_key, data.read(length)))
 
@@ -26,7 +33,12 @@ class FakeMinio:
         return []
 
     def list_objects(
-        self, *, bucket_name: str, prefix: str, recursive: bool, start_after: str | None = None
+        self,
+        *,
+        bucket_name: str,
+        prefix: str,
+        recursive: bool,
+        start_after: str | None = None,
     ) -> list[Any]:
         _ = (bucket_name, prefix, recursive, start_after)
         return []
@@ -45,7 +57,9 @@ class FakeMinio:
         _ = (bucket, object_key)
         return object()
 
-    def get_presigned_url(self, method: str, bucket: str, object_key: str, *, expires: object) -> str:
+    def get_presigned_url(
+        self, method: str, bucket: str, object_key: str, *, expires: object
+    ) -> str:
         _ = (method, bucket, object_key, expires)
         return "https://example/presigned"
 
@@ -71,7 +85,9 @@ def test_upload_bytes_autocreate_bucket_and_store_object() -> None:
         auto_create_bucket=True,
         client=fake,
     )
-    store.upload_bytes(b"hello", "s3://artifacts/jobs/1/stdout.log", content_type="text/plain")
+    store.upload_bytes(
+        b"hello", "s3://artifacts/jobs/1/stdout.log", content_type="text/plain"
+    )
 
     assert "artifacts" in fake.buckets
     assert fake.objects == [("artifacts", "jobs/1/stdout.log", b"hello")]

@@ -29,7 +29,9 @@ def main() -> None:
     dest = backup_root / stamp
     dest.mkdir(parents=True, exist_ok=False)
 
-    client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
+    client = Minio(
+        endpoint, access_key=access_key, secret_key=secret_key, secure=secure
+    )
 
     total_objects = 0
     total_bytes = 0
@@ -52,7 +54,9 @@ def main() -> None:
             total_objects += 1
             total_bytes += size
 
-        buckets_manifest.append({"bucket": bucket_name, "objects": count, "bytes": size_sum})
+        buckets_manifest.append(
+            {"bucket": bucket_name, "objects": count, "bytes": size_sum}
+        )
 
     manifest = {
         "created_at": run_at.isoformat(),
@@ -61,14 +65,18 @@ def main() -> None:
         "total_bytes": total_bytes,
         "buckets": buckets_manifest,
     }
-    (dest / "backup_manifest.json").write_text(json.dumps(manifest, ensure_ascii=True, indent=2), encoding="utf-8")
+    (dest / "backup_manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=True, indent=2), encoding="utf-8"
+    )
 
     cutoff = run_at - timedelta(days=retention_days)
     for child in backup_root.iterdir():
         if not child.is_dir() or child.name == stamp:
             continue
         try:
-            ts = datetime.strptime(child.name, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+            ts = datetime.strptime(child.name, "%Y%m%dT%H%M%SZ").replace(
+                tzinfo=timezone.utc
+            )
         except ValueError:
             continue
         if ts < cutoff:

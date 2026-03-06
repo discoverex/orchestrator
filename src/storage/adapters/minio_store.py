@@ -46,14 +46,28 @@ class MinioClientProtocol(Protocol):
     def make_bucket(self, bucket: str) -> None: ...
     def list_buckets(self) -> list[_BucketLike]: ...
     def list_objects(
-        self, *, bucket_name: str, prefix: str, recursive: bool, start_after: str | None = None
+        self,
+        *,
+        bucket_name: str,
+        prefix: str,
+        recursive: bool,
+        start_after: str | None = None,
     ) -> list[_ObjectLike]: ...
     def fput_object(self, bucket: str, object_key: str, file_path: str) -> None: ...
-    def put_object(self, bucket: str, object_key: str, data: BinaryIO, length: int, content_type: str) -> None: ...
+    def put_object(
+        self,
+        bucket: str,
+        object_key: str,
+        data: BinaryIO,
+        length: int,
+        content_type: str,
+    ) -> None: ...
     def fget_object(self, bucket: str, object_key: str, file_path: str) -> None: ...
     def get_object(self, bucket: str, object_key: str) -> _GetObjectResponseLike: ...
     def stat_object(self, bucket: str, object_key: str) -> _StatObjectLike: ...
-    def get_presigned_url(self, method: str, bucket: str, object_key: str, *, expires: timedelta) -> str: ...
+    def get_presigned_url(
+        self, method: str, bucket: str, object_key: str, *, expires: timedelta
+    ) -> str: ...
 
 
 class MinioObjectStore:
@@ -66,7 +80,9 @@ class MinioObjectStore:
         auto_create_bucket: bool = True,
         client: MinioClientProtocol | None = None,
     ) -> None:
-        self.client = client or Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
+        self.client = client or Minio(
+            endpoint, access_key=access_key, secret_key=secret_key, secure=secure
+        )
         self.auto_create_bucket = auto_create_bucket
 
     def _ensure_bucket(self, bucket: str) -> None:
@@ -114,10 +130,17 @@ class MinioObjectStore:
         self.client.fput_object(bucket, object_key, str(path))
         return ObjectStat(uri=object_uri, size=size)
 
-    def upload_bytes(self, data: bytes, object_uri: str, content_type: str = "application/octet-stream") -> ObjectStat:
+    def upload_bytes(
+        self,
+        data: bytes,
+        object_uri: str,
+        content_type: str = "application/octet-stream",
+    ) -> ObjectStat:
         bucket, object_key = parse_s3_uri(object_uri)
         self._ensure_bucket(bucket)
-        self.client.put_object(bucket, object_key, BytesIO(data), len(data), content_type=content_type)
+        self.client.put_object(
+            bucket, object_key, BytesIO(data), len(data), content_type=content_type
+        )
         return ObjectStat(uri=object_uri, size=len(data))
 
     def download_file(self, object_uri: str, local_path: str | Path) -> None:
@@ -148,9 +171,13 @@ class MinioObjectStore:
 
     def generate_presigned_get(self, object_uri: str, ttl_seconds: int) -> str:
         bucket, object_key = parse_s3_uri(object_uri)
-        return self.client.get_presigned_url("GET", bucket, object_key, expires=timedelta(seconds=ttl_seconds))
+        return self.client.get_presigned_url(
+            "GET", bucket, object_key, expires=timedelta(seconds=ttl_seconds)
+        )
 
     def generate_presigned_put(self, object_uri: str, ttl_seconds: int) -> str:
         bucket, object_key = parse_s3_uri(object_uri)
         self._ensure_bucket(bucket)
-        return self.client.get_presigned_url("PUT", bucket, object_key, expires=timedelta(seconds=ttl_seconds))
+        return self.client.get_presigned_url(
+            "PUT", bucket, object_key, expires=timedelta(seconds=ttl_seconds)
+        )

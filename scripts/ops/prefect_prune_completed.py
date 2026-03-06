@@ -37,7 +37,9 @@ def _json_request(method: str, path: str, payload: dict[str, Any] | None = None)
     if payload is not None:
         headers["Content-Type"] = "application/json"
         body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
-    req = request.Request(f"{_api_url()}/{path.lstrip('/')}", method=method, data=body, headers=headers)
+    req = request.Request(
+        f"{_api_url()}/{path.lstrip('/')}", method=method, data=body, headers=headers
+    )
     with request.urlopen(req, timeout=30) as resp:  # nosec B310 - env-controlled endpoint
         raw = resp.read()
     if not raw:
@@ -45,7 +47,9 @@ def _json_request(method: str, path: str, payload: dict[str, Any] | None = None)
     return json.loads(raw.decode("utf-8"))
 
 
-def _list_targets(cutoff_iso: str, page_size: int, max_runs: int) -> list[dict[str, Any]]:
+def _list_targets(
+    cutoff_iso: str, page_size: int, max_runs: int
+) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
     offset = 0
     while len(output) < max_runs:
@@ -75,16 +79,28 @@ def _delete_run(run_id: str) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Prune completed Prefect runs older than TTL.")
-    parser.add_argument("--apply", action="store_true", help="actually delete runs; default is dry-run")
-    parser.add_argument("--ttl-hours", type=int, default=int(_env("PRUNE_TTL_HOURS", "72")))
-    parser.add_argument("--page-size", type=int, default=int(_env("PRUNE_PAGE_SIZE", "200")))
-    parser.add_argument("--max-runs", type=int, default=int(_env("PRUNE_MAX_RUNS", "1000")))
+    parser = argparse.ArgumentParser(
+        description="Prune completed Prefect runs older than TTL."
+    )
+    parser.add_argument(
+        "--apply", action="store_true", help="actually delete runs; default is dry-run"
+    )
+    parser.add_argument(
+        "--ttl-hours", type=int, default=int(_env("PRUNE_TTL_HOURS", "72"))
+    )
+    parser.add_argument(
+        "--page-size", type=int, default=int(_env("PRUNE_PAGE_SIZE", "200"))
+    )
+    parser.add_argument(
+        "--max-runs", type=int, default=int(_env("PRUNE_MAX_RUNS", "1000"))
+    )
     args = parser.parse_args()
 
     cutoff = datetime.now(UTC) - timedelta(hours=args.ttl_hours)
     cutoff_iso = cutoff.isoformat().replace("+00:00", "Z")
-    targets = _list_targets(cutoff_iso=cutoff_iso, page_size=args.page_size, max_runs=args.max_runs)
+    targets = _list_targets(
+        cutoff_iso=cutoff_iso, page_size=args.page_size, max_runs=args.max_runs
+    )
 
     deleted = 0
     for row in targets:

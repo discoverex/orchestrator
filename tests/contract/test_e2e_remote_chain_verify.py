@@ -10,7 +10,12 @@ import pytest
 
 
 def _load_module() -> ModuleType:
-    path = Path(__file__).resolve().parents[2] / "scripts" / "e2e" / "verify_remote_chain.py"
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "scripts"
+        / "e2e"
+        / "verify_remote_chain.py"
+    )
     spec = importlib.util.spec_from_file_location("verify_remote_chain", path)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
@@ -19,7 +24,9 @@ def _load_module() -> ModuleType:
     return mod
 
 
-def test_e2e_remote_chain__storage_objects__returns_ok(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_e2e_remote_chain__storage_objects__returns_ok(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     mod = _load_module()
     flow_run_id = "8de7d74e-4728-4a23-859a-5fd3bcc34abb"
     bucket = "orchestrator-artifacts"
@@ -50,9 +57,18 @@ def test_e2e_remote_chain__storage_objects__returns_ok(tmp_path: Path, monkeypat
                 "flow_run_id": flow_run_id,
                 "attempt": 1,
                 "artifacts": [
-                    {"kind": "stdout", "object_uri": f"s3://{bucket}/jobs/{flow_run_id}/attempt-1/stdout.log"},
-                    {"kind": "stderr", "object_uri": f"s3://{bucket}/jobs/{flow_run_id}/attempt-1/stderr.log"},
-                    {"kind": "result", "object_uri": f"s3://{bucket}/jobs/{flow_run_id}/attempt-1/result.json"},
+                    {
+                        "kind": "stdout",
+                        "object_uri": f"s3://{bucket}/jobs/{flow_run_id}/attempt-1/stdout.log",
+                    },
+                    {
+                        "kind": "stderr",
+                        "object_uri": f"s3://{bucket}/jobs/{flow_run_id}/attempt-1/stderr.log",
+                    },
+                    {
+                        "kind": "result",
+                        "object_uri": f"s3://{bucket}/jobs/{flow_run_id}/attempt-1/result.json",
+                    },
                 ],
             }
         raise AssertionError(f"unexpected call: {method} {url}")
@@ -63,7 +79,9 @@ def test_e2e_remote_chain__storage_objects__returns_ok(tmp_path: Path, monkeypat
     assert Path(args.output_json).exists()
 
 
-def test_e2e_remote_chain__prune_verify_apply__treats_404_as_success(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_e2e_remote_chain__prune_verify_apply__treats_404_as_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     mod = _load_module()
 
     args = argparse.Namespace(

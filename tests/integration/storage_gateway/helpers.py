@@ -5,7 +5,11 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from storage.application.models import ExplorerHeadResult, ExplorerListResult, PresignResult
+from storage.application.models import (
+    ExplorerHeadResult,
+    ExplorerListResult,
+    PresignResult,
+)
 from storage.domain.models.object_ref import ObjectListEntry, ObjectStat
 from storage_gateway.main import app
 
@@ -40,7 +44,9 @@ class DummyStorageApp:
             expires_at=datetime.now(timezone.utc),
         )
 
-    def issue_batch_put(self, *, entries: list[Any], base_url: str) -> list[PresignResult]:
+    def issue_batch_put(
+        self, *, entries: list[Any], base_url: str
+    ) -> list[PresignResult]:
         return [
             self.issue_presign(
                 flow_run_id=e.flow_run_id,
@@ -68,7 +74,10 @@ class DummyStorageApp:
     def head_object(self, object_uri: str) -> ExplorerHeadResult:
         if object_uri not in self.objects:
             return ExplorerHeadResult(exists=False, stat=None)
-        return ExplorerHeadResult(exists=True, stat=ObjectStat(uri=object_uri, size=len(self.objects[object_uri])))
+        return ExplorerHeadResult(
+            exists=True,
+            stat=ObjectStat(uri=object_uri, size=len(self.objects[object_uri])),
+        )
 
     def list_buckets(self) -> list[str]:
         return [self.bucket]
@@ -89,11 +98,20 @@ class DummyStorageApp:
                 continue
             if cursor and key <= cursor:
                 continue
-            rows.append(ObjectListEntry(object_uri=object_uri, object_key=key, size=len(data), last_modified=None))
+            rows.append(
+                ObjectListEntry(
+                    object_uri=object_uri,
+                    object_key=key,
+                    size=len(data),
+                    last_modified=None,
+                )
+            )
             if len(rows) >= limit:
                 break
         next_cursor = rows[-1].object_key if len(rows) >= limit else None
-        return ExplorerListResult(bucket=bucket, prefix=prefix, next_cursor=next_cursor, entries=rows)
+        return ExplorerListResult(
+            bucket=bucket, prefix=prefix, next_cursor=next_cursor, entries=rows
+        )
 
     def download_object(self, object_uri: str) -> bytes:
         return self.objects[object_uri]

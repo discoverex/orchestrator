@@ -3,7 +3,6 @@ from __future__ import annotations
 from urllib.parse import parse_qs, urlparse
 
 from storage_gateway.main import app
-
 from tests.integration.storage_gateway.helpers import client
 
 
@@ -31,7 +30,12 @@ def test_proxy_put_and_get_roundtrip() -> None:
     put_res = c.post(
         "/v1/presign/put",
         headers={"Authorization": "Bearer test-token"},
-        json={"flow_run_id": "f3", "attempt": 1, "kind": "result", "filename": "payload.bin"},
+        json={
+            "flow_run_id": "f3",
+            "attempt": 1,
+            "kind": "result",
+            "filename": "payload.bin",
+        },
     )
     assert put_res.status_code == 200
     put_url = put_res.json()["url"]
@@ -47,7 +51,12 @@ def test_proxy_put_and_get_roundtrip() -> None:
     get_res = c.post(
         "/v1/presign/get",
         headers={"Authorization": "Bearer test-token"},
-        json={"flow_run_id": "f3", "attempt": 1, "kind": "result", "filename": "payload.bin"},
+        json={
+            "flow_run_id": "f3",
+            "attempt": 1,
+            "kind": "result",
+            "filename": "payload.bin",
+        },
     )
     assert get_res.status_code == 200
     get_token = parse_qs(urlparse(get_res.json()["url"]).query)["token"][0]

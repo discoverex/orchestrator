@@ -4,8 +4,9 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, cast
 from urllib import error, parse, request
 from urllib.parse import urlsplit
 
@@ -33,7 +34,9 @@ def cmd_write_summary_local(args: argparse.Namespace) -> int:
     }
     summary_file = Path(args.summary_file)
     summary_file.parent.mkdir(parents=True, exist_ok=True)
-    summary_file.write_text(json.dumps(summary, ensure_ascii=True, indent=2), encoding="utf-8")
+    summary_file.write_text(
+        json.dumps(summary, ensure_ascii=True, indent=2), encoding="utf-8"
+    )
     return 0
 
 
@@ -65,7 +68,10 @@ def cmd_poll_prefect_completion(args: argparse.Namespace) -> int:
 
     deadline = time.time() + args.timeout_sec
     while time.time() < deadline:
-        payload = cast(dict[str, Any], _http_json("GET", f"{api_url}/flow_runs/{args.flow_run_id}", timeout=10))
+        payload = cast(
+            dict[str, Any],
+            _http_json("GET", f"{api_url}/flow_runs/{args.flow_run_id}", timeout=10),
+        )
         state_type_raw = payload.get("state_type")
         if not state_type_raw:
             state = payload.get("state")
@@ -135,12 +141,16 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         raise SystemExit("manifest attempt mismatch")
 
     rows = manifest.get("artifacts", [])
-    kinds = {row.get("kind"): row.get("object_uri") for row in rows if isinstance(row, dict)}
+    kinds = {
+        row.get("kind"): row.get("object_uri") for row in rows if isinstance(row, dict)
+    }
     for kind in ("stdout", "stderr", "result"):
         if kinds.get(kind) != uris[kind]:
             raise SystemExit(f"manifest {kind} uri mismatch")
 
-    (log_dir / "flow_uris.json").write_text(json.dumps(uris, ensure_ascii=True, indent=2), encoding="utf-8")
+    (log_dir / "flow_uris.json").write_text(
+        json.dumps(uris, ensure_ascii=True, indent=2), encoding="utf-8"
+    )
     return 0
 
 
@@ -150,7 +160,10 @@ def cmd_create_and_verify_mlflow_tags(args: argparse.Namespace) -> int:
     log_dir = Path(args.log_dir)
     cf_access_client_id = args.cf_access_client_id or ""
     cf_access_client_secret = args.cf_access_client_secret or ""
-    flow_uris = cast(dict[str, str], json.loads((log_dir / "flow_uris.json").read_text(encoding="utf-8")))
+    flow_uris = cast(
+        dict[str, str],
+        json.loads((log_dir / "flow_uris.json").read_text(encoding="utf-8")),
+    )
 
     base_headers = {
         "Content-Type": "application/json",
@@ -161,15 +174,26 @@ def cmd_create_and_verify_mlflow_tags(args: argparse.Namespace) -> int:
         base_headers["CF-Access-Client-Secret"] = cf_access_client_secret
 
     def post(path: str, payload: dict[str, object]) -> dict[str, object]:
-        return _http_json("POST", f"{tracking_uri}{path}", payload=payload, headers=base_headers, timeout=15)
+        return _http_json(
+            "POST",
+            f"{tracking_uri}{path}",
+            payload=payload,
+            headers=base_headers,
+            timeout=15,
+        )
 
     def get(path: str, query: dict[str, str]) -> dict[str, object]:
         qs = parse.urlencode(query)
-        return _http_json("GET", f"{tracking_uri}{path}?{qs}", headers=base_headers, timeout=15)
+        return _http_json(
+            "GET", f"{tracking_uri}{path}?{qs}", headers=base_headers, timeout=15
+        )
 
     experiment_id = "0"
     try:
-        run = post("/api/2.0/mlflow/runs/create", {"experiment_id": experiment_id, "start_time": 0, "tags": []})
+        run = post(
+            "/api/2.0/mlflow/runs/create",
+            {"experiment_id": experiment_id, "start_time": 0, "tags": []},
+        )
     except error.HTTPError as exc:
         raise SystemExit(f"mlflow runs/create failed: HTTP {exc.code}") from exc
 
@@ -186,7 +210,10 @@ def cmd_create_and_verify_mlflow_tags(args: argparse.Namespace) -> int:
         "e2e_flow_run_id": flow_run_id,
     }
     for key, value in tags.items():
-        post("/api/2.0/mlflow/runs/set-tag", {"run_id": run_id, "key": key, "value": value})
+        post(
+            "/api/2.0/mlflow/runs/set-tag",
+            {"run_id": run_id, "key": key, "value": value},
+        )
 
     fetched = get("/api/2.0/mlflow/runs/get", {"run_id": run_id})
     fetched_run = cast(dict[str, Any], fetched.get("run", {}))
@@ -216,7 +243,10 @@ def cmd_uri_host(args: argparse.Namespace) -> int:
 
 
 def cmd_verify_flush_output(args: argparse.Namespace) -> int:
-    payload = cast(dict[str, object], json.loads(Path(args.output_json).read_text(encoding="utf-8")))
+    payload = cast(
+        dict[str, object],
+        json.loads(Path(args.output_json).read_text(encoding="utf-8")),
+    )
     uploaded_raw = payload.get("uploaded", [])
     if not isinstance(uploaded_raw, list):
         raise SystemExit("flush output uploaded field is not a list")
@@ -253,7 +283,9 @@ def cmd_write_summary_remote(args: argparse.Namespace) -> int:
     }
     summary_file = Path(args.summary_file)
     summary_file.parent.mkdir(parents=True, exist_ok=True)
-    summary_file.write_text(json.dumps(summary, ensure_ascii=True, indent=2), encoding="utf-8")
+    summary_file.write_text(
+        json.dumps(summary, ensure_ascii=True, indent=2), encoding="utf-8"
+    )
     return 0
 
 
@@ -271,7 +303,9 @@ def cmd_build_cf_headers_json(args: argparse.Namespace) -> int:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Shell helper commands used by e2e scripts.")
+    parser = argparse.ArgumentParser(
+        description="Shell helper commands used by e2e scripts."
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("write-summary-local")

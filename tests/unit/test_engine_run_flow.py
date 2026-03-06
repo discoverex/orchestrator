@@ -9,7 +9,9 @@ import pytest
 from flows.engine_run_flow import ArtifactLink, upload_outputs_task
 
 
-def test_upload_outputs_task_skips_already_uploaded(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_upload_outputs_task_skips_already_uploaded(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     uploads: list[Path] = []
     tasks_module = importlib.import_module("flows.engine_run.tasks")
 
@@ -26,10 +28,26 @@ def test_upload_outputs_task_skips_already_uploaded(monkeypatch: pytest.MonkeyPa
     result.write_text("{}", encoding="utf-8")
 
     links = [
-        ArtifactLink(kind="stdout", object_uri="s3://b/jobs/f1/attempt-1/stdout.log", url="http://example/stdout"),
-        ArtifactLink(kind="stderr", object_uri="s3://b/jobs/f1/attempt-1/stderr.log", url="http://example/stderr"),
-        ArtifactLink(kind="result", object_uri="s3://b/jobs/f1/attempt-1/result.json", url="http://example/result"),
-        ArtifactLink(kind="manifest", object_uri="s3://b/jobs/f1/attempt-1/artifacts.json", url="http://example/manifest"),
+        ArtifactLink(
+            kind="stdout",
+            object_uri="s3://b/jobs/f1/attempt-1/stdout.log",
+            url="http://example/stdout",
+        ),
+        ArtifactLink(
+            kind="stderr",
+            object_uri="s3://b/jobs/f1/attempt-1/stderr.log",
+            url="http://example/stderr",
+        ),
+        ArtifactLink(
+            kind="result",
+            object_uri="s3://b/jobs/f1/attempt-1/result.json",
+            url="http://example/result",
+        ),
+        ArtifactLink(
+            kind="manifest",
+            object_uri="s3://b/jobs/f1/attempt-1/artifacts.json",
+            url="http://example/manifest",
+        ),
     ]
     local_paths = {
         "workdir": str(tmp_path),
@@ -53,7 +71,12 @@ def test_upload_outputs_task_skips_already_uploaded(monkeypatch: pytest.MonkeyPa
 
     # stdout skipped, stderr/result/manifest uploaded
     assert len(uploads) == 3
-    manifest_payload = json.loads((tmp_path / "artifacts.json").read_text(encoding="utf-8"))
+    manifest_payload = json.loads(
+        (tmp_path / "artifacts.json").read_text(encoding="utf-8")
+    )
     assert manifest_payload["flow_run_id"] == "f1"
     assert manifest_payload["attempt"] == 1
-    assert {"kind": "stdout", "object_uri": "s3://b/jobs/f1/attempt-1/stdout.log"} in manifest_payload["artifacts"]
+    assert {
+        "kind": "stdout",
+        "object_uri": "s3://b/jobs/f1/attempt-1/stdout.log",
+    } in manifest_payload["artifacts"]

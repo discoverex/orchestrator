@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from common import StrictModel
+
 from ..domain.models.object_ref import ObjectListEntry, ObjectStat
 
 

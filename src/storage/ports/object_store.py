@@ -19,7 +19,12 @@ class ObjectStorePort(Protocol):
 
     def upload_file(self, local_path: str | Path, object_uri: str) -> ObjectStat: ...
 
-    def upload_bytes(self, data: bytes, object_uri: str, content_type: str = "application/octet-stream") -> ObjectStat: ...
+    def upload_bytes(
+        self,
+        data: bytes,
+        object_uri: str,
+        content_type: str = "application/octet-stream",
+    ) -> ObjectStat: ...
 
     def download_bytes(self, object_uri: str) -> bytes: ...
 
