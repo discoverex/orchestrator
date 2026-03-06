@@ -2,12 +2,20 @@
 
 ## Flow Input
 
+- `job_spec_json: str`
+- `resume_key: str | None` (optional)
+- `checkpoint_dir: str | None` (optional)
+
+`job_spec_json` schema:
+
+- `engine: str`
 - `repo_url: str`
 - `ref: str` (branch/tag/sha)
 - `entrypoint: list[str]`
-- `inputs_ref: list[str]` (optional)
-- `env: dict[str, str]` (optional)
-- `outputs_prefix: str | None` (optional)
+- `config: str | None` (repo-relative path only)
+- `inputs: dict[str, Any]`
+- `env: dict[str, str]`
+- `outputs_prefix: str | None`
 
 ## Version Pinning Policy
 
@@ -57,16 +65,10 @@ Optional additional gateway protection:
 
 ## E2E Acceptance (Register -> Worker -> Storage)
 
-The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the full orchestration chain in three modes:
+The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the orchestration chain in two modes:
 
 - `core`: deployment register, worker execution, object persistence in MinIO
 - `mlflow`: `core` + MLflow run tag linkage (`artifact_*_uri`)
-- `full`: `mlflow` + external domain/Cloudflare Access path checks
-
-`full` mode includes prereq gating before MLflow tag checks:
-
-1. required env keys exist (`MLFLOW_TRACKING_URI`, `MLFLOW_PUBLIC_URL`, `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET`)
-2. DNS resolves for tracking/public MLflow hostnames
 
 Core pass criteria:
 
