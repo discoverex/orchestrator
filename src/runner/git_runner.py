@@ -44,11 +44,12 @@ def resolve_commit(repo_url: str, ref: str) -> str:
 
 
 def run_entrypoint(
-    repo_url: str,
-    resolved_commit: str,
+    repo_url: str | None,
+    resolved_commit: str | None,
     entrypoint: list[str],
     env: dict[str, str] | None = None,
     *,
+    run_mode: str = "repo",
     engine: str,
     config_rel_path: str | None,
     inputs: dict[str, object] | None,
@@ -59,8 +60,18 @@ def run_entrypoint(
 ) -> RunArtifacts:
     workdir = Path(mkdtemp(prefix="orchestrator-run-"))
 
-    _run(["git", "clone", "--filter=blob:none", repo_url, str(workdir)])
-    _run(["git", "checkout", resolved_commit], cwd=workdir)
+    if run_mode == "repo":
+        if not repo_url:
+            raise RunnerError("repo_url is required when run_mode=repo")
+        if not resolved_commit:
+            raise RunnerError("resolved_commit is required when run_mode=repo")
+        _run(["git", "clone", "--filter=blob:none", repo_url, str(workdir)])
+        _run(["git", "checkout", resolved_commit], cwd=workdir)
+    elif run_mode == "inline":
+        if config_rel_path:
+            raise RunnerError("config is not supported when run_mode=inline")
+    else:
+        raise RunnerError(f"unsupported run_mode: {run_mode}")
 
     stdout_path = workdir / "stdout.log"
     stderr_path = workdir / "stderr.log"
@@ -79,10 +90,11 @@ def run_entrypoint(
     merged_env.update(
         {
             "ORCH_ENGINE": engine,
+            "ORCH_RUN_MODE": run_mode,
             "ORCH_FLOW_RUN_ID": flow_run_id,
             "ORCH_ATTEMPT": str(attempt),
             "ORCH_OUTPUTS_PREFIX": outputs_prefix,
-            "ORCH_RESOLVED_COMMIT": resolved_commit,
+            "ORCH_RESOLVED_COMMIT": resolved_commit or "",
             "ORCH_JOB_INPUTS_JSON": json.dumps(inputs or {}, ensure_ascii=True),
         }
     )
@@ -112,6 +124,7 @@ def run_entrypoint(
             {
                 "exit_code": proc.returncode,
                 "resolved_commit": resolved_commit,
+                "run_mode": run_mode,
                 "entrypoint": entrypoint,
             },
             ensure_ascii=True,

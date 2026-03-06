@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 
 from common import StrictModel
 
@@ -15,9 +15,10 @@ class JobSpecError(RuntimeError):
 
 
 class JobSpec(StrictModel):
+    run_mode: Literal["repo", "inline"] = "repo"
     engine: str = Field(min_length=1)
-    repo_url: str = Field(min_length=1)
-    ref: str = Field(min_length=1)
+    repo_url: str | None = None
+    ref: str | None = None
     entrypoint: list[str]
     config: str | None = None
     job_name: str | None = None
@@ -25,12 +26,22 @@ class JobSpec(StrictModel):
     env: dict[str, str] = Field(default_factory=dict)
     outputs_prefix: str | None = None
 
-    @field_validator("engine", "repo_url", "ref")
+    @field_validator("engine")
     @classmethod
     def _strip_non_empty(cls, value: str) -> str:
         trimmed = value.strip()
         if not trimmed:
             raise ValueError("must not be blank")
+        return trimmed
+
+    @field_validator("repo_url", "ref")
+    @classmethod
+    def _strip_optional_non_empty(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("must not be blank when provided")
         return trimmed
 
     @field_validator("entrypoint")
@@ -67,6 +78,22 @@ class JobSpec(StrictModel):
         if not trimmed:
             raise ValueError("job_name must not be blank when provided")
         return trimmed
+
+    @model_validator(mode="after")
+    def _validate_repo_fields_for_mode(self) -> "JobSpec":
+        if self.run_mode == "inline":
+            if self.repo_url is not None:
+                raise ValueError("repo_url must be omitted when run_mode=inline")
+            if self.ref is not None:
+                raise ValueError("ref must be omitted when run_mode=inline")
+            if self.config is not None:
+                raise ValueError("config must be omitted when run_mode=inline")
+            return self
+        if not self.repo_url:
+            raise ValueError("repo_url is required when run_mode=repo")
+        if not self.ref:
+            raise ValueError("ref is required when run_mode=repo")
+        return self
 
 
 def _load_registry(path: Path) -> set[str]:

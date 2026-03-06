@@ -71,10 +71,11 @@ def run_entrypoint_task(
 @task
 def run_entrypoint_job_task(
     *,
-    repo_url: str,
-    resolved_commit: str,
+    repo_url: str | None,
+    resolved_commit: str | None,
     entrypoint: list[str],
     env: dict[str, str],
+    run_mode: str = "repo",
     engine: str,
     config_rel_path: str | None,
     inputs: dict[str, object],
@@ -88,6 +89,7 @@ def run_entrypoint_job_task(
         resolved_commit=resolved_commit,
         entrypoint=entrypoint,
         env=env,
+        run_mode=run_mode,
         engine=engine,
         config_rel_path=config_rel_path,
         inputs=inputs,
