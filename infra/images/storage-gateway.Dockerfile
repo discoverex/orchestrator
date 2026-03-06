@@ -2,7 +2,6 @@ FROM orchestrator-base:local
 
 COPY --chown=appuser:appuser src/storage /app/src/storage
 COPY --chown=appuser:appuser src/storage_gateway /app/src/storage_gateway
-COPY --chown=appuser:appuser src/storage_explorer /app/src/storage_explorer
 
 USER appuser
 

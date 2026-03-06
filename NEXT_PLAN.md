@@ -6,9 +6,9 @@
   - 스케줄러(Prefect) -> 워커 -> storage-gateway -> MinIO 흐름 정상
   - 아티팩트(stdout/stderr/result/manifest) 검증 정상
 - `full` E2E는 현재 실패한다.
-  - 실패 지점: `verify-mlflow-tags`
+  - 실패 지점: `mlflow.verify_tags`
   - 현재 원인: MLflow write API(`runs/create`)가 `HTTP 403`으로 차단됨
-  - DNS 해석 실패 이슈는 해소됨(`verify-full-prereqs` 통과 확인)
+  - DNS 해석 실패 이슈는 해소됨(`full.verify_prereqs` 통과 확인)
 - `cloudflared` 터널 프로세스 자체는 정상 등록됨(Registered tunnel connection 확인).
 
 ## 1) 내가 하려고 했던 것 (진행 의도)
@@ -41,7 +41,7 @@
 - `mlflow` healthcheck를 `curl` -> `python urllib`로 변경
 
 4. E2E 오케스트레이터 개선
-- `scripts/e2e/e2e_orchestrator.sh`를 컨테이너 기반 실행으로 정렬
+- `scripts/e2e/e2e_local_orchestrator.sh`를 컨테이너 기반 실행으로 정렬
 - `core/mlflow/full` 모드와 결과 요약(`artifacts/e2e/.../summary.json`) 유지
 
 ## 3) 지금부터 해야 할 일 (우선순위)
@@ -58,12 +58,12 @@
 - `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`가 해당 앱 정책에 매칭되는지 확인
 
 4. full E2E 재실행 (미완료)
-- Access 정책 수정 후 `verify-mlflow-tags`와 외부 접근 단계까지 통과 여부 재확인
+- Access 정책 수정 후 `mlflow.verify_tags`와 외부 접근 단계까지 통과 여부 재확인
 
 5. 문서/운영 체크리스트 확정 (진행중)
 - `.env` 필수키와 실행 순서를 README/ops 문서에 최종 고정
-- `scripts/e2e/e2e_orchestrator.sh`에 `full` 모드 사전검증(`verify-full-prereqs`) 추가
-- `scripts/e2e/e2e_orchestrator.sh`에 `verify-mlflow-tracking-access` 추가
+- `scripts/e2e/e2e_local_orchestrator.sh`에 `full` 모드 사전검증(`full.verify_prereqs`) 추가
+- `scripts/e2e/e2e_local_orchestrator.sh`에 `mlflow.verify_tracking_access` 추가
 
 ## 4) 실행 방법 (상세)
 
@@ -119,13 +119,13 @@ curl -svI https://mlflow.discoverex.qzz.io \
 코어 경로:
 
 ```bash
-scripts/e2e/e2e_orchestrator.sh --mode core
+scripts/e2e/e2e_local_orchestrator.sh --mode core
 ```
 
 전체 경로:
 
 ```bash
-scripts/e2e/e2e_orchestrator.sh --mode full
+scripts/e2e/e2e_local_orchestrator.sh --mode full
 ```
 
 결과 확인:
@@ -149,7 +149,7 @@ cat "$latest/summary.json"
 1. `missing required env: MLFLOW_TRACKING_URI`
 - `.env`에 키 누락
 
-2. `verify-full-prereqs` 실패
+2. `full.verify_prereqs` 실패
 - `.env` 누락 또는 DNS 레코드/전파 문제
 
 3. `mlflow runs/create failed: HTTP 403`

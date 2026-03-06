@@ -1,0 +1,132 @@
+services:
+  base-runtime:
+    build:
+      context: ../..
+      dockerfile: infra/images/base.Dockerfile
+    image: orchestrator-base:local
+    command: ["true"]
+
+  minio:
+    image: minio/minio:latest
+    container_name: orchestrator-e2e-local-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - e2e_local_minio_data:/data
+    ports:
+      - "29000:9000"
+      - "29001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  prefect:
+    image: prefecthq/prefect:3-latest
+    container_name: orchestrator-e2e-local-prefect
+    command: prefect server start --host 0.0.0.0 --port 4200
+    ports:
+      - "24200:4200"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  storage-gateway:
+    build:
+      context: ../..
+      dockerfile: infra/images/storage-gateway.Dockerfile
+    image: orchestrator-storage-gateway:local
+    container_name: orchestrator-e2e-local-storage-gateway
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_SECURE: false
+      MINIO_AUTO_CREATE_BUCKET: true
+      ARTIFACT_BUCKET: orchestrator-artifacts
+      PRESIGN_TTL_DEFAULT: 900
+      PRESIGN_TTL_MAX: 3600
+      PRESIGN_MODE: gateway
+      STORAGE_PUBLIC_BASE_URL: ""
+      STORAGE_URL_SIGNING_SECRET: dev-url-signing-secret
+      STORAGE_GATEWAY_TOKEN: dev-storage-token
+      GATEWAY_REQUIRE_CF_ACCESS: false
+    ports:
+      - "28100:8100"
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/images/worker.Dockerfile
+    image: orchestrator-worker:local
+    container_name: orchestrator-e2e-local-worker
+    environment:
+      PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_WORK_POOL: colab-gpu
+      STORAGE_GATEWAY_URL: http://storage-gateway:8100
+      STORAGE_GATEWAY_TOKEN: dev-storage-token
+    depends_on:
+      prefect:
+        condition: service_healthy
+      storage-gateway:
+        condition: service_healthy
+
+  register:
+    build:
+      context: ../..
+      dockerfile: infra/images/register.Dockerfile
+    image: orchestrator-register:local
+    container_name: orchestrator-e2e-local-register
+    environment:
+      PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_WORK_POOL: colab-gpu
+      PREFECT_WORK_QUEUE: default
+      REGISTER_DEPLOYMENT_NAME: engine-run
+      REGISTER_DEPLOYMENT_VERSION: ""
+    depends_on:
+      prefect:
+        condition: service_healthy
+  
+  mlflow:
+    build:
+      context: ../..
+      dockerfile: infra/images/mlflow.Dockerfile
+    image: orchestrator-e2e-mlflow:local
+    container_name: orchestrator-e2e-local-mlflow
+    command:
+      - mlflow
+      - server
+      - --backend-store-uri
+      - sqlite:////tmp/mlflow/mlflow.db
+      - --default-artifact-root
+      - /tmp/mlflow/artifacts
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+    volumes:
+      - e2e_local_mlflow_data:/tmp/mlflow
+    ports:
+      - "25000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  e2e_local_minio_data:
+  e2e_local_mlflow_data:

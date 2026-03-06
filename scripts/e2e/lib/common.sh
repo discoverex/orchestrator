@@ -2,6 +2,9 @@
 
 load_env_file_if_exists() {
   local env_path="$1"
+  if [[ "${E2E_SKIP_DOTENV:-false}" == "true" && "$(basename "${env_path}")" == ".env" ]]; then
+    return 0
+  fi
   if [[ -f "${env_path}" ]]; then
     set -a
     # shellcheck disable=SC1090

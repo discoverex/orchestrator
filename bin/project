@@ -6,7 +6,7 @@ RUNTIME_ROOT_DEFAULT="$(cd "${ROOT_DIR}/.." && pwd)/runtime"
 RUNTIME_ROOT="${RUNTIME_ROOT:-${RUNTIME_ROOT_DEFAULT}}"
 source "${ROOT_DIR}/bin/lib/project_lib.sh"
 
-LOCAL_COMPOSE="${ROOT_DIR}/docker-compose.local.yml"
+LOCAL_COMPOSE="${ROOT_DIR}/scripts/e2e/docker-compose.local.test.yml"
 STORAGE_ENV="${ROOT_DIR}/infra/stacks/storage-node/.env"
 STORAGE_COMPOSE="${ROOT_DIR}/infra/stacks/storage-node/docker-compose.yml"
 REGISTER_ENV="${ROOT_DIR}/infra/stacks/register/.env"
@@ -15,14 +15,14 @@ WORKER_FIXED_ENV="${ROOT_DIR}/infra/stacks/worker/fixed/.env"
 WORKER_FIXED_COMPOSE="${ROOT_DIR}/infra/stacks/worker/fixed/docker-compose.yml"
 PREFECT_ENV="${ROOT_DIR}/infra/stacks/prefect-server/.env"
 PREFECT_COMPOSE="${ROOT_DIR}/infra/stacks/prefect-server/docker-compose.yml"
-E2E_SCRIPT="${ROOT_DIR}/scripts/e2e/e2e_orchestrator.sh"
-REMOTE_E2E_SCRIPT="${ROOT_DIR}/scripts/e2e/remote_prefect_storage_e2e.sh"
+E2E_SCRIPT="${ROOT_DIR}/scripts/e2e/e2e_local_orchestrator.sh"
+REMOTE_E2E_SCRIPT="${ROOT_DIR}/scripts/e2e/e2e_remote_prefect_storage.sh"
 SUBMIT_ROUTER_SCRIPT="${ROOT_DIR}/scripts/ops/prefect_submit_router.py"
 
 usage() {
   cat <<'EOF'
 Usage:
-  project e2e [core|mlflow|full] [--keep-on-fail] [--timeout-sec N]
+  project e2e [core|mlflow] [--keep-on-fail] [--timeout-sec N]
   project e2e-remote --prefect-api-url URL [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
   project base <build> [args...]
   project storage <up|down|ps|logs|build> [args...]
@@ -36,7 +36,7 @@ Usage:
 
 Examples:
   project e2e
-  project e2e full --keep-on-fail
+  project e2e mlflow --keep-on-fail
   project e2e-remote --prefect-api-url https://prefect.example.com/api --prune-mode apply
   project base build
   project storage up
@@ -66,7 +66,7 @@ case "${cmd}" in
     require_executable "${E2E_SCRIPT}" || exit 1
     mode="${1:-}"
     case "${mode}" in
-      core|mlflow|full)
+      core|mlflow)
         shift
         exec "${E2E_SCRIPT}" --mode "${mode}" "$@"
         ;;
