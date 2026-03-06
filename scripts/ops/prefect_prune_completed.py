@@ -17,9 +17,20 @@ def _api_url() -> str:
     return _env("PREFECT_API_URL", "http://127.0.0.1:4200/api").rstrip("/")
 
 
+def _prefect_headers() -> dict[str, str]:
+    headers: dict[str, str] = {}
+    cf_id = os.getenv("PREFECT_CF_ACCESS_CLIENT_ID", "")
+    cf_secret = os.getenv("PREFECT_CF_ACCESS_CLIENT_SECRET", "")
+    if cf_id and cf_secret:
+        headers["CF-Access-Client-Id"] = cf_id
+        headers["CF-Access-Client-Secret"] = cf_secret
+    return headers
+
+
 def _json_request(method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
     body = None
     headers = {"Accept": "application/json"}
+    headers.update(_prefect_headers())
     if payload is not None:
         headers["Content-Type"] = "application/json"
         body = json.dumps(payload, ensure_ascii=True).encode("utf-8")

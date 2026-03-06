@@ -110,12 +110,22 @@ def _prefect_api_url() -> str:
     return _env("PREFECT_API_URL", "http://127.0.0.1:4200/api").rstrip("/")
 
 
+def _prefect_headers() -> dict[str, str]:
+    headers: dict[str, str] = {}
+    cf_id = _env("PREFECT_CF_ACCESS_CLIENT_ID", "")
+    cf_secret = _env("PREFECT_CF_ACCESS_CLIENT_SECRET", "")
+    if cf_id and cf_secret:
+        headers["CF-Access-Client-Id"] = cf_id
+        headers["CF-Access-Client-Secret"] = cf_secret
+    return headers
+
+
 def _prefect_post(path: str, payload: dict[str, Any]) -> Any:
-    return _json_request("POST", f"{_prefect_api_url()}/{path.lstrip('/')}", payload=payload)
+    return _json_request("POST", f"{_prefect_api_url()}/{path.lstrip('/')}", payload=payload, headers=_prefect_headers())
 
 
 def _prefect_get(path: str) -> Any:
-    return _json_request("GET", f"{_prefect_api_url()}/{path.lstrip('/')}")
+    return _json_request("GET", f"{_prefect_api_url()}/{path.lstrip('/')}", headers=_prefect_headers())
 
 
 def _gateway_headers() -> dict[str, str]:

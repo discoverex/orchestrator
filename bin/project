@@ -11,11 +11,13 @@ REGISTER_COMPOSE="${ROOT_DIR}/infra/stacks/register/docker-compose.yml"
 PREFECT_ENV="${ROOT_DIR}/infra/stacks/prefect-server/.env"
 PREFECT_COMPOSE="${ROOT_DIR}/infra/stacks/prefect-server/docker-compose.yml"
 E2E_SCRIPT="${ROOT_DIR}/scripts/e2e/e2e_orchestrator.sh"
+REMOTE_E2E_SCRIPT="${ROOT_DIR}/scripts/e2e/remote_prefect_storage_e2e.sh"
 
 usage() {
   cat <<'EOF'
 Usage:
   project e2e [core|mlflow|full] [--keep-on-fail] [--timeout-sec N]
+  project e2e-remote --prefect-api-url URL [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
   project storage <up|down|ps|logs|build> [args...]
   project prefect <up|down|ps|logs|build|flush|prune> [args...]
   project local <up|down|ps|logs|build> [args...]
@@ -24,6 +26,7 @@ Usage:
 Examples:
   project e2e
   project e2e full --keep-on-fail
+  project e2e-remote --prefect-api-url https://prefect.example.com/api --prune-mode apply
   project storage up
   project storage down
   project storage logs --tail=120
@@ -77,6 +80,14 @@ case "${cmd}" in
         exec "${E2E_SCRIPT}" "$mode" "$@"
         ;;
     esac
+    ;;
+
+  e2e-remote)
+    if [[ ! -x "${REMOTE_E2E_SCRIPT}" ]]; then
+      echo "missing executable: ${REMOTE_E2E_SCRIPT}" >&2
+      exit 1
+    fi
+    exec "${REMOTE_E2E_SCRIPT}" "$@"
     ;;
 
   storage)
