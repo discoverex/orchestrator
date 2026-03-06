@@ -7,7 +7,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 from urllib import error, request
 
 
@@ -59,7 +59,13 @@ def http_json(
         raise VerifyError("http", "HTTP_UNREACHABLE", f"{method} {url} unreachable: {exc.reason}") from exc
     if not raw:
         return {}
-    return json.loads(raw.decode("utf-8"))
+    parsed = json.loads(raw.decode("utf-8"))
+    if isinstance(parsed, dict):
+        return cast(dict[str, Any], parsed)
+    if isinstance(parsed, list):
+        rows = [row for row in parsed if isinstance(row, dict)]
+        return cast(list[dict[str, Any]], rows)
+    raise VerifyError("http", "HTTP_BAD_JSON", f"{method} {url} returned non-object JSON")
 
 
 def gateway_headers(token: str) -> dict[str, str]:
@@ -81,7 +87,10 @@ def run_ops_script(script_rel_path: str, env_overrides: dict[str, str], argv: li
     stdout = proc.stdout.strip()
     if not stdout:
         return {}
-    return json.loads(stdout)
+    parsed = json.loads(stdout)
+    if not isinstance(parsed, dict):
+        raise VerifyError("ops-script", "SCRIPT_BAD_JSON", f"{script_rel_path} returned non-object JSON")
+    return cast(dict[str, Any], parsed)
 
 
 def command_wait_completed(args: Any, http_json_fn: Callable[..., Any]) -> dict[str, Any]:

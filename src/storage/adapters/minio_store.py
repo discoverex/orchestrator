@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
+from typing import BinaryIO, Protocol
 
 from minio import Minio
 from minio.error import S3Error
@@ -20,6 +21,41 @@ def parse_s3_uri(uri: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
+class _BucketLike(Protocol):
+    name: str
+
+
+class _ObjectLike(Protocol):
+    object_name: str | None
+    size: int | None
+    last_modified: object | None
+
+
+class _GetObjectResponseLike(Protocol):
+    def read(self) -> bytes: ...
+    def close(self) -> None: ...
+    def release_conn(self) -> None: ...
+
+
+class _StatObjectLike(Protocol):
+    size: int
+
+
+class MinioClientProtocol(Protocol):
+    def bucket_exists(self, bucket: str) -> bool: ...
+    def make_bucket(self, bucket: str) -> None: ...
+    def list_buckets(self) -> list[_BucketLike]: ...
+    def list_objects(
+        self, *, bucket_name: str, prefix: str, recursive: bool, start_after: str | None = None
+    ) -> list[_ObjectLike]: ...
+    def fput_object(self, bucket: str, object_key: str, file_path: str) -> None: ...
+    def put_object(self, bucket: str, object_key: str, data: BinaryIO, length: int, content_type: str) -> None: ...
+    def fget_object(self, bucket: str, object_key: str, file_path: str) -> None: ...
+    def get_object(self, bucket: str, object_key: str) -> _GetObjectResponseLike: ...
+    def stat_object(self, bucket: str, object_key: str) -> _StatObjectLike: ...
+    def get_presigned_url(self, method: str, bucket: str, object_key: str, *, expires: timedelta) -> str: ...
+
+
 class MinioObjectStore:
     def __init__(
         self,
@@ -28,7 +64,7 @@ class MinioObjectStore:
         secret_key: str,
         secure: bool = False,
         auto_create_bucket: bool = True,
-        client: Minio | None = None,
+        client: MinioClientProtocol | None = None,
     ) -> None:
         self.client = client or Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
         self.auto_create_bucket = auto_create_bucket

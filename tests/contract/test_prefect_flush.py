@@ -3,9 +3,13 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+from types import ModuleType
+from typing import Any
+
+import pytest
 
 
-def _load_module():
+def _load_module() -> ModuleType:
     path = Path(__file__).resolve().parents[2] / "scripts" / "ops" / "prefect_flush_completed.py"
     spec = importlib.util.spec_from_file_location("prefect_flush_completed", path)
     assert spec and spec.loader
@@ -35,7 +39,7 @@ def test_cursor_seen_and_advance(tmp_path: Path) -> None:
     assert loaded.seen("r0", "2026-03-04T00:00:00Z")
 
 
-def test_main_dry_run_collects_without_upload(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+def test_main_dry_run_collects_without_upload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     mod = _load_module()
     cursor_path = tmp_path / "cursor.json"
 
@@ -51,9 +55,9 @@ def test_main_dry_run_collects_without_upload(monkeypatch, tmp_path: Path) -> No
     monkeypatch.setattr(mod, "_list_completed_runs", lambda after_end_time, page_size, max_runs: runs)
     monkeypatch.setattr(mod, "_fetch_run_snapshot", lambda run_id: {"id": run_id})
 
-    uploads: list[tuple[dict, dict]] = []
+    uploads: list[tuple[dict[str, Any], dict[str, Any]]] = []
 
-    def _fake_upload(run: dict, snapshot: dict) -> str:
+    def _fake_upload(run: dict[str, Any], snapshot: dict[str, Any]) -> str:
         uploads.append((run, snapshot))
         return f"s3://bucket/{run['id']}.json"
 

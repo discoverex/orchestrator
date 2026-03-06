@@ -5,6 +5,7 @@ import argparse
 import json
 import time
 from pathlib import Path
+from typing import Any, Callable, cast
 from urllib import error, parse, request
 from urllib.parse import urlsplit
 
@@ -36,7 +37,14 @@ def cmd_write_summary_local(args: argparse.Namespace) -> int:
     return 0
 
 
-def _http_json(method: str, url: str, *, payload: dict | None = None, headers: dict[str, str] | None = None, timeout: int = 15) -> dict:
+def _http_json(
+    method: str,
+    url: str,
+    *,
+    payload: dict[str, object] | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: int = 15,
+) -> dict[str, object]:
     data = None
     req_headers = dict(headers or {})
     if payload is not None:
@@ -44,7 +52,10 @@ def _http_json(method: str, url: str, *, payload: dict | None = None, headers: d
         req_headers.setdefault("Content-Type", "application/json")
     req = request.Request(url, method=method, data=data, headers=req_headers)
     with request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        parsed = json.loads(resp.read().decode("utf-8"))
+    if not isinstance(parsed, dict):
+        raise SystemExit(f"expected JSON object from {method} {url}")
+    return cast(dict[str, object], parsed)
 
 
 def cmd_poll_prefect_completion(args: argparse.Namespace) -> int:
@@ -54,8 +65,13 @@ def cmd_poll_prefect_completion(args: argparse.Namespace) -> int:
 
     deadline = time.time() + args.timeout_sec
     while time.time() < deadline:
-        payload = _http_json("GET", f"{api_url}/flow_runs/{args.flow_run_id}", timeout=10)
-        state_type = (payload.get("state_type") or payload.get("state", {}).get("type") or "").upper()
+        payload = cast(dict[str, Any], _http_json("GET", f"{api_url}/flow_runs/{args.flow_run_id}", timeout=10))
+        state_type_raw = payload.get("state_type")
+        if not state_type_raw:
+            state = payload.get("state")
+            if isinstance(state, dict):
+                state_type_raw = state.get("type")
+        state_type = str(state_type_raw or "").upper()
         if state_type in terminal_success:
             print("COMPLETED")
             return 0
@@ -108,7 +124,8 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         timeout=10,
     )
 
-    req = request.Request(manifest_link["url"], method="GET")
+    manifest_url = str(manifest_link.get("url", ""))
+    req = request.Request(manifest_url, method="GET")
     with request.urlopen(req, timeout=15) as resp:
         manifest = json.loads(resp.read().decode("utf-8"))
 
@@ -133,7 +150,7 @@ def cmd_create_and_verify_mlflow_tags(args: argparse.Namespace) -> int:
     log_dir = Path(args.log_dir)
     cf_access_client_id = args.cf_access_client_id or ""
     cf_access_client_secret = args.cf_access_client_secret or ""
-    flow_uris = json.loads((log_dir / "flow_uris.json").read_text(encoding="utf-8"))
+    flow_uris = cast(dict[str, str], json.loads((log_dir / "flow_uris.json").read_text(encoding="utf-8")))
 
     base_headers = {
         "Content-Type": "application/json",
@@ -143,10 +160,10 @@ def cmd_create_and_verify_mlflow_tags(args: argparse.Namespace) -> int:
         base_headers["CF-Access-Client-Id"] = cf_access_client_id
         base_headers["CF-Access-Client-Secret"] = cf_access_client_secret
 
-    def post(path: str, payload: dict) -> dict:
+    def post(path: str, payload: dict[str, object]) -> dict[str, object]:
         return _http_json("POST", f"{tracking_uri}{path}", payload=payload, headers=base_headers, timeout=15)
 
-    def get(path: str, query: dict) -> dict:
+    def get(path: str, query: dict[str, str]) -> dict[str, object]:
         qs = parse.urlencode(query)
         return _http_json("GET", f"{tracking_uri}{path}?{qs}", headers=base_headers, timeout=15)
 
@@ -156,7 +173,11 @@ def cmd_create_and_verify_mlflow_tags(args: argparse.Namespace) -> int:
     except error.HTTPError as exc:
         raise SystemExit(f"mlflow runs/create failed: HTTP {exc.code}") from exc
 
-    run_id = run["run"]["info"]["run_id"]
+    run_obj = cast(dict[str, Any], run.get("run", {}))
+    info_obj = cast(dict[str, Any], run_obj.get("info", {}))
+    run_id = str(info_obj.get("run_id", ""))
+    if not run_id:
+        raise SystemExit("mlflow runs/create missing run_id")
     tags = {
         "artifact_manifest_uri": flow_uris["manifest"],
         "artifact_stdout_uri": flow_uris["stdout"],
@@ -168,8 +189,16 @@ def cmd_create_and_verify_mlflow_tags(args: argparse.Namespace) -> int:
         post("/api/2.0/mlflow/runs/set-tag", {"run_id": run_id, "key": key, "value": value})
 
     fetched = get("/api/2.0/mlflow/runs/get", {"run_id": run_id})
-    rows = fetched["run"]["data"].get("tags", [])
-    values = {row["key"]: row["value"] for row in rows}
+    fetched_run = cast(dict[str, Any], fetched.get("run", {}))
+    fetched_data = cast(dict[str, Any], fetched_run.get("data", {}))
+    rows = fetched_data.get("tags", [])
+    if not isinstance(rows, list):
+        raise SystemExit("mlflow runs/get tags is not a list")
+    values = {
+        str(row["key"]): str(row["value"])
+        for row in rows
+        if isinstance(row, dict) and "key" in row and "value" in row
+    }
     for key, value in tags.items():
         if values.get(key) != value:
             raise SystemExit(f"mlflow tag mismatch: {key}")
@@ -187,8 +216,11 @@ def cmd_uri_host(args: argparse.Namespace) -> int:
 
 
 def cmd_verify_flush_output(args: argparse.Namespace) -> int:
-    payload = json.loads(Path(args.output_json).read_text(encoding="utf-8"))
-    uploaded = payload.get("uploaded", [])
+    payload = cast(dict[str, object], json.loads(Path(args.output_json).read_text(encoding="utf-8")))
+    uploaded_raw = payload.get("uploaded", [])
+    if not isinstance(uploaded_raw, list):
+        raise SystemExit("flush output uploaded field is not a list")
+    uploaded = [row for row in uploaded_raw if isinstance(row, dict)]
     if not any(row.get("flow_run_id") == args.flow_run_id for row in uploaded):
         raise SystemExit("flush did not export current flow run")
     print("flush-ok")
@@ -307,7 +339,8 @@ def _build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
-    return args.func(args)
+    func = cast(Callable[[argparse.Namespace], int], args.func)
+    return func(args)
 
 
 if __name__ == "__main__":

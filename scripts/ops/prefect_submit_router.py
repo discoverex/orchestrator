@@ -5,11 +5,12 @@ import argparse
 import json
 import os
 import sys
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib import error, request
+
+from pydantic import BaseModel, ConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR / "src") not in sys.path:
@@ -62,8 +63,9 @@ def _parse_bool(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-@dataclass(frozen=True)
-class QueueDepth:
+class QueueDepth(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
     queue_name: str
     scheduled_count: int
     running_count: int

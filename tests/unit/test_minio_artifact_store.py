@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, BinaryIO
+
 import pytest
 
 from storage.adapters.minio_store import MinioObjectStore, parse_s3_uri
@@ -16,8 +18,36 @@ class FakeMinio:
     def make_bucket(self, bucket: str) -> None:
         self.buckets.add(bucket)
 
-    def put_object(self, bucket: str, object_key: str, data, length: int, content_type: str) -> None:
+    def put_object(self, bucket: str, object_key: str, data: BinaryIO, length: int, content_type: str) -> None:
+        _ = content_type
         self.objects.append((bucket, object_key, data.read(length)))
+
+    def list_buckets(self) -> list[Any]:
+        return []
+
+    def list_objects(
+        self, *, bucket_name: str, prefix: str, recursive: bool, start_after: str | None = None
+    ) -> list[Any]:
+        _ = (bucket_name, prefix, recursive, start_after)
+        return []
+
+    def fput_object(self, bucket: str, object_key: str, file_path: str) -> None:
+        _ = (bucket, object_key, file_path)
+
+    def fget_object(self, bucket: str, object_key: str, file_path: str) -> None:
+        _ = (bucket, object_key, file_path)
+
+    def get_object(self, bucket: str, object_key: str) -> Any:
+        _ = (bucket, object_key)
+        return object()
+
+    def stat_object(self, bucket: str, object_key: str) -> Any:
+        _ = (bucket, object_key)
+        return object()
+
+    def get_presigned_url(self, method: str, bucket: str, object_key: str, *, expires: object) -> str:
+        _ = (method, bucket, object_key, expires)
+        return "https://example/presigned"
 
 
 def test_parse_s3_uri_valid() -> None:

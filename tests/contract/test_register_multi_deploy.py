@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import argparse
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, cast
 
 import deployments.register as register
+import pytest
 
 
 class _FakeSourceFlow:
@@ -17,20 +19,21 @@ class _FakeSourceFlow:
 
 @contextmanager
 def _patch_flow(fake: _FakeSourceFlow) -> Iterator[None]:
-    original = register.flow.from_source
-    register.flow.from_source = lambda **kwargs: fake  # type: ignore[assignment]
+    register_any = cast(Any, register)
+    original = register_any.flow.from_source
+    register_any.flow.from_source = lambda **kwargs: fake
     try:
         yield
     finally:
-        register.flow.from_source = original  # type: ignore[assignment]
+        register_any.flow.from_source = original
 
 
-def test_dual_mode_registers_fixed_and_colab(monkeypatch) -> None:  # noqa: ANN001
+def test_dual_mode_registers_fixed_and_colab(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = _FakeSourceFlow()
     monkeypatch.setattr(
         register,
         "parse_args",
-        lambda: register.argparse.Namespace(
+        lambda: argparse.Namespace(
             single_name=None,
             single_queue="default",
             pool="gpu-pool",
@@ -51,12 +54,12 @@ def test_dual_mode_registers_fixed_and_colab(monkeypatch) -> None:  # noqa: ANN0
     assert fake.calls[1]["work_queue_name"] == "gpu-colab"
 
 
-def test_single_mode_registers_compat_deployment(monkeypatch) -> None:  # noqa: ANN001
+def test_single_mode_registers_compat_deployment(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = _FakeSourceFlow()
     monkeypatch.setattr(
         register,
         "parse_args",
-        lambda: register.argparse.Namespace(
+        lambda: argparse.Namespace(
             single_name="engine-run",
             single_queue="default",
             pool="gpu-pool",

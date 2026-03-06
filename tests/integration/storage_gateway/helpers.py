@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -17,7 +18,17 @@ class DummyStorageApp:
     def _object_uri(self, flow_run_id: str, attempt: int, filename: str) -> str:
         return f"s3://{self.bucket}/jobs/{flow_run_id}/attempt-{attempt}/{filename}"
 
-    def issue_presign(self, *, flow_run_id: str, attempt: int, filename: str, method: str, base_url: str, ttl_seconds: int | None):
+    def issue_presign(
+        self,
+        *,
+        flow_run_id: str,
+        attempt: int,
+        filename: str,
+        method: str,
+        base_url: str,
+        ttl_seconds: int | None,
+    ) -> PresignResult:
+        _ = base_url
         ttl = 900 if ttl_seconds is None else ttl_seconds
         if ttl > 3600:
             raise ValueError("ttl_seconds must be <= 3600")
@@ -29,7 +40,7 @@ class DummyStorageApp:
             expires_at=datetime.now(timezone.utc),
         )
 
-    def issue_batch_put(self, *, entries, base_url: str):
+    def issue_batch_put(self, *, entries: list[Any], base_url: str) -> list[PresignResult]:
         return [
             self.issue_presign(
                 flow_run_id=e.flow_run_id,
@@ -42,7 +53,8 @@ class DummyStorageApp:
             for e in entries
         ]
 
-    def proxy_upload(self, *, token: str, data: bytes, content_type: str):
+    def proxy_upload(self, *, token: str, data: bytes, content_type: str) -> ObjectStat:
+        _ = content_type
         method, object_uri = token.split(":", 1)
         assert method == "PUT"
         self.objects[object_uri] = data
@@ -53,7 +65,7 @@ class DummyStorageApp:
         assert method == "GET"
         return self.objects[object_uri]
 
-    def head_object(self, object_uri: str):
+    def head_object(self, object_uri: str) -> ExplorerHeadResult:
         if object_uri not in self.objects:
             return ExplorerHeadResult(exists=False, stat=None)
         return ExplorerHeadResult(exists=True, stat=ObjectStat(uri=object_uri, size=len(self.objects[object_uri])))
@@ -61,7 +73,15 @@ class DummyStorageApp:
     def list_buckets(self) -> list[str]:
         return [self.bucket]
 
-    def list_objects(self, *, bucket: str, prefix: str = "", cursor: str | None = None, limit: int = 200):
+    def list_objects(
+        self,
+        *,
+        bucket: str,
+        prefix: str = "",
+        cursor: str | None = None,
+        limit: int = 200,
+    ) -> ExplorerListResult:
+        _ = bucket
         rows: list[ObjectListEntry] = []
         for object_uri, data in sorted(self.objects.items()):
             key = object_uri.split("/", 3)[-1]

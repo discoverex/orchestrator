@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 _SAFE_KEY = re.compile(r"[^a-zA-Z0-9._-]+")
 
@@ -29,7 +29,10 @@ def load_checkpoint(path: Path | None) -> dict[str, Any]:
     if path is None or not path.exists():
         return {}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return cast(dict[str, Any], data)
+        return {}
     except (json.JSONDecodeError, OSError):
         return {}
 

@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from storage.application.models import ExplorerHeadResult, ExplorerListResult, PresignResult
-from storage.domain.models.object_ref import ObjectStat
-from storage.ports.object_store import ObjectStorePort
-from storage.ports.token_signer import TokenSignerPort
+from common import StrictModel
+from ..domain.models.object_ref import ObjectStat
+from ..ports.object_store import ObjectStorePort
+from ..ports.token_signer import TokenSignerPort
+from .models import ExplorerHeadResult, ExplorerListResult, PresignResult
 
 
-@dataclass(frozen=True)
-class PresignEntry:
+class PresignEntry(StrictModel):
     flow_run_id: str
     attempt: int
     kind: str

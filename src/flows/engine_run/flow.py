@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from prefect import flow
 from prefect.context import get_run_context
@@ -26,13 +26,23 @@ def _artifact_paths_exist(local_paths: dict[str, str]) -> bool:
     return all(Path(local_paths[k]).exists() for k in ("stdout", "stderr", "result"))
 
 
+def _flow_attempt() -> int:
+    try:
+        ctx = get_run_context()
+        flow_ctx = getattr(ctx, "flow_run", None)
+        run_count = getattr(flow_ctx, "run_count", None)
+        return int(run_count or 1)
+    except Exception:
+        return 1
+
+
 @flow(name="run-job", retries=3, retry_delay_seconds=30)
 def run_job_flow(
     job_spec_json: str | dict[str, Any],
     resume_key: str | None = None,
     checkpoint_dir: str | None = None,
 ) -> dict[str, object]:
-    run_id = flow_run.get_id()
+    run_id = flow_run.get_id() or "unknown-flow-run"
     if isinstance(job_spec_json, dict):
         import json
 
@@ -50,10 +60,7 @@ def run_job_flow(
     state.setdefault("resume_key", active_resume_key)
     state.setdefault("steps", {})
 
-    try:
-        attempt = int(get_run_context().flow_run.run_count or 1)
-    except Exception:
-        attempt = 1
+    attempt = _flow_attempt()
     state["attempt"] = attempt
     save_checkpoint(checkpoint_path, state)
 
@@ -74,7 +81,7 @@ def run_job_flow(
         save_checkpoint(checkpoint_path, state)
 
     if _step_done(state, "run_entrypoint"):
-        local_paths = state["local_paths"]
+        local_paths = cast(dict[str, str], state["local_paths"])
         exit_code = int(state.get("exit_code", 1))
     else:
         effective_outputs_prefix = job.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/"
@@ -102,7 +109,7 @@ def run_job_flow(
     else:
         links = prepare_manifest_task(run_id, attempt)
         _mark_step(state, "prepare_manifest")
-        state["links"] = [link.__dict__ for link in links]
+        state["links"] = [link.model_dump(mode="json") for link in links]
         save_checkpoint(checkpoint_path, state)
 
         uploaded = upload_outputs_task(

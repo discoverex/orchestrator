@@ -184,7 +184,7 @@ verify_prefect_flush() {
   FLUSH_TARGET_URL="${STORAGE_GATEWAY_URL}" \
   FLUSH_GATEWAY_TOKEN="${STORAGE_GATEWAY_TOKEN}" \
   FLUSH_CURSOR_PATH="${LOG_DIR}/prefect-flush-cursor.json" \
-  python3 scripts/ops/prefect_flush_completed.py --once --page-size 100 --max-runs 500 >"${out_json}"
+  uv run python scripts/ops/prefect_flush_completed.py --once --page-size 100 --max-runs 500 >"${out_json}"
 
   python3 "${PY_HELPER}" verify-flush-output \
     --output-json "${out_json}" \
@@ -194,7 +194,7 @@ verify_prefect_flush() {
 verify_prefect_prune() {
   local out_json="${LOG_DIR}/prefect-prune.json"
   PREFECT_API_URL="${PREFECT_API_URL}" \
-  python3 scripts/ops/prefect_prune_completed.py --apply --ttl-hours 0 --page-size 200 --max-runs 1000 >"${out_json}"
+  uv run python scripts/ops/prefect_prune_completed.py --apply --ttl-hours 0 --page-size 200 --max-runs 1000 >"${out_json}"
 
   python3 "${PY_HELPER}" verify-prune-removed \
     --prefect-api-url "${PREFECT_API_URL}" \

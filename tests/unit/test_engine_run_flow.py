@@ -4,10 +4,12 @@ import importlib
 import json
 from pathlib import Path
 
+import pytest
+
 from flows.engine_run_flow import ArtifactLink, upload_outputs_task
 
 
-def test_upload_outputs_task_skips_already_uploaded(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+def test_upload_outputs_task_skips_already_uploaded(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     uploads: list[Path] = []
     tasks_module = importlib.import_module("flows.engine_run.tasks")
 

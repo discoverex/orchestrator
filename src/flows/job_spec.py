@@ -5,16 +5,15 @@ import os
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from common import StrictModel
+from pydantic import Field, ValidationError, field_validator
 
 
 class JobSpecError(RuntimeError):
     pass
 
 
-class JobSpec(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class JobSpec(StrictModel):
     engine: str = Field(min_length=1)
     repo_url: str = Field(min_length=1)
     ref: str = Field(min_length=1)

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib import error, request
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 def env(name: str, default: str | None = None, *, required: bool = False) -> str:
@@ -48,10 +49,11 @@ def json_request(
     return json.loads(raw.decode("utf-8"))
 
 
-@dataclass
-class Cursor:
+class Cursor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     last_end_time: str = ""
-    ids_at_last_end_time: list[str] | None = None
+    ids_at_last_end_time: list[str] = Field(default_factory=list)
 
     @classmethod
     def load(cls, path: Path) -> "Cursor":
@@ -70,7 +72,7 @@ class Cursor:
             json.dumps(
                 {
                     "last_end_time": self.last_end_time,
-                    "ids_at_last_end_time": self.ids_at_last_end_time or [],
+                    "ids_at_last_end_time": self.ids_at_last_end_time,
                     "updated_at": iso_now(),
                 },
                 ensure_ascii=True,
@@ -85,7 +87,7 @@ class Cursor:
             return False
         if end_time < self.last_end_time:
             return True
-        if end_time == self.last_end_time and run_id in (self.ids_at_last_end_time or []):
+        if end_time == self.last_end_time and run_id in self.ids_at_last_end_time:
             return True
         return False
 
@@ -95,10 +97,8 @@ class Cursor:
             self.ids_at_last_end_time = [run_id]
             return
         if end_time == self.last_end_time:
-            ids = self.ids_at_last_end_time or []
-            if run_id not in ids:
-                ids.append(run_id)
-            self.ids_at_last_end_time = ids
+            if run_id not in self.ids_at_last_end_time:
+                self.ids_at_last_end_time.append(run_id)
 
 
 def prefect_api_url() -> str:
