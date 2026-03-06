@@ -81,6 +81,7 @@ Artifact and experiment policy:
 Use this when this machine is dedicated storage node:
 
 ```bash
+./bin/project runtime init storage
 cp infra/stacks/storage-node/.env.example infra/stacks/storage-node/.env
 set -a; source infra/stacks/storage-node/.env; set +a
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml build base-runtime
@@ -109,6 +110,7 @@ Runbook: `docs/ops/prefect-server.md`
 `bin/project` is the canonical local operator command:
 
 ```bash
+./bin/project runtime init all
 ./bin/project e2e full --keep-on-fail
 ./bin/project e2e-remote --prefect-api-url https://prefect.example.com/api --prune-mode apply
 ./bin/project storage up
@@ -122,6 +124,11 @@ Runbook: `docs/ops/prefect-server.md`
 ./bin/project worker register-gpu
 ./bin/project worker submit --repo-url https://github.com/octocat/Hello-World.git --ref master
 ```
+
+Runtime data policy:
+
+- Run commands from project root (`orchestrator`).
+- Keep runtime data outside repo under `../runtime` (for example `../runtime/storage`, `../runtime/worker`).
 
 `bin/remote` provides remote VM control for Prefect stack:
 

@@ -5,6 +5,7 @@ Always-on GPU worker stack for the fixed worker node.
 ## 1) Configure
 
 ```bash
+./bin/project runtime init worker
 cp infra/stacks/worker/fixed/.env.example infra/stacks/worker/fixed/.env
 # edit infra/stacks/worker/fixed/.env
 ```
@@ -27,3 +28,4 @@ docker compose --env-file infra/stacks/worker/fixed/.env -f infra/stacks/worker/
 
 - Default queue target is `gpu-fixed`.
 - This unit is intended to be always-on and low-touch.
+- Runtime data is expected outside repo at `../runtime/worker` by default.

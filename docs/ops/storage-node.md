@@ -12,6 +12,7 @@ Prefect server must run on another node.
 ## 1) Deploy (production profile)
 
 ```bash
+./bin/project runtime init storage
 cp infra/stacks/storage-node/.env.example infra/stacks/storage-node/.env
 # fill strong secrets, MLflow DB, and Cloudflare values
 set -a; source infra/stacks/storage-node/.env; set +a
@@ -21,6 +22,11 @@ docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml build storage-gateway
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml up -d
 ```
+
+Runtime policy:
+
+- Keep compose/scripts/env files in `orchestrator`.
+- Keep runtime data in parent `../runtime/storage` (default via `.env.example`).
 
 ## 2) Access model
 
@@ -101,7 +107,7 @@ uv run python scripts/ops/storage_backup.py
 Recommend cron:
 
 ```cron
-15 2 * * * cd /home/esillileu/discoverex/orchestrator && /usr/bin/env bash -lc 'set -a; source infra/stacks/storage-node/.env; set +a; uv run python scripts/ops/storage_backup.py >> /home/esillileu/discoverex/data/backups/backup.log 2>&1'
+15 2 * * * cd /home/esillileu/discoverex/orchestrator && /usr/bin/env bash -lc 'set -a; source infra/stacks/storage-node/.env; set +a; uv run python scripts/ops/storage_backup.py >> ../runtime/storage/logs/backup.log 2>&1'
 ```
 
 ## 6) Restore drill (weekly)
