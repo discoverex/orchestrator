@@ -26,6 +26,14 @@ jobs:
           enable-cache: true
       - run: uv python install 3.11
       - run: uv sync --dev --frozen
+      - name: Validate Prefect Caddyfile
+        run: |
+          docker run --rm \
+            -e PREFECT_HOSTNAMES="prefect.example.com prefect-api.example.com" \
+            -e PREFECT_PORT=4200 \
+            -v "$PWD/infra/stacks/prefect-server/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10 \
+            caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
       - run: uv run pytest -q
         env:
           PYTHONPATH: src

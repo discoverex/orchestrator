@@ -1,8 +1,6 @@
-http://{$PREFECT_HOSTNAMES} {
-  redir https://{host}{uri} permanent
-}
-
-https://{$PREFECT_HOSTNAMES} {
+{$PREFECT_HOSTNAMES} {
+  @http protocol http
+  redir @http https://{host}{uri} permanent
   encode zstd gzip
   reverse_proxy prefect-server:{$PREFECT_PORT}
 }
