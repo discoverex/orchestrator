@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def _load_module():
-    path = Path(__file__).resolve().parents[1] / "scripts" / "e2e" / "verify_remote_chain.py"
+    path = Path(__file__).resolve().parents[2] / "scripts" / "e2e" / "verify_remote_chain.py"
     spec = importlib.util.spec_from_file_location("verify_remote_chain", path)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
