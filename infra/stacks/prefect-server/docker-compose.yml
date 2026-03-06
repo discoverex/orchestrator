@@ -84,8 +84,17 @@ services:
         condition: service_healthy
     environment:
       PREFECT_HOSTNAMES: ${PREFECT_HOSTNAMES}
+      PREFECT_HOSTNAMES_SPACE: ${PREFECT_HOSTNAMES_SPACE:-}
       PREFECT_PORT: ${PREFECT_PORT:-4200}
       CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:-}
+    command:
+      - sh
+      - -lc
+      - >
+        hostnames="$${PREFECT_HOSTNAMES_SPACE:-$${PREFECT_HOSTNAMES}}" &&
+        hostnames="$${hostnames//,/ }" &&
+        export PREFECT_HOSTNAMES="$${hostnames}" &&
+        caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     ports:
       - "80:80"
       - "443:443"
