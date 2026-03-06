@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 from prefect import flow
@@ -26,11 +27,20 @@ def main() -> None:
         entrypoint="src/flows/engine_run_flow.py:engine_run_flow",
     )
     base_parameters = {
-        "repo_url": "https://github.com/example/repo.git",
-        "ref": "main",
-        "entrypoint": ["/bin/sh", "-lc", "echo hello"],
-        "resume_key": None,
-        "checkpoint_dir": None,
+        "job_spec_json": json.dumps(
+            {
+                "engine": "shell",
+                "repo_url": "https://github.com/example/repo.git",
+                "ref": "main",
+                "entrypoint": ["/bin/sh", "-lc", "echo hello"],
+                "config": None,
+                "job_name": None,
+                "inputs": {},
+                "env": {},
+                "outputs_prefix": None,
+            },
+            ensure_ascii=True,
+        )
     }
 
     if args.single_name:

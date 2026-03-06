@@ -88,9 +88,6 @@ export MLFLOW_TRACKING_URI=https://mlflow.discoverex.qzz.io
 # - save returned object_uri values as MLflow tags (artifact_manifest_uri, artifact_stdout_uri, ...)
 ```
 
-If `scripts/e2e/e2e_local_orchestrator.sh --mode full` fails at `full.verify_prereqs`,
-fix `.env` keys and DNS resolution first before retrying.
-
 If it fails at `mlflow.verify_tags` with `mlflow runs/create failed: HTTP 403`,
 Cloudflare Access policy is still blocking MLflow write APIs for the service token.
 

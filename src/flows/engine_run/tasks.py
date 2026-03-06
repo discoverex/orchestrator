@@ -36,7 +36,37 @@ def prepare_manifest_task(flow_run_id: str, attempt: int) -> list[ArtifactLink]:
 
 @task
 def run_entrypoint_task(repo_url: str, resolved_commit: str, entrypoint: list[str], env: dict[str, str]) -> tuple[dict[str, str], int]:
-    artifacts = run_entrypoint(repo_url=repo_url, resolved_commit=resolved_commit, entrypoint=entrypoint, env=env)
+    raise RuntimeError("run_entrypoint_task signature changed; call run_entrypoint_job_task instead")
+
+
+@task
+def run_entrypoint_job_task(
+    *,
+    repo_url: str,
+    resolved_commit: str,
+    entrypoint: list[str],
+    env: dict[str, str],
+    engine: str,
+    config_rel_path: str | None,
+    inputs: dict[str, object],
+    flow_run_id: str,
+    attempt: int,
+    outputs_prefix: str,
+    job_name: str | None = None,
+) -> tuple[dict[str, str], int]:
+    artifacts = run_entrypoint(
+        repo_url=repo_url,
+        resolved_commit=resolved_commit,
+        entrypoint=entrypoint,
+        env=env,
+        engine=engine,
+        config_rel_path=config_rel_path,
+        inputs=inputs,
+        flow_run_id=flow_run_id,
+        attempt=attempt,
+        outputs_prefix=outputs_prefix,
+        job_name=job_name,
+    )
     paths = {
         "workdir": str(artifacts.workdir),
         "stdout": str(artifacts.stdout_path),

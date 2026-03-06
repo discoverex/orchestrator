@@ -50,7 +50,7 @@ Examples:
   project runtime init all
   project worker fixed up
   project worker register-gpu
-  project worker submit --repo-url https://github.com/octocat/Hello-World.git --ref master
+  project worker submit --job-spec-json '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo hello"]}'
 EOF
 }
 

@@ -16,7 +16,7 @@ cp infra/stacks/register/.env.example infra/stacks/register/.env
 ## 2) Register deployment
 
 ```bash
-docker compose -f docker-compose.local.yml exec -T prefect prefect work-pool create ${PREFECT_WORK_POOL:-gpu-pool} --type process || true
+docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml exec -T prefect prefect work-pool create ${PREFECT_WORK_POOL:-gpu-pool} --type process || true
 docker compose --env-file infra/stacks/register/.env -f infra/stacks/register/docker-compose.yml build base-runtime
 docker compose --env-file infra/stacks/register/.env -f infra/stacks/register/docker-compose.yml run --rm register
 ```
