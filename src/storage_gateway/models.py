@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from common import StrictModel
+from pydantic import Field
 
 
 class ArtifactKind(str, Enum):
@@ -23,7 +24,7 @@ DEFAULT_FILENAMES: dict[ArtifactKind, str] = {
 }
 
 
-class PresignRequest(BaseModel):
+class PresignRequest(StrictModel):
     flow_run_id: str = Field(min_length=1)
     attempt: int = Field(ge=1)
     kind: ArtifactKind
@@ -31,23 +32,23 @@ class PresignRequest(BaseModel):
     ttl_seconds: int | None = Field(default=None, gt=0)
 
 
-class BatchPresignRequest(BaseModel):
+class BatchPresignRequest(StrictModel):
     flow_run_id: str = Field(min_length=1)
     attempt: int = Field(ge=1)
     entries: list[PresignRequest] = Field(min_length=1)
 
 
-class PresignResponse(BaseModel):
+class PresignResponse(StrictModel):
     kind: ArtifactKind
     object_uri: str
     url: str
     expires_at: datetime
 
 
-class HeadRequest(BaseModel):
+class HeadRequest(StrictModel):
     object_uri: str
 
 
-class HeadResponse(BaseModel):
+class HeadResponse(StrictModel):
     exists: bool
     size: int | None = None

@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
+from common import StrictModel
 
-@dataclass(frozen=True)
-class CodeRef:
+
+class CodeRef(StrictModel):
     repo_url: str
     ref: str
     resolved_commit: str
     entrypoint: list[str]
 
 
-@dataclass(frozen=True)
-class RunArtifacts:
+class RunArtifacts(StrictModel):
     workdir: Path
     stdout_path: Path
     stderr_path: Path

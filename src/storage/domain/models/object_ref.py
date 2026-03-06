@@ -1,22 +1,20 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 
+from common import StrictModel
 
-@dataclass(frozen=True)
-class ObjectRef:
+
+class ObjectRef(StrictModel):
     uri: str
 
 
-@dataclass(frozen=True)
-class ObjectStat:
+class ObjectStat(StrictModel):
     uri: str
     size: int
 
 
-@dataclass(frozen=True)
-class ObjectListEntry:
+class ObjectListEntry(StrictModel):
     object_uri: str
     object_key: str
     size: int

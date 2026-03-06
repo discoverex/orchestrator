@@ -1,9 +1,24 @@
 from __future__ import annotations
 
+from typing import Callable, Protocol
+
+from fastapi import FastAPI
 from fastapi import Header, HTTPException
 
 
-def authorize(app_state, authorization: str | None, cf_access_client_id: str | None, cf_access_client_secret: str | None) -> None:
+class GatewayAuthState(Protocol):
+    token: str
+    require_cf_access: bool
+    cf_client_id: str
+    cf_client_secret: str
+
+
+def authorize(
+    app_state: GatewayAuthState,
+    authorization: str | None,
+    cf_access_client_id: str | None,
+    cf_access_client_secret: str | None,
+) -> None:
     expected = f"Bearer {app_state.token}"
     if authorization != expected:
         raise HTTPException(status_code=401, detail="unauthorized")
@@ -15,7 +30,7 @@ def authorize(app_state, authorization: str | None, cf_access_client_id: str | N
         raise HTTPException(status_code=403, detail="cf_access_forbidden")
 
 
-def authorize_dependency(app):
+def authorize_dependency(app: FastAPI) -> Callable[[str | None, str | None, str | None], None]:
     def _authorize(
         authorization: str | None = Header(default=None),
         cf_access_client_id: str | None = Header(default=None),

@@ -3,8 +3,23 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import Protocol, cast
 
 from prefect import flow
+
+
+class DeployableFlow(Protocol):
+    def deploy(
+        self,
+        *,
+        name: str,
+        work_pool_name: str,
+        work_queue_name: str,
+        version: str | None,
+        build: bool,
+        push: bool,
+        parameters: dict[str, str],
+    ) -> None: ...
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,9 +37,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    source_flow = flow.from_source(
+    source_flow = cast(
+        DeployableFlow,
+        flow.from_source(
         source=str(Path.cwd()),
         entrypoint="src/flows/engine_run_flow.py:engine_run_flow",
+        ),
     )
     base_parameters = {
         "job_spec_json": json.dumps(

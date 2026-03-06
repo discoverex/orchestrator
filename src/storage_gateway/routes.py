@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 
 from storage.application.service import PresignEntry
 from storage_gateway.auth import authorize_dependency
@@ -14,7 +14,7 @@ from storage_gateway.models import (
 )
 
 
-def build_router(app) -> APIRouter:
+def build_router(app: FastAPI) -> APIRouter:
     router = APIRouter()
     authorize = authorize_dependency(app)
 

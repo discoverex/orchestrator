@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from storage.domain.models.object_ref import ObjectListEntry, ObjectStat
+from ..domain.models.object_ref import ObjectListEntry, ObjectStat
 
 
 class ObjectStorePort(Protocol):

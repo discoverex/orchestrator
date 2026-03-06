@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from common import StrictModel
 
 
-@dataclass(frozen=True)
-class ArtifactLink:
+class ArtifactLink(StrictModel):
     kind: str
     object_uri: str
     url: str

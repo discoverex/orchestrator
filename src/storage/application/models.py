@@ -1,27 +1,24 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 
-from storage.domain.models.object_ref import ObjectListEntry, ObjectStat
+from common import StrictModel
+from ..domain.models.object_ref import ObjectListEntry, ObjectStat
 
 
-@dataclass(frozen=True)
-class PresignResult:
+class PresignResult(StrictModel):
     object_uri: str
     url: str
     expires_at: datetime
 
 
-@dataclass(frozen=True)
-class ExplorerListResult:
+class ExplorerListResult(StrictModel):
     bucket: str
     prefix: str
     next_cursor: str | None
     entries: list[ObjectListEntry]
 
 
-@dataclass(frozen=True)
-class ExplorerHeadResult:
+class ExplorerHeadResult(StrictModel):
     exists: bool
     stat: ObjectStat | None
