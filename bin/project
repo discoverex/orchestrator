@@ -23,6 +23,7 @@ usage() {
 Usage:
   project e2e [core|mlflow|full] [--keep-on-fail] [--timeout-sec N]
   project e2e-remote --prefect-api-url URL [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
+  project base <build> [args...]
   project storage <up|down|ps|logs|build> [args...]
   project prefect <up|down|ps|logs|build|flush|prune> [args...]
   project local <up|down|ps|logs|build> [args...]
@@ -36,6 +37,7 @@ Examples:
   project e2e
   project e2e full --keep-on-fail
   project e2e-remote --prefect-api-url https://prefect.example.com/api --prune-mode apply
+  project base build
   project storage up
   project storage down
   project storage logs --tail=120
@@ -69,6 +71,10 @@ run_prefect() {
 
 run_worker_fixed() {
   docker compose --env-file "${WORKER_FIXED_ENV}" -f "${WORKER_FIXED_COMPOSE}" "$@"
+}
+
+build_base_runtime() {
+  docker build -f "${ROOT_DIR}/infra/images/base.Dockerfile" -t orchestrator-base:local "$@" "${ROOT_DIR}"
 }
 
 runtime_init() {
@@ -134,6 +140,19 @@ case "${cmd}" in
     exec "${REMOTE_E2E_SCRIPT}" "$@"
     ;;
 
+  base)
+    sub="${1:-}"
+    shift || true
+    case "${sub}" in
+      build) build_base_runtime "$@" ;;
+      *)
+        echo "unknown base command: ${sub}" >&2
+        usage
+        exit 2
+        ;;
+    esac
+    ;;
+
   storage)
     sub="${1:-}"
     shift || true
@@ -142,7 +161,10 @@ case "${cmd}" in
       down) run_storage down "$@" ;;
       ps) run_storage ps "$@" ;;
       logs) run_storage logs --tail=120 "$@" ;;
-      build) run_storage build base-runtime storage-gateway mlflow "$@" ;;
+      build)
+        build_base_runtime
+        run_storage build base-runtime storage-gateway mlflow "$@"
+        ;;
       *)
         echo "unknown storage command: ${sub}" >&2
         usage
@@ -159,7 +181,10 @@ case "${cmd}" in
       down) run_prefect down "$@" ;;
       ps) run_prefect ps "$@" ;;
       logs) run_prefect logs --tail=120 "$@" ;;
-      build) docker build -f "${ROOT_DIR}/infra/images/prefect-server.Dockerfile" -t orchestrator-prefect-server:local "$@" "${ROOT_DIR}" ;;
+      build)
+        build_base_runtime
+        docker build -f "${ROOT_DIR}/infra/images/prefect-server.Dockerfile" -t orchestrator-prefect-server:local "$@" "${ROOT_DIR}"
+        ;;
       flush) run_prefect run --rm prefect-maintenance python /opt/orchestrator/scripts/ops/prefect_flush_completed.py --once "$@" ;;
       prune) run_prefect run --rm prefect-maintenance python /opt/orchestrator/scripts/ops/prefect_prune_completed.py --apply "$@" ;;
       *)
@@ -178,7 +203,10 @@ case "${cmd}" in
       down) run_local down "$@" ;;
       ps) run_local ps "$@" ;;
       logs) run_local logs --tail=120 "$@" ;;
-      build) run_local build base-runtime storage-gateway worker register "$@" ;;
+      build)
+        build_base_runtime
+        run_local build base-runtime storage-gateway worker register "$@"
+        ;;
       *)
         echo "unknown local command: ${sub}" >&2
         usage
@@ -192,7 +220,10 @@ case "${cmd}" in
     shift || true
     case "${sub}" in
       run) run_register run --rm register "$@" ;;
-      build) run_register build base-runtime register "$@" ;;
+      build)
+        build_base_runtime
+        run_register build base-runtime register "$@"
+        ;;
       *)
         echo "unknown register command: ${sub}" >&2
         usage
@@ -228,7 +259,10 @@ case "${cmd}" in
           down) run_worker_fixed down "$@" ;;
           ps) run_worker_fixed ps "$@" ;;
           logs) run_worker_fixed logs --tail=120 "$@" ;;
-          build) run_worker_fixed build base-runtime worker "$@" ;;
+          build)
+            build_base_runtime
+            run_worker_fixed build base-runtime worker "$@"
+            ;;
           *)
             echo "unknown worker fixed command: ${action}" >&2
             usage
