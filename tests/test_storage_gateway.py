@@ -84,12 +84,6 @@ def _client() -> TestClient:
     app.state.storage_app = DummyStorageApp()
     app.state.token = "test-token"
     app.state.require_cf_access = False
-    app.state.explorer_enabled = True
-    app.state.explorer_local_only = False
-    app.state.explorer_sessions = {}
-    app.state.explorer_cookie_name = "explorer_session"
-    app.state.explorer_session_ttl = 3600
-    app.state.explorer_page_size = 200
     return TestClient(app)
 
 
@@ -99,12 +93,6 @@ def _cf_client() -> TestClient:
     app.state.require_cf_access = True
     app.state.cf_client_id = "cf-id"
     app.state.cf_client_secret = "cf-secret"
-    app.state.explorer_enabled = True
-    app.state.explorer_local_only = False
-    app.state.explorer_sessions = {}
-    app.state.explorer_cookie_name = "explorer_session"
-    app.state.explorer_session_ttl = 3600
-    app.state.explorer_page_size = 200
     return TestClient(app)
 
 
@@ -207,34 +195,3 @@ def test_cf_access_required() -> None:
     )
     assert ok.status_code == 200
 
-
-def test_explorer_session_and_listing() -> None:
-    client = _client()
-    login = client.post("/v1/explorer/session", json={"token": "test-token"})
-    assert login.status_code == 200
-
-    buckets = client.get("/v1/explorer/buckets")
-    assert buckets.status_code == 200
-    assert buckets.json() == {"buckets": ["orchestrator-artifacts"]}
-
-    app.state.storage_app.objects["s3://orchestrator-artifacts/jobs/f1/attempt-1/stdout.log"] = b"abc"
-    objs = client.get("/v1/explorer/objects", params={"bucket": "orchestrator-artifacts", "prefix": "jobs/"})
-    assert objs.status_code == 200
-    payload = objs.json()
-    assert payload["bucket"] == "orchestrator-artifacts"
-    assert len(payload["entries"]) == 1
-    assert payload["entries"][0]["object_key"] == "jobs/f1/attempt-1/stdout.log"
-
-
-def test_explorer_download_requires_session() -> None:
-    client = _client()
-    object_uri = "s3://orchestrator-artifacts/jobs/f2/attempt-1/result.json"
-    app.state.storage_app.objects[object_uri] = b"payload"
-
-    unauthorized = client.get("/v1/explorer/download", params={"object_uri": object_uri})
-    assert unauthorized.status_code == 401
-
-    assert client.post("/v1/explorer/session", json={"token": "test-token"}).status_code == 200
-    downloaded = client.get("/v1/explorer/download", params={"object_uri": object_uri})
-    assert downloaded.status_code == 200
-    assert downloaded.content == b"payload"

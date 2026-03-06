@@ -42,8 +42,8 @@ def test_application_does_not_import_fastapi() -> None:
     assert not violations, "\n".join(violations)
 
 
-def test_gateway_and_explorer_do_not_import_storage_adapters() -> None:
-    roots = [Path("src/storage_gateway"), Path("src/storage_explorer")]
+def test_gateway_does_not_import_storage_adapters() -> None:
+    roots = [Path("src/storage_gateway")]
     violations: list[str] = []
     for root in roots:
         for path in _py_files(root):
