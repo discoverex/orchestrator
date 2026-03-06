@@ -81,6 +81,7 @@ jobs:
         run: |
           cp infra/stacks/prefect-server/docker-compose.yml docker-compose.yml
           cp infra/stacks/prefect-server/Caddyfile Caddyfile
+          cp infra/stacks/prefect-server/deploy.sh deploy.sh
           cat > .env.runtime <<'EOF'
           PREFECT_SERVER_IMAGE=${{ needs.build-images.outputs.image }}
           PREFECT_HOSTNAME=${{ vars.PREFECT_HOSTNAME }}
@@ -115,24 +116,21 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USERNAME }}
           key: ${{ secrets.REMOTE_SSH_KEY }}
-          source: docker-compose.yml,Caddyfile,.env.runtime
+          source: docker-compose.yml,Caddyfile,.env.runtime,deploy.sh
           target: ${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}
 
-      - name: Setup SSH key
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.REMOTE_SSH_KEY }}" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p "${{ vars.REMOTE_PORT || '22' }}" "${{ secrets.REMOTE_HOST }}" >> ~/.ssh/known_hosts
-
       - name: Deploy prefect stack
-        run: |
-          set -euo pipefail
-          ssh -i ~/.ssh/id_deploy -p "${{ vars.REMOTE_PORT || '22' }}" "${{ secrets.REMOTE_USERNAME }}@${{ secrets.REMOTE_HOST }}" \
-            "set -euo pipefail; \
-            export REMOTE_DEPLOY_PATH='${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}'; \
-            export ENV_FILE_NAME='.env.runtime'; \
-            export GHCR_USERNAME='${{ github.actor }}'; \
-            export GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}'; \
-            bash -s" < infra/stacks/prefect-server/deploy.sh
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USERNAME }}
+          key: ${{ secrets.REMOTE_SSH_KEY }}
+          port: ${{ vars.REMOTE_PORT || '22' }}
+          script: |
+            set -euo pipefail
+            export REMOTE_DEPLOY_PATH="${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}"
+            export ENV_FILE_NAME=".env.runtime"
+            export GHCR_USERNAME="${{ github.actor }}"
+            export GHCR_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            cd "${REMOTE_DEPLOY_PATH}"
+            bash ./deploy.sh
