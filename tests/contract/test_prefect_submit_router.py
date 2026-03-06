@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def _load_module():
-    path = Path(__file__).resolve().parents[1] / "scripts" / "ops" / "prefect_submit_router.py"
+    path = Path(__file__).resolve().parents[2] / "scripts" / "ops" / "prefect_submit_router.py"
     spec = importlib.util.spec_from_file_location("prefect_submit_router", path)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)

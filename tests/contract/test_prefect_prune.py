@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def _load_module():
-    path = Path(__file__).resolve().parents[1] / "scripts" / "ops" / "prefect_prune_completed.py"
+    path = Path(__file__).resolve().parents[2] / "scripts" / "ops" / "prefect_prune_completed.py"
     spec = importlib.util.spec_from_file_location("prefect_prune_completed", path)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
