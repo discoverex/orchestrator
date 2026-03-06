@@ -11,23 +11,28 @@ REGISTER_COMPOSE="${ROOT_DIR}/infra/stacks/register/docker-compose.yml"
 PREFECT_ENV="${ROOT_DIR}/infra/stacks/prefect-server/.env"
 PREFECT_COMPOSE="${ROOT_DIR}/infra/stacks/prefect-server/docker-compose.yml"
 E2E_SCRIPT="${ROOT_DIR}/scripts/e2e/e2e_orchestrator.sh"
+REMOTE_E2E_SCRIPT="${ROOT_DIR}/scripts/e2e/remote_prefect_storage_e2e.sh"
 
 usage() {
   cat <<'EOF'
 Usage:
   project e2e [core|mlflow|full] [--keep-on-fail] [--timeout-sec N]
+  project e2e-remote --prefect-api-url URL [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
   project storage <up|down|ps|logs|build> [args...]
-  project prefect <up|down|ps|logs|build> [args...]
+  project prefect <up|down|ps|logs|build|flush|prune> [args...]
   project local <up|down|ps|logs|build> [args...]
   project register <run|build> [args...]
 
 Examples:
   project e2e
   project e2e full --keep-on-fail
+  project e2e-remote --prefect-api-url https://prefect.example.com/api --prune-mode apply
   project storage up
   project storage down
   project storage logs --tail=120
   project prefect up
+  project prefect flush
+  project prefect prune
   project local up
   project register run
 EOF
@@ -77,6 +82,14 @@ case "${cmd}" in
     esac
     ;;
 
+  e2e-remote)
+    if [[ ! -x "${REMOTE_E2E_SCRIPT}" ]]; then
+      echo "missing executable: ${REMOTE_E2E_SCRIPT}" >&2
+      exit 1
+    fi
+    exec "${REMOTE_E2E_SCRIPT}" "$@"
+    ;;
+
   storage)
     sub="${1:-}"
     shift || true
@@ -98,11 +111,13 @@ case "${cmd}" in
     sub="${1:-}"
     shift || true
     case "${sub}" in
-      up) run_prefect up -d --build "$@" ;;
+      up) run_prefect up -d "$@" ;;
       down) run_prefect down "$@" ;;
       ps) run_prefect ps "$@" ;;
       logs) run_prefect logs --tail=120 "$@" ;;
-      build) run_prefect build prefect-server "$@" ;;
+      build) docker build -f "${ROOT_DIR}/infra/images/prefect-server.Dockerfile" -t orchestrator-prefect-server:local "$@" "${ROOT_DIR}" ;;
+      flush) run_prefect run --rm prefect-maintenance python /opt/orchestrator/scripts/ops/prefect_flush_completed.py --once "$@" ;;
+      prune) run_prefect run --rm prefect-maintenance python /opt/orchestrator/scripts/ops/prefect_prune_completed.py --apply "$@" ;;
       *)
         echo "unknown prefect command: ${sub}" >&2
         usage

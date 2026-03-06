@@ -1,0 +1,144 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+      - ops/test-action
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ vars.IMAGE_NAMESPACE || format('{0}/orchestrator', github.repository_owner) }}
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.11
+      - run: uv sync --dev --frozen
+      - name: Validate Prefect Caddyfile
+        run: |
+          docker run --rm \
+            -e PREFECT_HOSTNAMES="prefect.example.com prefect-api.example.com" \
+            -e PREFECT_PORT=4200 \
+            -v "$PWD/infra/stacks/prefect-server/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10 \
+            caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+      - run: uv run pytest -q
+        env:
+          PYTHONPATH: src
+
+  build-images:
+    needs: quality-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set image tag
+        id: image
+        run: echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/prefect-server:sha-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+      - name: Build and (optionally) push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/images/prefect-server.Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.image.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-prefect-server:
+    needs: build-images
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' && vars.ENABLE_PREFECT_DEPLOY == 'true' }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            infra/stacks/prefect-server/docker-compose.yml
+            infra/stacks/prefect-server/deploy.sh
+            infra/stacks/prefect-server/Caddyfile
+          sparse-checkout-cone-mode: false
+
+      - name: Prepare deploy assets
+        run: |
+          cp infra/stacks/prefect-server/docker-compose.yml docker-compose.yml
+          cp infra/stacks/prefect-server/Caddyfile Caddyfile
+          cp infra/stacks/prefect-server/deploy.sh deploy.sh
+          cat > .env.runtime <<'EOF'
+          PREFECT_SERVER_IMAGE=${{ needs.build-images.outputs.image }}
+          PREFECT_HOSTNAMES=${{ vars.PREFECT_HOSTNAMES }}
+          PREFECT_PORT=${{ vars.PREFECT_PORT }}
+          PREFECT_BIND_PORT=${{ vars.PREFECT_BIND_PORT }}
+          PREFECT_BIND_ADDRESS=${{ vars.PREFECT_BIND_ADDRESS }}
+          PREFECT_API_PUBLIC_URL=${{ vars.PREFECT_API_PUBLIC_URL }}
+          PREFECT_DB_NAME=${{ vars.PREFECT_DB_NAME }}
+          PREFECT_DB_USER=${{ vars.PREFECT_DB_USER }}
+          PREFECT_DB_PASSWORD=${{ secrets.PREFECT_DB_PASSWORD }}
+          PREFECT_DB_DATA_DIR=${{ vars.PREFECT_DB_DATA_DIR }}
+          FLUSH_TARGET_URL=${{ vars.FLUSH_TARGET_URL }}
+          FLUSH_GATEWAY_TOKEN=${{ secrets.FLUSH_GATEWAY_TOKEN }}
+          FLUSH_CF_ACCESS_CLIENT_ID=${{ secrets.FLUSH_CF_ACCESS_CLIENT_ID }}
+          FLUSH_CF_ACCESS_CLIENT_SECRET=${{ secrets.FLUSH_CF_ACCESS_CLIENT_SECRET }}
+          PREFECT_MAINT_DATA_DIR=${{ vars.PREFECT_MAINT_DATA_DIR }}
+          FLUSH_INTERVAL_SEC=${{ vars.FLUSH_INTERVAL_SEC }}
+          PRUNE_INTERVAL_SEC=${{ vars.PRUNE_INTERVAL_SEC }}
+          PRUNE_TTL_HOURS=${{ vars.PRUNE_TTL_HOURS }}
+          FLUSH_PAGE_SIZE=${{ vars.FLUSH_PAGE_SIZE }}
+          FLUSH_MAX_RUNS=${{ vars.FLUSH_MAX_RUNS }}
+          PRUNE_PAGE_SIZE=${{ vars.PRUNE_PAGE_SIZE }}
+          PRUNE_MAX_RUNS=${{ vars.PRUNE_MAX_RUNS }}
+          CADDY_ACME_EMAIL=${{ vars.CADDY_ACME_EMAIL }}
+          CADDY_DATA_DIR=${{ vars.CADDY_DATA_DIR }}
+          CADDY_CONFIG_DIR=${{ vars.CADDY_CONFIG_DIR }}
+          EOF
+
+      - name: Upload deploy assets
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USERNAME }}
+          key: ${{ secrets.REMOTE_SSH_KEY }}
+          source: docker-compose.yml,Caddyfile,.env.runtime,deploy.sh
+          target: ${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}
+
+      - name: Deploy prefect stack
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USERNAME }}
+          key: ${{ secrets.REMOTE_SSH_KEY }}
+          port: ${{ vars.REMOTE_PORT || '22' }}
+          script: |
+            set -euo pipefail
+            export REMOTE_DEPLOY_PATH="${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}"
+            export ENV_FILE_NAME=".env.runtime"
+            export GHCR_USERNAME="${{ github.actor }}"
+            export GHCR_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            cd "${REMOTE_DEPLOY_PATH}"
+            bash ./deploy.sh

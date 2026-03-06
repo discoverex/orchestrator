@@ -1,17 +1,21 @@
 # Prefect Server Stack (VM)
 
-This stack runs Prefect server + Cloudflare Tunnel on a VM for external workers.
+This stack runs Prefect server + VM-local Postgres.
+It also runs maintenance to flush completed runs to storage-node and prune old VM data.
 
 ## 1) Configure
 
 ```bash
 cp infra/stacks/prefect-server/.env.example infra/stacks/prefect-server/.env
 # edit infra/stacks/prefect-server/.env
-# copy tunnel credentials json into infra/stacks/prefect-server/.cloudflared/
+./bin/project prefect build
 ```
 
-`PREFECT_API_DATABASE_CONNECTION_URL` must point to the shared Postgres instance.
-Use logical DB/user separation (for example: database `prefect`, user `prefect_user`).
+`prefect-db` is part of this stack. Set `PREFECT_DB_*` values in `.env`.
+Completed runs are exported as full JSON snapshots using:
+
+- `FLUSH_TARGET_URL` (storage-gateway base URL)
+- `FLUSH_GATEWAY_TOKEN`
 
 ## 2) Start/stop
 
@@ -20,6 +24,8 @@ Use logical DB/user separation (for example: database `prefect`, user `prefect_u
 ./bin/project prefect ps
 ./bin/project prefect logs
 ./bin/project prefect down
+./bin/project prefect flush
+./bin/project prefect prune
 ```
 
 ## 3) VM bootstrap (remote)
@@ -38,9 +44,7 @@ from root `.env` by default.
 
 External workers should use:
 
-- `PREFECT_API_URL=https://<PREFECT_HOSTNAME>/api`
-- Cloudflare Access service token headers:
+- `PREFECT_API_URL=https://<your-domain>/api`
+- If Cloudflare Access is enabled on the domain, pass service token headers:
   - `CF-Access-Client-Id`
   - `CF-Access-Client-Secret`
-
-Apply Cloudflare Access policy so worker tokens can call Prefect API endpoints.

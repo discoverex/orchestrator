@@ -1,17 +1,40 @@
 services:
+  prefect-db:
+    image: postgres:16
+    container_name: orchestrator-prefect-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PREFECT_DB_NAME:-prefect}
+      POSTGRES_USER: ${PREFECT_DB_USER:-prefect_user}
+      POSTGRES_PASSWORD: ${PREFECT_DB_PASSWORD:-REPLACE_ME_PREFECT_DB_PASSWORD}
+    volumes:
+      - ${PREFECT_DB_DATA_DIR:-/srv/orchestrator/prefect-db}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PREFECT_DB_USER:-prefect_user} -d ${PREFECT_DB_NAME:-prefect}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   prefect-server:
-    build:
-      context: ../../..
-      dockerfile: infra/images/prefect-server.Dockerfile
-    image: orchestrator-prefect-server:local
+    image: ${PREFECT_SERVER_IMAGE:-orchestrator-prefect-server:local}
     container_name: orchestrator-prefect-server
     restart: unless-stopped
     environment:
-      PREFECT_API_DATABASE_CONNECTION_URL: ${PREFECT_API_DATABASE_CONNECTION_URL}
       PREFECT_API_URL: ${PREFECT_API_PUBLIC_URL:-}
-    command: prefect server start --host 0.0.0.0 --port ${PREFECT_PORT:-4200}
+      PREFECT_DB_NAME: ${PREFECT_DB_NAME:-prefect}
+      PREFECT_DB_USER: ${PREFECT_DB_USER:-prefect_user}
+      PREFECT_DB_PASSWORD: ${PREFECT_DB_PASSWORD:-REPLACE_ME_PREFECT_DB_PASSWORD}
+    command:
+      - sh
+      - -lc
+      - >
+        export PREFECT_API_DATABASE_CONNECTION_URL="postgresql+asyncpg://$${PREFECT_DB_USER}:$${PREFECT_DB_PASSWORD}@prefect-db:5432/$${PREFECT_DB_NAME}" &&
+        prefect server start --host 0.0.0.0 --port ${PREFECT_PORT:-4200}
     ports:
-      - "127.0.0.1:${PREFECT_BIND_PORT:-14200}:${PREFECT_PORT:-4200}"
+      - "${PREFECT_BIND_ADDRESS:-127.0.0.1}:${PREFECT_BIND_PORT:-14200}:${PREFECT_PORT:-4200}"
+    depends_on:
+      prefect-db:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -24,22 +47,58 @@ services:
       timeout: 5s
       retries: 12
 
-  cloudflared:
-    image: cloudflare/cloudflared:2026.2.0
-    container_name: orchestrator-prefect-cloudflared
+  prefect-maintenance:
+    image: ${PREFECT_SERVER_IMAGE:-orchestrator-prefect-server:local}
+    container_name: orchestrator-prefect-maintenance
     restart: unless-stopped
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    environment:
+      PREFECT_API_URL: http://prefect-server:${PREFECT_PORT:-4200}/api
+      FLUSH_TARGET_URL: ${FLUSH_TARGET_URL}
+      FLUSH_GATEWAY_TOKEN: ${FLUSH_GATEWAY_TOKEN}
+      FLUSH_CF_ACCESS_CLIENT_ID: ${FLUSH_CF_ACCESS_CLIENT_ID:-}
+      FLUSH_CF_ACCESS_CLIENT_SECRET: ${FLUSH_CF_ACCESS_CLIENT_SECRET:-}
+      FLUSH_INTERVAL_SEC: ${FLUSH_INTERVAL_SEC:-600}
+      PRUNE_INTERVAL_SEC: ${PRUNE_INTERVAL_SEC:-43200}
+      PRUNE_TTL_HOURS: ${PRUNE_TTL_HOURS:-72}
+      FLUSH_CURSOR_PATH: /var/lib/orchestrator/prefect-flush/cursor.json
+      FLUSH_PAGE_SIZE: ${FLUSH_PAGE_SIZE:-100}
+      FLUSH_MAX_RUNS: ${FLUSH_MAX_RUNS:-500}
+      PRUNE_PAGE_SIZE: ${PRUNE_PAGE_SIZE:-200}
+      PRUNE_MAX_RUNS: ${PRUNE_MAX_RUNS:-1000}
+    command:
+      - bash
+      - -lc
+      - /opt/orchestrator/scripts/ops/prefect_maintenance_loop.sh
+    volumes:
+      - ${PREFECT_MAINT_DATA_DIR:-/srv/orchestrator/prefect-maint}:/var/lib/orchestrator/prefect-flush
+
+  caddy:
+    image: caddy:2.10
+    container_name: orchestrator-prefect-caddy
+    restart: unless-stopped
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    environment:
+      PREFECT_HOSTNAMES: ${PREFECT_HOSTNAMES}
+      PREFECT_HOSTNAMES_SPACE: ${PREFECT_HOSTNAMES_SPACE:-}
+      PREFECT_PORT: ${PREFECT_PORT:-4200}
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:-}
     command:
       - sh
       - -lc
       - >
-        sed -e "s/__CF_TUNNEL_ID__/${CF_TUNNEL_ID}/g"
-        -e "s#__CF_CREDENTIALS_FILE__#${CF_CREDENTIALS_FILE}#g"
-        -e "s/__PREFECT_HOSTNAME__/${PREFECT_HOSTNAME}/g"
-        -e "s/__PREFECT_PORT__/${PREFECT_PORT:-4200}/g"
-        /etc/cloudflared/config.yml > /tmp/config.yml &&
-        cloudflared tunnel --config /tmp/config.yml run
+        hostnames="$${PREFECT_HOSTNAMES_SPACE:-$${PREFECT_HOSTNAMES}}" &&
+        hostnames="$${hostnames//,/ }" &&
+        export PREFECT_HOSTNAMES="$${hostnames}" &&
+        caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./.cloudflared:/etc/cloudflared:ro
-    depends_on:
-      prefect-server:
-        condition: service_healthy
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${CADDY_DATA_DIR:-/srv/orchestrator/caddy/data}:/data
+      - ${CADDY_CONFIG_DIR:-/srv/orchestrator/caddy/config}:/config
