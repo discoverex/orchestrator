@@ -30,15 +30,15 @@ REGISTER_ONLY="false"
 BOOTSTRAP_WORKER="false"
 WORKER_CONTAINER_NAME="orchestrator-e2e-temp-worker"
 FLOW_RUN_ID=""
-JOB_SPEC_JSON='{"run_mode":"inline","engine":"shell","entrypoint":["/bin/sh","-lc","nvidia-smi -L"],"config":null,"inputs":{},"env":{},"outputs_prefix":null,"job_name":"gpu-driver-smoke"}'
+JOB_SPEC_JSON='{"run_mode":"inline","engine":"shell","entrypoint":["/bin/sh","-lc","if [ -r /proc/driver/nvidia/version ]; then echo \"nvidia-driver-present\"; cat /proc/driver/nvidia/version; exit 0; fi; if command -v nvidia-smi >/dev/null 2>&1; then echo \"nvidia-smi-present\"; nvidia-smi -L; exit 0; fi; echo \"nvidia-driver-not-found\" >&2; exit 42"],"config":null,"inputs":{},"env":{},"outputs_prefix":null,"job_name":"gpu-driver-smoke"}'
 
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/e2e/e2e_remote_prefect_storage.sh --prefect-api-url URL [options]
+  scripts/e2e/e2e_remote_prefect_storage.sh [--prefect-api-url URL] [options]
 
 Options:
-  --prefect-api-url URL         Remote Prefect API URL (e.g. https://<host>/api)
+  --prefect-api-url URL         Remote Prefect API URL (default: $PREFECT_API_URL from env)
   --work-pool NAME              Prefect work pool name (default: gpu-pool)
   --work-queue NAME             Prefect work queue name (default: gpu-fixed)
   --prefect-cf-access-client-id ID
@@ -47,7 +47,7 @@ Options:
   --storage-gateway-token TOK   storage-gateway bearer token
   --artifact-bucket NAME        Artifact bucket name (default: orchestrator-artifacts)
   --timeout-sec N               Timeout for flow completion (default: 600)
-  --job-spec-json JSON          JobSpec payload (default: inline nvidia-smi smoke)
+  --job-spec-json JSON          JobSpec payload (default: inline nvidia driver existence check)
   --prune-mode dry-run|apply    Prune validation mode (default: dry-run)
   --prune-ttl-hours N           TTL hours passed to prune (default: 72)
   --register-only               Stop after deployment register/verify
@@ -140,7 +140,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${PREFECT_API_URL}" ]]; then
-  echo "missing required --prefect-api-url" >&2
+  echo "missing Prefect API URL; pass --prefect-api-url or set PREFECT_API_URL" >&2
   exit 2
 fi
 

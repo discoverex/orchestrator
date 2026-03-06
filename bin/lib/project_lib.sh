@@ -79,6 +79,16 @@ has_prune_mode_arg() {
   return 1
 }
 
+has_prefect_api_url_arg() {
+  local arg
+  for arg in "$@"; do
+    if [[ "${arg}" == "--prefect-api-url" || "${arg}" == --prefect-api-url=* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 ensure_worker_gpu_runtime() {
   local script="${ROOT_DIR}/scripts/ops/install_nvidia_container_toolkit.sh"
   if [[ ! -x "${script}" ]]; then
