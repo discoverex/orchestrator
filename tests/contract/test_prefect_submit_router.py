@@ -30,9 +30,8 @@ def test_router_diverts_when_fixed_running(monkeypatch) -> None:  # noqa: ANN001
                 "colab_deployment": "engine-run-colab",
                 "fixed_queue": "gpu-fixed",
                 "colab_queue": "gpu-colab",
-                "repo_url": "https://github.com/octocat/Hello-World.git",
-                "ref": "master",
-                "entrypoint": '["/bin/sh","-lc","echo test"]',
+                "job_spec_json": '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo test"],"config":null,"inputs":{},"env":{},"outputs_prefix":null}',
+                "job_spec_file": None,
                 "resume_key": None,
                 "checkpoint_dir": None,
                 "parameters_json": None,
@@ -42,7 +41,7 @@ def test_router_diverts_when_fixed_running(monkeypatch) -> None:  # noqa: ANN001
     monkeypatch.setattr(mod, "_scheduled_count_for_queue", lambda q: 0)
     monkeypatch.setattr(mod, "_running_count_for_queue", lambda q: 1 if q == "gpu-fixed" else 0)
     monkeypatch.setattr(mod, "_find_deployment_id", lambda d: f"id-{d}")
-    monkeypatch.setattr(mod, "_create_flow_run", lambda dep_id, params: {"id": "run-1", "name": "r1"})
+    monkeypatch.setattr(mod, "_create_flow_run", lambda dep_id, params, flow_run_name=None: {"id": "run-1", "name": flow_run_name or "r1"})
 
     out = _capture_json_stdout(mod.main)
     assert out["selected_deployment"] == "engine-run-colab"
@@ -64,9 +63,8 @@ def test_router_strict_priority_keeps_preferred(monkeypatch) -> None:  # noqa: A
                 "colab_deployment": "engine-run-colab",
                 "fixed_queue": "gpu-fixed",
                 "colab_queue": "gpu-colab",
-                "repo_url": "https://github.com/octocat/Hello-World.git",
-                "ref": "master",
-                "entrypoint": '["/bin/sh","-lc","echo test"]',
+                "job_spec_json": '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo test"],"config":null,"inputs":{},"env":{},"outputs_prefix":null}',
+                "job_spec_file": None,
                 "resume_key": None,
                 "checkpoint_dir": None,
                 "parameters_json": None,
@@ -76,11 +74,50 @@ def test_router_strict_priority_keeps_preferred(monkeypatch) -> None:  # noqa: A
     monkeypatch.setattr(mod, "_scheduled_count_for_queue", lambda q: 100 if q == "gpu-fixed" else 0)
     monkeypatch.setattr(mod, "_running_count_for_queue", lambda q: 100 if q == "gpu-fixed" else 0)
     monkeypatch.setattr(mod, "_find_deployment_id", lambda d: f"id-{d}")
-    monkeypatch.setattr(mod, "_create_flow_run", lambda dep_id, params: {"id": "run-2", "name": "r2"})
+    monkeypatch.setattr(mod, "_create_flow_run", lambda dep_id, params, flow_run_name=None: {"id": "run-2", "name": flow_run_name or "r2"})
 
     out = _capture_json_stdout(mod.main)
     assert out["selected_deployment"] == "engine-run"
     assert out["reason"] == "strict-priority-selected-preferred"
+
+
+def test_router_forwards_job_name_to_flow_run_name(monkeypatch) -> None:  # noqa: ANN001
+    mod = _load_module()
+    monkeypatch.setattr(
+        mod,
+        "_build_parser",
+        lambda: _FakeParser(
+            {
+                "mode": "fixed-first",
+                "strict_priority": "true",
+                "queue_depth_threshold": 0,
+                "divert_when_running": "true",
+                "fixed_deployment": "engine-run",
+                "colab_deployment": "engine-run-colab",
+                "fixed_queue": "gpu-fixed",
+                "colab_queue": "gpu-colab",
+                "job_spec_json": '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo test"],"config":null,"job_name":"my-job","inputs":{},"env":{},"outputs_prefix":null}',
+                "job_spec_file": None,
+                "resume_key": None,
+                "checkpoint_dir": None,
+                "parameters_json": None,
+            }
+        ),
+    )
+    monkeypatch.setattr(mod, "_scheduled_count_for_queue", lambda q: 0)
+    monkeypatch.setattr(mod, "_running_count_for_queue", lambda q: 0)
+    monkeypatch.setattr(mod, "_find_deployment_id", lambda d: f"id-{d}")
+
+    calls: dict[str, str | None] = {}
+
+    def _fake_create(dep_id, params, flow_run_name=None):  # noqa: ANN001
+        calls["name"] = flow_run_name
+        return {"id": "run-3", "name": flow_run_name or "generated"}
+
+    monkeypatch.setattr(mod, "_create_flow_run", _fake_create)
+    out = _capture_json_stdout(mod.main)
+    assert calls["name"] == "my-job"
+    assert out["flow_run_name"] == "my-job"
 
 
 class _FakeParser:
