@@ -30,6 +30,7 @@ REGISTER_ONLY="false"
 BOOTSTRAP_WORKER="false"
 WORKER_CONTAINER_NAME="orchestrator-e2e-temp-worker"
 FLOW_RUN_ID=""
+JOB_SPEC_JSON='{"run_mode":"inline","engine":"shell","entrypoint":["/bin/sh","-lc","nvidia-smi"],"config":null,"inputs":{},"env":{},"outputs_prefix":null,"job_name":"gpu-smoke-nvidia-smi"}'
 
 usage() {
   cat <<'EOF'
@@ -46,6 +47,7 @@ Options:
   --storage-gateway-token TOK   storage-gateway bearer token
   --artifact-bucket NAME        Artifact bucket name (default: orchestrator-artifacts)
   --timeout-sec N               Timeout for flow completion (default: 600)
+  --job-spec-json JSON          JobSpec payload (default: inline nvidia-smi smoke)
   --prune-mode dry-run|apply    Prune validation mode (default: dry-run)
   --prune-ttl-hours N           TTL hours passed to prune (default: 72)
   --register-only               Stop after deployment register/verify
@@ -95,6 +97,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --timeout-sec)
       TIMEOUT_SEC="${2:-}"
+      shift 2
+      ;;
+    --job-spec-json)
+      JOB_SPEC_JSON="${2:-}"
       shift 2
       ;;
     --prune-mode)
@@ -266,7 +272,8 @@ else
   record_step "worker.bootstrap_temp" "pass" "skipped (production worker expected)"
 fi
 
-must_step "prefect.submit_flow_run" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' prefecthq/prefect:3-latest prefect deployment run 'run-job/engine-run' -p job_spec_json='{\"engine\":\"shell\",\"repo_url\":\"https://github.com/octocat/Hello-World.git\",\"ref\":\"master\",\"entrypoint\":[\"/bin/sh\",\"-lc\",\"echo hello-prefect-remote\"],\"config\":null,\"inputs\":{},\"env\":{},\"outputs_prefix\":null}' > '${LOG_DIR}/prefect-submit.log'"
+JOB_SPEC_JSON_B64="$(printf '%s' "${JOB_SPEC_JSON}" | base64 -w0)"
+must_step "prefect.submit_flow_run" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e JOB_SPEC_JSON_B64='${JOB_SPEC_JSON_B64}' prefecthq/prefect:3-latest sh -lc 'JOB_SPEC_JSON=\"\$(printf %s \"\$JOB_SPEC_JSON_B64\" | base64 -d)\" && prefect deployment run \"run-job/engine-run\" -p \"job_spec_json=\$JOB_SPEC_JSON\"' > '${LOG_DIR}/prefect-submit.log'"
 FLOW_RUN_ID="$(grep -Eo '[0-9a-fA-F-]{36}' "${LOG_DIR}/prefect-submit.log" | head -n1 || true)"
 if [[ -z "${FLOW_RUN_ID}" ]]; then
   record_step "prefect.extract_flow_run_id" "fail" "unable to parse flow run id"
