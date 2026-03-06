@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from flows.checkpoint_store import load_checkpoint, resolve_checkpoint_path, sanitize_resume_key, save_checkpoint
+from flows.checkpoint_store import (
+    load_checkpoint,
+    resolve_checkpoint_path,
+    sanitize_resume_key,
+    save_checkpoint,
+)
 
 
 def test_sanitize_resume_key() -> None:

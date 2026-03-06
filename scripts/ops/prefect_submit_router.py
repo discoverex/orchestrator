@@ -71,7 +71,9 @@ class QueueDepth(BaseModel):
     running_count: int
 
 
-def _count_for_queue(queue_name: str, state_types: list[str], max_rows: int = 200) -> int:
+def _count_for_queue(
+    queue_name: str, state_types: list[str], max_rows: int = 200
+) -> int:
     rows = _http_json(
         "POST",
         "flow_runs/filter",
@@ -119,7 +121,9 @@ def _find_deployment_id(deployment_name: str) -> str:
     raise RuntimeError(f"deployment not found: {deployment_name}")
 
 
-def _create_flow_run(deployment_id: str, parameters: dict[str, Any], flow_run_name: str | None = None) -> dict[str, Any]:
+def _create_flow_run(
+    deployment_id: str, parameters: dict[str, Any], flow_run_name: str | None = None
+) -> dict[str, Any]:
     payload: dict[str, Any] = {"parameters": parameters}
     if flow_run_name:
         payload["name"] = flow_run_name
@@ -134,8 +138,14 @@ def _create_flow_run(deployment_id: str, parameters: dict[str, Any], flow_run_na
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Submit flow run to fixed/colab deployment based on queue-depth policy.")
-    parser.add_argument("--mode", default=_env("WORKER_ROUTING_MODE", "fixed-first"), choices=("fixed-first", "colab-first"))
+    parser = argparse.ArgumentParser(
+        description="Submit flow run to fixed/colab deployment based on queue-depth policy."
+    )
+    parser.add_argument(
+        "--mode",
+        default=_env("WORKER_ROUTING_MODE", "fixed-first"),
+        choices=("fixed-first", "colab-first"),
+    )
     parser.add_argument(
         "--strict-priority",
         default=_env("WORKER_ROUTING_STRICT_PRIORITY", "false"),
@@ -152,21 +162,38 @@ def _build_parser() -> argparse.ArgumentParser:
         default=_env("WORKER_ROUTING_DIVERT_WHEN_RUNNING", "true"),
         help="If true and preferred queue has RUNNING flow(s), divert to secondary when strict-priority is false.",
     )
-    parser.add_argument("--fixed-deployment", default=_env("ROUTER_FIXED_DEPLOYMENT", "engine-run"))
-    parser.add_argument("--colab-deployment", default=_env("ROUTER_COLAB_DEPLOYMENT", "engine-run-colab"))
-    parser.add_argument("--fixed-queue", default=_env("ROUTER_FIXED_QUEUE", "gpu-fixed"))
-    parser.add_argument("--colab-queue", default=_env("ROUTER_COLAB_QUEUE", "gpu-colab"))
+    parser.add_argument(
+        "--fixed-deployment", default=_env("ROUTER_FIXED_DEPLOYMENT", "engine-run")
+    )
+    parser.add_argument(
+        "--colab-deployment",
+        default=_env("ROUTER_COLAB_DEPLOYMENT", "engine-run-colab"),
+    )
+    parser.add_argument(
+        "--fixed-queue", default=_env("ROUTER_FIXED_QUEUE", "gpu-fixed")
+    )
+    parser.add_argument(
+        "--colab-queue", default=_env("ROUTER_COLAB_QUEUE", "gpu-colab")
+    )
     parser.add_argument("--job-spec-json", default=None, help="JobSpec JSON string.")
-    parser.add_argument("--job-spec-file", default=None, help="Path to JobSpec JSON file.")
+    parser.add_argument(
+        "--job-spec-file", default=None, help="Path to JobSpec JSON file."
+    )
     parser.add_argument("--resume-key", default=None)
     parser.add_argument("--checkpoint-dir", default=None)
-    parser.add_argument("--parameters-json", default=None, help="Optional JSON object merged into JobSpec JSON.")
+    parser.add_argument(
+        "--parameters-json",
+        default=None,
+        help="Optional JSON object merged into JobSpec JSON.",
+    )
     return parser
 
 
 def _load_job_spec_raw(args: argparse.Namespace) -> str:
     if bool(args.job_spec_json) == bool(args.job_spec_file):
-        raise SystemExit("exactly one of --job-spec-json or --job-spec-file is required")
+        raise SystemExit(
+            "exactly one of --job-spec-json or --job-spec-file is required"
+        )
     if args.job_spec_json:
         return str(args.job_spec_json)
     return Path(str(args.job_spec_file)).read_text(encoding="utf-8")
@@ -190,12 +217,20 @@ def main() -> int:
         running_count=_running_count_for_queue(args.colab_queue),
     )
 
-    preferred_deployment = args.fixed_deployment if args.mode == "fixed-first" else args.colab_deployment
-    secondary_deployment = args.colab_deployment if args.mode == "fixed-first" else args.fixed_deployment
+    preferred_deployment = (
+        args.fixed_deployment if args.mode == "fixed-first" else args.colab_deployment
+    )
+    secondary_deployment = (
+        args.colab_deployment if args.mode == "fixed-first" else args.fixed_deployment
+    )
     preferred_depth = fixed_depth if args.mode == "fixed-first" else colab_depth
 
     selected = preferred_deployment
-    decision_reason = "strict-priority-selected-preferred" if strict_priority else "preferred-selected"
+    decision_reason = (
+        "strict-priority-selected-preferred"
+        if strict_priority
+        else "preferred-selected"
+    )
     if not strict_priority:
         if divert_when_running and preferred_depth.running_count > 0:
             selected = secondary_deployment

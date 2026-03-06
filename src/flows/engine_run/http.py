@@ -17,7 +17,9 @@ def gateway_headers() -> dict[str, str]:
     }
 
 
-def http_json(method: str, url: str, payload: dict[str, object]) -> dict[str, object] | list[dict[str, object]]:
+def http_json(
+    method: str, url: str, payload: dict[str, object]
+) -> dict[str, object] | list[dict[str, object]]:
     body = json.dumps(payload).encode("utf-8")
     req = request.Request(url, method=method, data=body, headers=gateway_headers())
     with request.urlopen(req) as resp:  # nosec B310 - controlled endpoint from env

@@ -27,10 +27,14 @@ def _http_json(
     headers: dict[str, str] | None = None,
     timeout: int = 30,
 ) -> dict[str, Any] | list[dict[str, Any]]:
-    return core.http_json(method, url, payload=payload, headers=headers, timeout=timeout)
+    return core.http_json(
+        method, url, payload=payload, headers=headers, timeout=timeout
+    )
 
 
-def _run_ops_script(script_rel_path: str, env_overrides: dict[str, str], argv: list[str]) -> dict[str, Any]:
+def _run_ops_script(
+    script_rel_path: str, env_overrides: dict[str, str], argv: list[str]
+) -> dict[str, Any]:
     return core.run_ops_script(script_rel_path, env_overrides, argv)
 
 
@@ -51,7 +55,9 @@ def _command_prune_verify(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Remote Prefect/storage verification helpers for E2E.")
+    parser = argparse.ArgumentParser(
+        description="Remote Prefect/storage verification helpers for E2E."
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     wait_p = sub.add_parser("prefect-wait-completed")
@@ -107,7 +113,9 @@ def main() -> int:
         elif args.command == "prune-verify":
             out = _command_prune_verify(args)
         else:
-            raise VerifyError("main", "UNKNOWN_COMMAND", f"unsupported command: {args.command}")
+            raise VerifyError(
+                "main", "UNKNOWN_COMMAND", f"unsupported command: {args.command}"
+            )
     except VerifyError as exc:
         _print_json(exc.as_json())
         return 1

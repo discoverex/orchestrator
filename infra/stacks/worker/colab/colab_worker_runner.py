@@ -22,26 +22,36 @@ REQUIRED_ENV = (
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run Prefect worker in Colab with checkpoint-ready env.")
+    parser = argparse.ArgumentParser(
+        description="Run Prefect worker in Colab with checkpoint-ready env."
+    )
     parser.add_argument("command", choices=("start", "status", "logs", "stop"))
     parser.add_argument("--pid-file", default=str(DEFAULT_PID_PATH))
     parser.add_argument("--log-file", default=str(DEFAULT_LOG_PATH))
     parser.add_argument("--tail", type=int, default=120, help="Used by logs command.")
     parser.add_argument("--checkpoint-dir", default=str(DEFAULT_CHECKPOINT_DIR))
     parser.add_argument("--requirements-file", default=str(DEFAULT_REQUIREMENTS_PATH))
-    parser.add_argument("--skip-install", action="store_true", help="Skip pip bootstrap even if Prefect is missing.")
+    parser.add_argument(
+        "--skip-install",
+        action="store_true",
+        help="Skip pip bootstrap even if Prefect is missing.",
+    )
     return parser.parse_args()
 
 
 def _require_env() -> None:
     missing = [key for key in REQUIRED_ENV if not os.getenv(key)]
     if missing:
-        raise RuntimeError(f"missing required environment variables: {', '.join(missing)}")
+        raise RuntimeError(
+            f"missing required environment variables: {', '.join(missing)}"
+        )
 
 
 def _ensure_drive_checkpoint_dir(path: Path) -> None:
     if not path.exists():
-        raise RuntimeError(f"checkpoint directory not found: {path} (mount Google Drive first)")
+        raise RuntimeError(
+            f"checkpoint directory not found: {path} (mount Google Drive first)"
+        )
     if not path.is_dir():
         raise RuntimeError(f"checkpoint path is not a directory: {path}")
     os.environ["ORCHESTRATOR_CHECKPOINT_DIR"] = str(path)
@@ -55,7 +65,9 @@ def _prefect_env() -> dict[str, str]:
     return env
 
 
-def _run(cmd: list[str], env: dict[str, str] | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+def _run(
+    cmd: list[str], env: dict[str, str] | None = None, check: bool = True
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(cmd, check=check, text=True, capture_output=True, env=env)
 
 
@@ -72,10 +84,15 @@ def _ensure_colab_dependencies(requirements_file: Path, skip_install: bool) -> N
     if _prefect_compatible_installed():
         return
     if skip_install:
-        raise RuntimeError("prefect>=3 is required but not installed (and --skip-install was set)")
+        raise RuntimeError(
+            "prefect>=3 is required but not installed (and --skip-install was set)"
+        )
     if not requirements_file.exists():
         raise RuntimeError(f"requirements file not found: {requirements_file}")
-    _run([sys.executable, "-m", "pip", "install", "-r", str(requirements_file)], check=True)
+    _run(
+        [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)],
+        check=True,
+    )
     if not _prefect_compatible_installed():
         raise RuntimeError("prefect>=3 install failed")
 
@@ -97,13 +114,29 @@ def _is_running(pid: int) -> bool:
         return False
 
 
-def start(pid_file: Path, log_file: Path, checkpoint_dir: Path, requirements_file: Path, skip_install: bool) -> int:
+def start(
+    pid_file: Path,
+    log_file: Path,
+    checkpoint_dir: Path,
+    requirements_file: Path,
+    skip_install: bool,
+) -> int:
     _require_env()
     _ensure_drive_checkpoint_dir(checkpoint_dir)
     _ensure_colab_dependencies(requirements_file, skip_install)
     env = _prefect_env()
 
-    _run([sys.executable, "-m", "prefect", "config", "set", f"PREFECT_API_URL={env['PREFECT_API_URL']}"], env=env)
+    _run(
+        [
+            sys.executable,
+            "-m",
+            "prefect",
+            "config",
+            "set",
+            f"PREFECT_API_URL={env['PREFECT_API_URL']}",
+        ],
+        env=env,
+    )
     _run(
         [
             sys.executable,
@@ -198,7 +231,9 @@ def main() -> int:
     requirements_file = Path(args.requirements_file)
     try:
         if args.command == "start":
-            return start(pid_file, log_file, checkpoint_dir, requirements_file, args.skip_install)
+            return start(
+                pid_file, log_file, checkpoint_dir, requirements_file, args.skip_install
+            )
         if args.command == "status":
             return status(pid_file)
         if args.command == "logs":

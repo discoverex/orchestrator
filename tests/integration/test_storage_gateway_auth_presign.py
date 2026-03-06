@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-
 from tests.integration.storage_gateway.helpers import cf_client, client
 
 
 def test_rejects_missing_auth() -> None:
     c = client()
-    res = c.post("/v1/presign/put", json={"flow_run_id": "f1", "attempt": 1, "kind": "stdout"})
+    res = c.post(
+        "/v1/presign/put", json={"flow_run_id": "f1", "attempt": 1, "kind": "stdout"}
+    )
     assert res.status_code == 401
 
 
@@ -19,7 +20,10 @@ def test_presign_put_builds_attempt_prefix() -> None:
     )
     assert res.status_code == 200
     payload = res.json()
-    assert payload["object_uri"] == "s3://orchestrator-artifacts/jobs/f1/attempt-2/stdout.log"
+    assert (
+        payload["object_uri"]
+        == "s3://orchestrator-artifacts/jobs/f1/attempt-2/stdout.log"
+    )
     assert payload["url"].startswith("https://gw.example/v1/object/proxy?token=")
 
 

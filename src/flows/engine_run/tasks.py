@@ -23,20 +23,49 @@ def prepare_manifest_task(flow_run_id: str, attempt: int) -> list[ArtifactLink]:
         "flow_run_id": flow_run_id,
         "attempt": attempt,
         "entries": [
-            {"flow_run_id": flow_run_id, "attempt": attempt, "kind": "stdout", "filename": "stdout.log"},
-            {"flow_run_id": flow_run_id, "attempt": attempt, "kind": "stderr", "filename": "stderr.log"},
-            {"flow_run_id": flow_run_id, "attempt": attempt, "kind": "result", "filename": "result.json"},
-            {"flow_run_id": flow_run_id, "attempt": attempt, "kind": "manifest", "filename": "artifacts.json"},
+            {
+                "flow_run_id": flow_run_id,
+                "attempt": attempt,
+                "kind": "stdout",
+                "filename": "stdout.log",
+            },
+            {
+                "flow_run_id": flow_run_id,
+                "attempt": attempt,
+                "kind": "stderr",
+                "filename": "stderr.log",
+            },
+            {
+                "flow_run_id": flow_run_id,
+                "attempt": attempt,
+                "kind": "result",
+                "filename": "result.json",
+            },
+            {
+                "flow_run_id": flow_run_id,
+                "attempt": attempt,
+                "kind": "manifest",
+                "filename": "artifacts.json",
+            },
         ],
     }
     rows = http_json("POST", f"{gateway}/v1/presign/batch", payload)
     assert isinstance(rows, list)
-    return [ArtifactLink(kind=str(r["kind"]), object_uri=str(r["object_uri"]), url=str(r["url"])) for r in rows]
+    return [
+        ArtifactLink(
+            kind=str(r["kind"]), object_uri=str(r["object_uri"]), url=str(r["url"])
+        )
+        for r in rows
+    ]
 
 
 @task
-def run_entrypoint_task(repo_url: str, resolved_commit: str, entrypoint: list[str], env: dict[str, str]) -> tuple[dict[str, str], int]:
-    raise RuntimeError("run_entrypoint_task signature changed; call run_entrypoint_job_task instead")
+def run_entrypoint_task(
+    repo_url: str, resolved_commit: str, entrypoint: list[str], env: dict[str, str]
+) -> tuple[dict[str, str], int]:
+    raise RuntimeError(
+        "run_entrypoint_task signature changed; call run_entrypoint_job_task instead"
+    )
 
 
 @task
@@ -92,10 +121,16 @@ def upload_outputs_task(
             manifest = {
                 "flow_run_id": flow_run_id,
                 "attempt": attempt,
-                "artifacts": [{"kind": k, "object_uri": v} for k, v in output.items() if k != "manifest"],
+                "artifacts": [
+                    {"kind": k, "object_uri": v}
+                    for k, v in output.items()
+                    if k != "manifest"
+                ],
             }
             manifest_path = Path(local_paths["result"]).parent / "artifacts.json"
-            manifest_path.write_text(json.dumps(manifest, ensure_ascii=True, indent=2), encoding="utf-8")
+            manifest_path.write_text(
+                json.dumps(manifest, ensure_ascii=True, indent=2), encoding="utf-8"
+            )
             upload_file(link.url, manifest_path.read_bytes())
             output["manifest"] = link.object_uri
             continue

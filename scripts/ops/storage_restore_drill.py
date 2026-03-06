@@ -40,8 +40,12 @@ def main() -> None:
         raise SystemExit(f"no backup runs in {backup_root}")
 
     latest = runs[-1]
-    client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
-    drill_bucket = f"restore-drill-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    client = Minio(
+        endpoint, access_key=access_key, secret_key=secret_key, secure=secure
+    )
+    drill_bucket = (
+        f"restore-drill-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    )
     client.make_bucket(drill_bucket)
 
     restored = 0

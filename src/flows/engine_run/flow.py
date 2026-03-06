@@ -8,8 +8,17 @@ from prefect import flow
 from prefect.context import get_run_context
 from prefect.runtime import flow_run
 
-from flows.checkpoint_store import load_checkpoint, resolve_checkpoint_path, save_checkpoint
-from flows.engine_run.tasks import prepare_manifest_task, resolve_commit_task, run_entrypoint_job_task, upload_outputs_task
+from flows.checkpoint_store import (
+    load_checkpoint,
+    resolve_checkpoint_path,
+    save_checkpoint,
+)
+from flows.engine_run.tasks import (
+    prepare_manifest_task,
+    resolve_commit_task,
+    run_entrypoint_job_task,
+    upload_outputs_task,
+)
 from flows.job_spec import parse_job_spec_json
 from runner.git_runner import cleanup_workdir
 
@@ -73,9 +82,19 @@ def run_job_flow(
         save_checkpoint(checkpoint_path, state)
 
     local_paths = state.get("local_paths", {})
-    if _step_done(state, "run_entrypoint") and isinstance(local_paths, dict) and not _artifact_paths_exist(local_paths):
+    if (
+        _step_done(state, "run_entrypoint")
+        and isinstance(local_paths, dict)
+        and not _artifact_paths_exist(local_paths)
+    ):
         state["steps"]["run_entrypoint"] = False
-        for key in ("stdout_uploaded", "stderr_uploaded", "result_uploaded", "manifest_uploaded", "cleanup"):
+        for key in (
+            "stdout_uploaded",
+            "stderr_uploaded",
+            "result_uploaded",
+            "manifest_uploaded",
+            "cleanup",
+        ):
             state["steps"][key] = False
         state["uploaded"] = {}
         save_checkpoint(checkpoint_path, state)
@@ -84,7 +103,9 @@ def run_job_flow(
         local_paths = cast(dict[str, str], state["local_paths"])
         exit_code = int(state.get("exit_code", 1))
     else:
-        effective_outputs_prefix = job.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/"
+        effective_outputs_prefix = (
+            job.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/"
+        )
         local_paths, exit_code = run_entrypoint_job_task(
             repo_url=job.repo_url,
             resolved_commit=resolved_commit,

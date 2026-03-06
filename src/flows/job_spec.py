@@ -5,8 +5,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from common import StrictModel
 from pydantic import Field, ValidationError, field_validator
+
+from common import StrictModel
 
 
 class JobSpecError(RuntimeError):
@@ -79,7 +80,9 @@ def _load_registry(path: Path) -> set[str]:
 
 
 def validate_engine_registry(engine: str) -> None:
-    registry_path = Path(os.getenv("ORCH_ENGINE_REGISTRY_PATH", "infra/engines/registry.json"))
+    registry_path = Path(
+        os.getenv("ORCH_ENGINE_REGISTRY_PATH", "infra/engines/registry.json")
+    )
     if not registry_path.exists():
         return
     allowed = _load_registry(registry_path)

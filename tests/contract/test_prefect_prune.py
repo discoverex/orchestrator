@@ -9,7 +9,12 @@ import pytest
 
 
 def _load_module() -> ModuleType:
-    path = Path(__file__).resolve().parents[2] / "scripts" / "ops" / "prefect_prune_completed.py"
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "scripts"
+        / "ops"
+        / "prefect_prune_completed.py"
+    )
     spec = importlib.util.spec_from_file_location("prefect_prune_completed", path)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
@@ -18,7 +23,9 @@ def _load_module() -> ModuleType:
     return mod
 
 
-def test_list_targets_uses_completed_and_cutoff(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_list_targets_uses_completed_and_cutoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     mod = _load_module()
 
     calls: list[dict[str, object]] = []
@@ -55,7 +62,11 @@ def test_main_apply_deletes_targets(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PREFECT_API_URL", "http://prefect.local/api")
     monkeypatch.setenv("PRUNE_TTL_HOURS", "72")
 
-    monkeypatch.setattr(mod, "_list_targets", lambda cutoff_iso, page_size, max_runs: [{"id": "run-a"}, {"id": "run-b"}])
+    monkeypatch.setattr(
+        mod,
+        "_list_targets",
+        lambda cutoff_iso, page_size, max_runs: [{"id": "run-a"}, {"id": "run-b"}],
+    )
     deleted: list[str] = []
     monkeypatch.setattr(mod, "_delete_run", lambda run_id: deleted.append(run_id))
     monkeypatch.setattr("sys.argv", ["prefect_prune_completed.py", "--apply"])

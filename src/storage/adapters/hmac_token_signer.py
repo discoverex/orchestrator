@@ -25,13 +25,21 @@ class HmacTokenSigner(TokenSignerPort):
         return base64.urlsafe_b64decode(padded.encode("ascii"))
 
     def _sign(self, payload_b64: str) -> str:
-        digest = hmac.new(self._secret, payload_b64.encode("ascii"), hashlib.sha256).digest()
+        digest = hmac.new(
+            self._secret, payload_b64.encode("ascii"), hashlib.sha256
+        ).digest()
         return self._b64url_encode(digest)
 
     def mint(self, method: str, object_uri: str, ttl_seconds: int) -> str:
-        exp = int((datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)).timestamp())
+        exp = int(
+            (datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)).timestamp()
+        )
         payload = {"m": method, "u": object_uri, "e": exp}
-        payload_b64 = self._b64url_encode(json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8"))
+        payload_b64 = self._b64url_encode(
+            json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode(
+                "utf-8"
+            )
+        )
         return f"{payload_b64}.{self._sign(payload_b64)}"
 
     def decode(self, token: str, expected_method: str) -> str:

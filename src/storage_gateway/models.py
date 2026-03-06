@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from common import StrictModel
 from pydantic import Field
+
+from common import StrictModel
 
 
 class ArtifactKind(str, Enum):

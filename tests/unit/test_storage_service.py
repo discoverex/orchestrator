@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
-from storage.domain.models.object_ref import ObjectListEntry, ObjectStat
 from storage.application.service import StorageApplicationService
-from pathlib import Path
+from storage.domain.models.object_ref import ObjectListEntry, ObjectStat
 
 
 class DummyStore:
@@ -14,7 +15,12 @@ class DummyStore:
     def generate_presigned_put(self, object_uri: str, ttl_seconds: int) -> str:
         return f"PUT::{object_uri}::{ttl_seconds}"
 
-    def upload_bytes(self, data: bytes, object_uri: str, content_type: str = "application/octet-stream") -> ObjectStat:
+    def upload_bytes(
+        self,
+        data: bytes,
+        object_uri: str,
+        content_type: str = "application/octet-stream",
+    ) -> ObjectStat:
         _ = (data, content_type)
         return ObjectStat(uri=object_uri, size=0)
 
@@ -61,13 +67,17 @@ class DummySigner:
 
 
 def test_build_object_uri() -> None:
-    svc = StorageApplicationService(DummyStore(), DummySigner(), bucket="bucket-a", ttl_default=900, ttl_max=3600)
+    svc = StorageApplicationService(
+        DummyStore(), DummySigner(), bucket="bucket-a", ttl_default=900, ttl_max=3600
+    )
     uri = svc.build_object_uri("flow-1", 2, "stdout.log")
     assert uri == "s3://bucket-a/jobs/flow-1/attempt-2/stdout.log"
 
 
 def test_validate_ttl_range() -> None:
-    svc = StorageApplicationService(DummyStore(), DummySigner(), bucket="bucket-a", ttl_default=900, ttl_max=3600)
+    svc = StorageApplicationService(
+        DummyStore(), DummySigner(), bucket="bucket-a", ttl_default=900, ttl_max=3600
+    )
     assert svc.validate_ttl(None) == 900
     assert svc.validate_ttl(120) == 120
     with pytest.raises(ValueError):

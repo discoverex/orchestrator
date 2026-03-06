@@ -40,7 +40,9 @@ def _put_presigned(url: str, body: bytes) -> None:
     core.put_presigned(url, body)
 
 
-def _list_completed_runs(after_end_time: str, page_size: int, max_runs: int) -> list[dict[str, Any]]:
+def _list_completed_runs(
+    after_end_time: str, page_size: int, max_runs: int
+) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
     offset = 0
     while len(output) < max_runs:
@@ -103,22 +105,41 @@ def _upload_snapshot(flow_run: dict[str, Any], snapshot: dict[str, Any]) -> str:
     )
     put_url = str(presign["url"])
     object_uri = str(presign["object_uri"])
-    _put_presigned(put_url, json.dumps(snapshot, ensure_ascii=True, indent=2).encode("utf-8"))
+    _put_presigned(
+        put_url, json.dumps(snapshot, ensure_ascii=True, indent=2).encode("utf-8")
+    )
     return object_uri
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Flush completed Prefect runs to storage-gateway as full JSON snapshots.")
+    parser = argparse.ArgumentParser(
+        description="Flush completed Prefect runs to storage-gateway as full JSON snapshots."
+    )
     parser.add_argument("--once", action="store_true", help="run once and exit")
-    parser.add_argument("--dry-run", action="store_true", help="collect snapshots without upload or cursor update")
-    parser.add_argument("--cursor-path", default=_env("FLUSH_CURSOR_PATH", "/var/lib/orchestrator/prefect-flush/cursor.json"))
-    parser.add_argument("--page-size", type=int, default=int(_env("FLUSH_PAGE_SIZE", "100")))
-    parser.add_argument("--max-runs", type=int, default=int(_env("FLUSH_MAX_RUNS", "500")))
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="collect snapshots without upload or cursor update",
+    )
+    parser.add_argument(
+        "--cursor-path",
+        default=_env(
+            "FLUSH_CURSOR_PATH", "/var/lib/orchestrator/prefect-flush/cursor.json"
+        ),
+    )
+    parser.add_argument(
+        "--page-size", type=int, default=int(_env("FLUSH_PAGE_SIZE", "100"))
+    )
+    parser.add_argument(
+        "--max-runs", type=int, default=int(_env("FLUSH_MAX_RUNS", "500"))
+    )
     args = parser.parse_args()
 
     cursor_path = Path(args.cursor_path)
     cursor = Cursor.load(cursor_path)
-    runs = _list_completed_runs(cursor.last_end_time, page_size=args.page_size, max_runs=args.max_runs)
+    runs = _list_completed_runs(
+        cursor.last_end_time, page_size=args.page_size, max_runs=args.max_runs
+    )
 
     exported = 0
     skipped = 0

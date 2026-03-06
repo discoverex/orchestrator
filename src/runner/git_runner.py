@@ -94,8 +94,18 @@ def run_entrypoint(
     if env:
         merged_env.update(env)
 
-    with stdout_path.open("w", encoding="utf-8") as stdout_f, stderr_path.open("w", encoding="utf-8") as stderr_f:
-        proc = subprocess.run(entrypoint, cwd=workdir, env=merged_env, stdout=stdout_f, stderr=stderr_f, text=True)
+    with (
+        stdout_path.open("w", encoding="utf-8") as stdout_f,
+        stderr_path.open("w", encoding="utf-8") as stderr_f,
+    ):
+        proc = subprocess.run(
+            entrypoint,
+            cwd=workdir,
+            env=merged_env,
+            stdout=stdout_f,
+            stderr=stderr_f,
+            text=True,
+        )
 
     result_path.write_text(
         json.dumps(

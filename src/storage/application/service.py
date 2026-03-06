@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from common import StrictModel
+
 from ..domain.models.object_ref import ObjectStat
 from ..ports.object_store import ObjectStorePort
 from ..ports.token_signer import TokenSignerPort
@@ -48,9 +49,13 @@ class StorageApplicationService:
         clean = filename.lstrip("/")
         return f"s3://{self.bucket}/jobs/{flow_run_id}/attempt-{attempt}/{clean}"
 
-    def _gateway_url(self, base_url: str, method: str, object_uri: str, ttl_seconds: int) -> str:
+    def _gateway_url(
+        self, base_url: str, method: str, object_uri: str, ttl_seconds: int
+    ) -> str:
         base = (self.public_base_url or base_url).rstrip("/")
-        token = self.token_signer.mint(method=method, object_uri=object_uri, ttl_seconds=ttl_seconds)
+        token = self.token_signer.mint(
+            method=method, object_uri=object_uri, ttl_seconds=ttl_seconds
+        )
         return f"{base}/v1/object/proxy?token={token}"
 
     def issue_presign(
@@ -64,9 +69,13 @@ class StorageApplicationService:
         ttl_seconds: int | None,
     ) -> PresignResult:
         ttl = self.validate_ttl(ttl_seconds)
-        object_uri = self.build_object_uri(flow_run_id=flow_run_id, attempt=attempt, filename=filename)
+        object_uri = self.build_object_uri(
+            flow_run_id=flow_run_id, attempt=attempt, filename=filename
+        )
         if self.presign_mode == "gateway":
-            url = self._gateway_url(base_url=base_url, method=method, object_uri=object_uri, ttl_seconds=ttl)
+            url = self._gateway_url(
+                base_url=base_url, method=method, object_uri=object_uri, ttl_seconds=ttl
+            )
         elif method == "PUT":
             url = self.object_store.generate_presigned_put(object_uri, ttl)
         else:
@@ -74,7 +83,9 @@ class StorageApplicationService:
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl)
         return PresignResult(object_uri=object_uri, url=url, expires_at=expires_at)
 
-    def issue_batch_put(self, *, entries: list[PresignEntry], base_url: str) -> list[PresignResult]:
+    def issue_batch_put(
+        self, *, entries: list[PresignEntry], base_url: str
+    ) -> list[PresignResult]:
         return [
             self.issue_presign(
                 flow_run_id=e.flow_run_id,
@@ -89,7 +100,9 @@ class StorageApplicationService:
 
     def proxy_upload(self, *, token: str, data: bytes, content_type: str) -> ObjectStat:
         object_uri = self.token_signer.decode(token=token, expected_method="PUT")
-        return self.object_store.upload_bytes(data, object_uri, content_type=content_type)
+        return self.object_store.upload_bytes(
+            data, object_uri, content_type=content_type
+        )
 
     def proxy_download(self, *, token: str) -> bytes:
         object_uri = self.token_signer.decode(token=token, expected_method="GET")
@@ -116,7 +129,9 @@ class StorageApplicationService:
             start_after=cursor,
             limit=limit,
         )
-        return ExplorerListResult(bucket=bucket, prefix=prefix, next_cursor=next_cursor, entries=entries)
+        return ExplorerListResult(
+            bucket=bucket, prefix=prefix, next_cursor=next_cursor, entries=entries
+        )
 
     def download_object(self, object_uri: str) -> bytes:
         return self.object_store.download_bytes(object_uri)

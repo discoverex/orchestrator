@@ -116,11 +116,18 @@ def prefect_headers() -> dict[str, str]:
 
 
 def prefect_post(path: str, payload: dict[str, Any]) -> Any:
-    return json_request("POST", f"{prefect_api_url()}/{path.lstrip('/')}" , payload=payload, headers=prefect_headers())
+    return json_request(
+        "POST",
+        f"{prefect_api_url()}/{path.lstrip('/')}",
+        payload=payload,
+        headers=prefect_headers(),
+    )
 
 
 def prefect_get(path: str) -> Any:
-    return json_request("GET", f"{prefect_api_url()}/{path.lstrip('/')}" , headers=prefect_headers())
+    return json_request(
+        "GET", f"{prefect_api_url()}/{path.lstrip('/')}", headers=prefect_headers()
+    )
 
 
 def gateway_headers() -> dict[str, str]:
@@ -135,7 +142,9 @@ def gateway_headers() -> dict[str, str]:
 
 def gateway_post(path: str, payload: dict[str, Any]) -> Any:
     base = env("FLUSH_TARGET_URL", required=True).rstrip("/")
-    return json_request("POST", f"{base}/{path.lstrip('/')}" , payload=payload, headers=gateway_headers())
+    return json_request(
+        "POST", f"{base}/{path.lstrip('/')}", payload=payload, headers=gateway_headers()
+    )
 
 
 def put_presigned(url: str, body: bytes) -> None:
@@ -152,7 +161,14 @@ def put_presigned(url: str, body: bytes) -> None:
         return
 
 
-def fetch_paginated(path: str, *, sort: str, filter_key: str, filter_payload: dict[str, Any], page_size: int = 200) -> list[dict[str, Any]]:
+def fetch_paginated(
+    path: str,
+    *,
+    sort: str,
+    filter_key: str,
+    filter_payload: dict[str, Any],
+    page_size: int = 200,
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     offset = 0
     while True:

@@ -5,7 +5,6 @@ import stat
 import subprocess
 from pathlib import Path
 
-
 SCRIPT = Path("infra/stacks/prefect-server/deploy.sh")
 
 
@@ -14,7 +13,7 @@ def _write_fake_docker(bin_dir: Path, log_path: Path) -> None:
     docker.write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        "echo \"$*\" >> \"" + str(log_path) + "\"\n"
+        'echo "$*" >> "' + str(log_path) + '"\n'
         "exit 0\n",
         encoding="utf-8",
     )
@@ -89,10 +88,15 @@ def test_deploy_script_applies_defaults_and_runs_compose(tmp_path: Path) -> None
 
     assert proc.returncode == 0, proc.stderr
     lines = log_path.read_text(encoding="utf-8").strip().splitlines()
-    assert any(line.startswith("compose --env-file") and " pull" in line for line in lines)
     assert any(
-        "compose --env-file" in line and "up -d --wait prefect-db prefect-server prefect-maintenance caddy" in line
+        line.startswith("compose --env-file") and " pull" in line for line in lines
+    )
+    assert any(
+        "compose --env-file" in line
+        and "up -d --wait prefect-db prefect-server prefect-maintenance caddy" in line
         for line in lines
     )
-    assert any(line.startswith("compose --env-file") and " ps" in line for line in lines)
+    assert any(
+        line.startswith("compose --env-file") and " ps" in line for line in lines
+    )
     assert not (deploy_dir / ".env.runtime").exists()

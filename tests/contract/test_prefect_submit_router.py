@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 import pytest
 
 
 def _load_module() -> ModuleType:
-    path = Path(__file__).resolve().parents[2] / "scripts" / "ops" / "prefect_submit_router.py"
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "scripts"
+        / "ops"
+        / "prefect_submit_router.py"
+    )
     spec = importlib.util.spec_from_file_location("prefect_submit_router", path)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
@@ -43,12 +49,17 @@ def test_router_diverts_when_fixed_running(monkeypatch: pytest.MonkeyPatch) -> N
         ),
     )
     monkeypatch.setattr(mod, "_scheduled_count_for_queue", lambda q: 0)
-    monkeypatch.setattr(mod, "_running_count_for_queue", lambda q: 1 if q == "gpu-fixed" else 0)
+    monkeypatch.setattr(
+        mod, "_running_count_for_queue", lambda q: 1 if q == "gpu-fixed" else 0
+    )
     monkeypatch.setattr(mod, "_find_deployment_id", lambda d: f"id-{d}")
     monkeypatch.setattr(
         mod,
         "_create_flow_run",
-        lambda dep_id, params, flow_run_name=None: {"id": "run-1", "name": flow_run_name or "r1"},
+        lambda dep_id, params, flow_run_name=None: {
+            "id": "run-1",
+            "name": flow_run_name or "r1",
+        },
     )
 
     out = _capture_json_stdout(mod.main)
@@ -56,7 +67,9 @@ def test_router_diverts_when_fixed_running(monkeypatch: pytest.MonkeyPatch) -> N
     assert out["reason"] == "running-diverted-to-secondary"
 
 
-def test_router_strict_priority_keeps_preferred(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_router_strict_priority_keeps_preferred(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     mod = _load_module()
     monkeypatch.setattr(
         mod,
@@ -79,17 +92,30 @@ def test_router_strict_priority_keeps_preferred(monkeypatch: pytest.MonkeyPatch)
             }
         ),
     )
-    monkeypatch.setattr(mod, "_scheduled_count_for_queue", lambda q: 100 if q == "gpu-fixed" else 0)
-    monkeypatch.setattr(mod, "_running_count_for_queue", lambda q: 100 if q == "gpu-fixed" else 0)
+    monkeypatch.setattr(
+        mod, "_scheduled_count_for_queue", lambda q: 100 if q == "gpu-fixed" else 0
+    )
+    monkeypatch.setattr(
+        mod, "_running_count_for_queue", lambda q: 100 if q == "gpu-fixed" else 0
+    )
     monkeypatch.setattr(mod, "_find_deployment_id", lambda d: f"id-{d}")
-    monkeypatch.setattr(mod, "_create_flow_run", lambda dep_id, params, flow_run_name=None: {"id": "run-2", "name": flow_run_name or "r2"})
+    monkeypatch.setattr(
+        mod,
+        "_create_flow_run",
+        lambda dep_id, params, flow_run_name=None: {
+            "id": "run-2",
+            "name": flow_run_name or "r2",
+        },
+    )
 
     out = _capture_json_stdout(mod.main)
     assert out["selected_deployment"] == "engine-run"
     assert out["reason"] == "strict-priority-selected-preferred"
 
 
-def test_router_forwards_job_name_to_flow_run_name(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_router_forwards_job_name_to_flow_run_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     mod = _load_module()
     monkeypatch.setattr(
         mod,
@@ -118,7 +144,9 @@ def test_router_forwards_job_name_to_flow_run_name(monkeypatch: pytest.MonkeyPat
 
     calls: dict[str, str | None] = {}
 
-    def _fake_create(dep_id: str, params: dict[str, object], flow_run_name: str | None = None) -> dict[str, str]:
+    def _fake_create(
+        dep_id: str, params: dict[str, object], flow_run_name: str | None = None
+    ) -> dict[str, str]:
         _ = (dep_id, params)
         calls["name"] = flow_run_name
         return {"id": "run-3", "name": flow_run_name or "generated"}

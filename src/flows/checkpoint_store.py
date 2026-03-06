@@ -42,5 +42,7 @@ def save_checkpoint(path: Path | None, state: dict[str, Any]) -> None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(f"{path.suffix}.tmp")
-    tmp_path.write_text(json.dumps(state, ensure_ascii=True, indent=2), encoding="utf-8")
+    tmp_path.write_text(
+        json.dumps(state, ensure_ascii=True, indent=2), encoding="utf-8"
+    )
     tmp_path.replace(path)

@@ -23,14 +23,30 @@ class DeployableFlow(Protocol):
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Register Prefect deployment for engine_run_flow")
-    parser.add_argument("--single-name", default=None, help="Single deployment name (compat mode)")
-    parser.add_argument("--single-queue", default="default", help="Single deployment queue (compat mode)")
+    parser = argparse.ArgumentParser(
+        description="Register Prefect deployment for engine_run_flow"
+    )
+    parser.add_argument(
+        "--single-name", default=None, help="Single deployment name (compat mode)"
+    )
+    parser.add_argument(
+        "--single-queue",
+        default="default",
+        help="Single deployment queue (compat mode)",
+    )
     parser.add_argument("--pool", default="gpu-pool", help="Prefect work pool name")
-    parser.add_argument("--fixed-name", default="engine-run", help="Fixed deployment name")
-    parser.add_argument("--fixed-queue", default="gpu-fixed", help="Fixed deployment queue")
-    parser.add_argument("--colab-name", default="engine-run-colab", help="Colab deployment name")
-    parser.add_argument("--colab-queue", default="gpu-colab", help="Colab deployment queue")
+    parser.add_argument(
+        "--fixed-name", default="engine-run", help="Fixed deployment name"
+    )
+    parser.add_argument(
+        "--fixed-queue", default="gpu-fixed", help="Fixed deployment queue"
+    )
+    parser.add_argument(
+        "--colab-name", default="engine-run-colab", help="Colab deployment name"
+    )
+    parser.add_argument(
+        "--colab-queue", default="gpu-colab", help="Colab deployment queue"
+    )
     parser.add_argument("--version", default=None, help="Deployment version")
     return parser.parse_args()
 
@@ -40,8 +56,8 @@ def main() -> None:
     source_flow = cast(
         DeployableFlow,
         flow.from_source(
-        source=str(Path.cwd()),
-        entrypoint="src/flows/engine_run_flow.py:engine_run_flow",
+            source=str(Path.cwd()),
+            entrypoint="src/flows/engine_run_flow.py:engine_run_flow",
         ),
     )
     base_parameters = {
