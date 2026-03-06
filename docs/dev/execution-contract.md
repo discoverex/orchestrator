@@ -35,16 +35,11 @@ All endpoints require bearer auth:
 
 - `Authorization: Bearer <STORAGE_GATEWAY_TOKEN>`
 
-## Local Explorer APIs
+Optional additional gateway protection:
 
-Local-only operator explorer (disabled by default):
-
-- `POST /v1/explorer/session`
-- `DELETE /v1/explorer/session`
-- `GET /v1/explorer/buckets`
-- `GET /v1/explorer/objects`
-- `GET /v1/explorer/download`
-- `GET /explorer`
+- Cloudflare Access service-token headers:
+  - `CF-Access-Client-Id`
+  - `CF-Access-Client-Secret`
 
 ## Flow Result Metadata
 

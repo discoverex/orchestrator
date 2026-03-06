@@ -38,10 +38,7 @@ Runtime policy:
 - MLflow auth model: Cloudflare Access(Service Token) only
 - Artifact policy: all file upload/download must go through `storage-gateway` (single entrypoint)
 - MLflow responsibility: metadata only (params/metrics/tags/status). Do not use `mlflow.log_artifact()`.
-- Optional local explorer:
-  - `STORAGE_EXPLORER_ENABLED=true`
-  - `STORAGE_EXPLORER_LOCAL_ONLY=true`
-  - open `http://127.0.0.1:${STORAGE_GATEWAY_PORT}/explorer`
+- MinIO operator access should use MinIO Console route (`storage.discoverex...`) or localhost-bound console port.
 - Request auth on gateway:
 
 1. Bearer token (`Authorization`)
