@@ -1,14 +1,14 @@
 services:
   base-runtime:
     build:
-      context: ../../..
+      context: ../../../..
       dockerfile: infra/images/base.Dockerfile
     image: orchestrator-base:local
     command: ["true"]
 
   worker:
     build:
-      context: ../../..
+      context: ../../../..
       dockerfile: infra/images/worker.Dockerfile
     image: orchestrator-worker:local
     container_name: ${WORKER_CONTAINER_NAME:-orchestrator-worker-fixed}
