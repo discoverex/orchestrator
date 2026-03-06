@@ -39,7 +39,10 @@ source "${ENV_FILE_PATH}"
 set +a
 
 require_env PREFECT_SERVER_IMAGE
-require_env PREFECT_HOSTNAME
+if [[ -z "${PREFECT_HOSTNAMES:-}" && -n "${PREFECT_HOSTNAME:-}" ]]; then
+  export PREFECT_HOSTNAMES="${PREFECT_HOSTNAME}"
+fi
+require_env PREFECT_HOSTNAMES
 require_env PREFECT_API_PUBLIC_URL
 require_env PREFECT_DB_PASSWORD
 require_env FLUSH_TARGET_URL
