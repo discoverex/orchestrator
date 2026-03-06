@@ -28,7 +28,7 @@ services:
       - sh
       - -lc
       - >
-        export PREFECT_API_DATABASE_CONNECTION_URL="postgresql+asyncpg://${PREFECT_DB_USER}:${PREFECT_DB_PASSWORD}@prefect-db:5432/${PREFECT_DB_NAME}" &&
+        export PREFECT_API_DATABASE_CONNECTION_URL="postgresql+asyncpg://$${PREFECT_DB_USER}:$${PREFECT_DB_PASSWORD}@prefect-db:5432/$${PREFECT_DB_NAME}" &&
         prefect server start --host 0.0.0.0 --port ${PREFECT_PORT:-4200}
     ports:
       - "${PREFECT_BIND_ADDRESS:-127.0.0.1}:${PREFECT_BIND_PORT:-14200}:${PREFECT_PORT:-4200}"
