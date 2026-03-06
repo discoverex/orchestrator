@@ -78,3 +78,11 @@ has_prune_mode_arg() {
   done
   return 1
 }
+
+ensure_worker_gpu_runtime() {
+  local script="${ROOT_DIR}/scripts/ops/install_nvidia_container_toolkit.sh"
+  if [[ ! -x "${script}" ]]; then
+    chmod +x "${script}"
+  fi
+  "${script}"
+}

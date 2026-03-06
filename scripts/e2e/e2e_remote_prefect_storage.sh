@@ -30,7 +30,7 @@ REGISTER_ONLY="false"
 BOOTSTRAP_WORKER="false"
 WORKER_CONTAINER_NAME="orchestrator-e2e-temp-worker"
 FLOW_RUN_ID=""
-JOB_SPEC_JSON='{"run_mode":"inline","engine":"shell","entrypoint":["/bin/sh","-lc","nvidia-smi"],"config":null,"inputs":{},"env":{},"outputs_prefix":null,"job_name":"gpu-smoke-nvidia-smi"}'
+JOB_SPEC_JSON='{"run_mode":"inline","engine":"shell","entrypoint":["/bin/sh","-lc","nvidia-smi -L"],"config":null,"inputs":{},"env":{},"outputs_prefix":null,"job_name":"gpu-driver-smoke"}'
 
 usage() {
   cat <<'EOF'

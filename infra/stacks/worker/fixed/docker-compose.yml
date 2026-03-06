@@ -13,6 +13,7 @@ services:
     image: orchestrator-worker:local
     container_name: ${WORKER_CONTAINER_NAME:-orchestrator-worker-fixed}
     restart: unless-stopped
+    gpus: all
     environment:
       PREFECT_API_URL: ${PREFECT_API_URL}
       PREFECT_WORK_POOL: ${PREFECT_WORK_POOL:-gpu-pool}

@@ -208,7 +208,10 @@ case "${cmd}" in
         action="${1:-}"
         shift || true
         case "${action}" in
-          up) run_worker_fixed up -d --build "$@" ;;
+          up)
+            ensure_worker_gpu_runtime
+            run_worker_fixed up -d --build "$@"
+            ;;
           down) run_worker_fixed down "$@" ;;
           ps) run_worker_fixed ps "$@" ;;
           logs) run_worker_fixed logs --tail=120 "$@" ;;
