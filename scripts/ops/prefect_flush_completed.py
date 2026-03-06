@@ -3,161 +3,41 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-from dataclasses import dataclass
-from datetime import UTC, datetime
+import sys
 from pathlib import Path
 from typing import Any
-from urllib import error, request
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from scripts.ops.lib import prefect_flush_core as core  # noqa: E402
+
+Cursor = core.Cursor
 
 
 def _env(name: str, default: str | None = None, *, required: bool = False) -> str:
-    value = os.getenv(name, default)
-    if required and not value:
-        raise SystemExit(f"missing required env: {name}")
-    return value or ""
+    return core.env(name, default, required=required)
 
 
 def _iso_now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _parse_iso8601(value: str) -> datetime:
-    if value.endswith("Z"):
-        value = value[:-1] + "+00:00"
-    return datetime.fromisoformat(value).astimezone(UTC)
-
-
-def _json_request(
-    method: str,
-    url: str,
-    payload: dict[str, Any] | None = None,
-    headers: dict[str, str] | None = None,
-) -> Any:
-    body = None
-    req_headers = {
-        "Accept": "application/json",
-        "User-Agent": "orchestrator-e2e/1.0",
-    }
-    if headers:
-        req_headers.update(headers)
-    if payload is not None:
-        body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
-        req_headers["Content-Type"] = "application/json"
-    req = request.Request(url, method=method, data=body, headers=req_headers)
-    try:
-        with request.urlopen(req, timeout=30) as resp:  # nosec B310 - env-controlled endpoints
-            raw = resp.read()
-    except error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"{method} {url} failed: HTTP {exc.code} {detail}") from exc
-    if not raw:
-        return {}
-    return json.loads(raw.decode("utf-8"))
-
-
-@dataclass
-class Cursor:
-    last_end_time: str = ""
-    ids_at_last_end_time: list[str] | None = None
-
-    @classmethod
-    def load(cls, path: Path) -> "Cursor":
-        if not path.exists():
-            return cls(last_end_time="", ids_at_last_end_time=[])
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return cls(
-            last_end_time=str(data.get("last_end_time", "")),
-            ids_at_last_end_time=list(data.get("ids_at_last_end_time", [])),
-        )
-
-    def save(self, path: Path) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(
-            json.dumps(
-                {
-                    "last_end_time": self.last_end_time,
-                    "ids_at_last_end_time": self.ids_at_last_end_time or [],
-                    "updated_at": _iso_now(),
-                },
-                ensure_ascii=True,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-        tmp.replace(path)
-
-    def seen(self, run_id: str, end_time: str) -> bool:
-        if not self.last_end_time:
-            return False
-        if end_time < self.last_end_time:
-            return True
-        if end_time == self.last_end_time and run_id in (self.ids_at_last_end_time or []):
-            return True
-        return False
-
-    def advance(self, run_id: str, end_time: str) -> None:
-        if not self.last_end_time or end_time > self.last_end_time:
-            self.last_end_time = end_time
-            self.ids_at_last_end_time = [run_id]
-            return
-        if end_time == self.last_end_time:
-            ids = self.ids_at_last_end_time or []
-            if run_id not in ids:
-                ids.append(run_id)
-            self.ids_at_last_end_time = ids
-
-
-def _prefect_api_url() -> str:
-    return _env("PREFECT_API_URL", "http://127.0.0.1:4200/api").rstrip("/")
-
-
-def _prefect_headers() -> dict[str, str]:
-    headers: dict[str, str] = {}
-    cf_id = _env("PREFECT_CF_ACCESS_CLIENT_ID", "")
-    cf_secret = _env("PREFECT_CF_ACCESS_CLIENT_SECRET", "")
-    if cf_id and cf_secret:
-        headers["CF-Access-Client-Id"] = cf_id
-        headers["CF-Access-Client-Secret"] = cf_secret
-    return headers
+    return core.iso_now()
 
 
 def _prefect_post(path: str, payload: dict[str, Any]) -> Any:
-    return _json_request("POST", f"{_prefect_api_url()}/{path.lstrip('/')}", payload=payload, headers=_prefect_headers())
+    return core.prefect_post(path, payload)
 
 
 def _prefect_get(path: str) -> Any:
-    return _json_request("GET", f"{_prefect_api_url()}/{path.lstrip('/')}", headers=_prefect_headers())
-
-
-def _gateway_headers() -> dict[str, str]:
-    headers = {"Authorization": f"Bearer {_env('FLUSH_GATEWAY_TOKEN', required=True)}"}
-    cf_id = _env("FLUSH_CF_ACCESS_CLIENT_ID", "")
-    cf_secret = _env("FLUSH_CF_ACCESS_CLIENT_SECRET", "")
-    if cf_id and cf_secret:
-        headers["CF-Access-Client-Id"] = cf_id
-        headers["CF-Access-Client-Secret"] = cf_secret
-    return headers
+    return core.prefect_get(path)
 
 
 def _gateway_post(path: str, payload: dict[str, Any]) -> Any:
-    base = _env("FLUSH_TARGET_URL", required=True).rstrip("/")
-    return _json_request("POST", f"{base}/{path.lstrip('/')}", payload=payload, headers=_gateway_headers())
+    return core.gateway_post(path, payload)
 
 
 def _put_presigned(url: str, body: bytes) -> None:
-    req = request.Request(
-        url,
-        method="PUT",
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "User-Agent": "orchestrator-e2e/1.0",
-        },
-    )
-    with request.urlopen(req, timeout=60):  # nosec B310 - presigned URL
-        return
+    core.put_presigned(url, body)
 
 
 def _list_completed_runs(after_end_time: str, page_size: int, max_runs: int) -> list[dict[str, Any]]:
@@ -186,13 +66,13 @@ def _list_completed_runs(after_end_time: str, page_size: int, max_runs: int) -> 
 
 def _fetch_run_snapshot(run_id: str) -> dict[str, Any]:
     flow_run = _prefect_get(f"flow_runs/{run_id}")
-    task_runs = _fetch_paginated(
+    task_runs = core.fetch_paginated(
         "task_runs/filter",
         sort="EXPECTED_START_TIME_ASC",
         filter_key="task_runs",
         filter_payload={"flow_run_id": {"any_": [run_id]}},
     )
-    logs = _fetch_paginated(
+    logs = core.fetch_paginated(
         "logs/filter",
         sort="TIMESTAMP_ASC",
         filter_key="logs",
@@ -201,33 +81,11 @@ def _fetch_run_snapshot(run_id: str) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "exported_at": _iso_now(),
-        "source": {"prefect_api_url": _prefect_api_url(), "flow_run_id": run_id},
+        "source": {"prefect_api_url": core.prefect_api_url(), "flow_run_id": run_id},
         "flow_run": flow_run,
-        "task_runs": task_runs if isinstance(task_runs, list) else [],
-        "logs": logs if isinstance(logs, list) else [],
+        "task_runs": task_runs,
+        "logs": logs,
     }
-
-
-def _fetch_paginated(path: str, *, sort: str, filter_key: str, filter_payload: dict[str, Any], page_size: int = 200) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    offset = 0
-    while True:
-        rows = _prefect_post(
-            path,
-            {
-                "sort": sort,
-                "limit": page_size,
-                "offset": offset,
-                filter_key: filter_payload,
-            },
-        )
-        if not isinstance(rows, list) or not rows:
-            break
-        out.extend(rows)
-        if len(rows) < page_size:
-            break
-        offset += page_size
-    return out
 
 
 def _upload_snapshot(flow_run: dict[str, Any], snapshot: dict[str, Any]) -> str:
