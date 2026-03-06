@@ -3,9 +3,13 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+from types import ModuleType
+from typing import Any, Callable, cast
+
+import pytest
 
 
-def _load_module():
+def _load_module() -> ModuleType:
     path = Path(__file__).resolve().parents[2] / "scripts" / "ops" / "prefect_submit_router.py"
     spec = importlib.util.spec_from_file_location("prefect_submit_router", path)
     assert spec and spec.loader
@@ -15,7 +19,7 @@ def _load_module():
     return mod
 
 
-def test_router_diverts_when_fixed_running(monkeypatch) -> None:  # noqa: ANN001
+def test_router_diverts_when_fixed_running(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _load_module()
     monkeypatch.setattr(
         mod,
@@ -41,14 +45,18 @@ def test_router_diverts_when_fixed_running(monkeypatch) -> None:  # noqa: ANN001
     monkeypatch.setattr(mod, "_scheduled_count_for_queue", lambda q: 0)
     monkeypatch.setattr(mod, "_running_count_for_queue", lambda q: 1 if q == "gpu-fixed" else 0)
     monkeypatch.setattr(mod, "_find_deployment_id", lambda d: f"id-{d}")
-    monkeypatch.setattr(mod, "_create_flow_run", lambda dep_id, params, flow_run_name=None: {"id": "run-1", "name": flow_run_name or "r1"})
+    monkeypatch.setattr(
+        mod,
+        "_create_flow_run",
+        lambda dep_id, params, flow_run_name=None: {"id": "run-1", "name": flow_run_name or "r1"},
+    )
 
     out = _capture_json_stdout(mod.main)
     assert out["selected_deployment"] == "engine-run-colab"
     assert out["reason"] == "running-diverted-to-secondary"
 
 
-def test_router_strict_priority_keeps_preferred(monkeypatch) -> None:  # noqa: ANN001
+def test_router_strict_priority_keeps_preferred(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _load_module()
     monkeypatch.setattr(
         mod,
@@ -81,7 +89,7 @@ def test_router_strict_priority_keeps_preferred(monkeypatch) -> None:  # noqa: A
     assert out["reason"] == "strict-priority-selected-preferred"
 
 
-def test_router_forwards_job_name_to_flow_run_name(monkeypatch) -> None:  # noqa: ANN001
+def test_router_forwards_job_name_to_flow_run_name(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _load_module()
     monkeypatch.setattr(
         mod,
@@ -110,7 +118,8 @@ def test_router_forwards_job_name_to_flow_run_name(monkeypatch) -> None:  # noqa
 
     calls: dict[str, str | None] = {}
 
-    def _fake_create(dep_id, params, flow_run_name=None):  # noqa: ANN001
+    def _fake_create(dep_id: str, params: dict[str, object], flow_run_name: str | None = None) -> dict[str, str]:
+        _ = (dep_id, params)
         calls["name"] = flow_run_name
         return {"id": "run-3", "name": flow_run_name or "generated"}
 
@@ -121,14 +130,14 @@ def test_router_forwards_job_name_to_flow_run_name(monkeypatch) -> None:  # noqa
 
 
 class _FakeParser:
-    def __init__(self, payload):
+    def __init__(self, payload: dict[str, object]) -> None:
         self._payload = payload
 
-    def parse_args(self):
+    def parse_args(self) -> object:
         return type("Args", (), self._payload)()
 
 
-def _capture_json_stdout(fn):
+def _capture_json_stdout(fn: Callable[[], int]) -> dict[str, Any]:
     import io
     import json
     from contextlib import redirect_stdout
@@ -137,4 +146,4 @@ def _capture_json_stdout(fn):
     with redirect_stdout(buf):
         rc = fn()
     assert rc == 0
-    return json.loads(buf.getvalue().strip())
+    return cast(dict[str, Any], json.loads(buf.getvalue().strip()))

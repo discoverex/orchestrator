@@ -4,9 +4,12 @@ import argparse
 import importlib.util
 import sys
 from pathlib import Path
+from types import ModuleType
+
+import pytest
 
 
-def _load_module():
+def _load_module() -> ModuleType:
     path = Path(__file__).resolve().parents[2] / "scripts" / "e2e" / "verify_remote_chain.py"
     spec = importlib.util.spec_from_file_location("verify_remote_chain", path)
     assert spec and spec.loader
@@ -16,7 +19,7 @@ def _load_module():
     return mod
 
 
-def test_e2e_remote_chain__storage_objects__returns_ok(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+def test_e2e_remote_chain__storage_objects__returns_ok(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _load_module()
     flow_run_id = "8de7d74e-4728-4a23-859a-5fd3bcc34abb"
     bucket = "orchestrator-artifacts"
@@ -30,7 +33,14 @@ def test_e2e_remote_chain__storage_objects__returns_ok(tmp_path: Path, monkeypat
         output_json=str(tmp_path / "storage.json"),
     )
 
-    def _fake_http_json(method: str, url: str, payload=None, headers=None, timeout=30):  # noqa: ANN001
+    def _fake_http_json(
+        method: str,
+        url: str,
+        payload: dict[str, object] | None = None,
+        headers: dict[str, str] | None = None,
+        timeout: int = 30,
+    ) -> dict[str, object]:
+        _ = (payload, headers, timeout)
         if method == "POST" and url.endswith("/v1/object/head"):
             return {"exists": True}
         if method == "POST" and url.endswith("/v1/presign/get"):
@@ -53,7 +63,7 @@ def test_e2e_remote_chain__storage_objects__returns_ok(tmp_path: Path, monkeypat
     assert Path(args.output_json).exists()
 
 
-def test_e2e_remote_chain__prune_verify_apply__treats_404_as_success(monkeypatch) -> None:  # noqa: ANN001
+def test_e2e_remote_chain__prune_verify_apply__treats_404_as_success(monkeypatch: pytest.MonkeyPatch) -> None:
     mod = _load_module()
 
     args = argparse.Namespace(
@@ -69,7 +79,8 @@ def test_e2e_remote_chain__prune_verify_apply__treats_404_as_success(monkeypatch
 
     monkeypatch.setattr(mod, "_run_ops_script", lambda *args, **kwargs: {"deleted": 1})
 
-    def _raise_404(*args, **kwargs):  # noqa: ANN001
+    def _raise_404(*args: object, **kwargs: object) -> dict[str, object]:
+        _ = (args, kwargs)
         raise mod.VerifyError("http", "HTTP_404", "not found")
 
     monkeypatch.setattr(mod, "_http_json", _raise_404)

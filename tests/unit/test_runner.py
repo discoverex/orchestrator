@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from runner import git_runner
@@ -12,7 +14,7 @@ def test_resolve_commit_accepts_sha() -> None:
 
 
 def test_resolve_commit_invalid_ref_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _always_fail(_cmd: list[str], cwd=None) -> str:  # noqa: ANN001
+    def _always_fail(_cmd: list[str], cwd: Path | None = None) -> str:
         _ = cwd
         raise RunnerError("fail")
 
