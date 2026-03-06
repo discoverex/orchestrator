@@ -137,6 +137,16 @@ case "${cmd}" in
       echo "missing executable: ${REMOTE_E2E_SCRIPT}" >&2
       exit 1
     fi
+    prune_arg_present="false"
+    for arg in "$@"; do
+      if [[ "${arg}" == "--prune-mode" || "${arg}" == --prune-mode=* ]]; then
+        prune_arg_present="true"
+        break
+      fi
+    done
+    if [[ "${prune_arg_present}" == "false" ]]; then
+      exec "${REMOTE_E2E_SCRIPT}" --prune-mode dry-run "$@"
+    fi
     exec "${REMOTE_E2E_SCRIPT}" "$@"
     ;;
 
