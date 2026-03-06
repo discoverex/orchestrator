@@ -2,8 +2,13 @@ tunnel: d701bf8c-328d-4f47-80a8-38b283f78bfe
 credentials-file: /etc/cloudflared/d701bf8c-328d-4f47-80a8-38b283f78bfe.json
 
 ingress:
+  - hostname: storage.discoverex.qzz.io
+    path: /v1/object/proxy.*
+    service: http://storage-gateway:8100
+  - hostname: storage.discoverex.qzz.io
+    service: http://minio:9001
   - hostname: mlflow.discoverex.qzz.io
-    service: http://mlflow:__MLFLOW_PORT__
+    service: http://mlflow:5000
   - hostname: discoverex.qzz.io
     service: http://storage-gateway:8100
   - service: http_status:404

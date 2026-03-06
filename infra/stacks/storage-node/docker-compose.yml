@@ -117,11 +117,10 @@ services:
     container_name: orchestrator-cloudflared
     restart: unless-stopped
     command:
-      - sh
-      - -lc
-      - >
-        sed "s/__MLFLOW_PORT__/${MLFLOW_PORT:-5000}/g" /etc/cloudflared/config.yml > /tmp/config.yml &&
-        cloudflared tunnel --config /tmp/config.yml run
+      - tunnel
+      - --config
+      - /etc/cloudflared/config.yml
+      - run
     volumes:
       - ./.cloudflared:/etc/cloudflared:ro
     depends_on:
