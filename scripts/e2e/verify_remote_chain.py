@@ -41,7 +41,10 @@ def _http_json(
     timeout: int = 30,
 ) -> dict[str, Any] | list[dict[str, Any]]:
     body = None
-    req_headers = {"Accept": "application/json"}
+    req_headers = {
+        "Accept": "application/json",
+        "User-Agent": "orchestrator-e2e/1.0",
+    }
     if headers:
         req_headers.update(headers)
     if payload is not None:

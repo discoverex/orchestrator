@@ -35,7 +35,10 @@ def _json_request(
     headers: dict[str, str] | None = None,
 ) -> Any:
     body = None
-    req_headers = {"Accept": "application/json"}
+    req_headers = {
+        "Accept": "application/json",
+        "User-Agent": "orchestrator-e2e/1.0",
+    }
     if headers:
         req_headers.update(headers)
     if payload is not None:
@@ -144,7 +147,15 @@ def _gateway_post(path: str, payload: dict[str, Any]) -> Any:
 
 
 def _put_presigned(url: str, body: bytes) -> None:
-    req = request.Request(url, method="PUT", data=body, headers={"Content-Type": "application/json"})
+    req = request.Request(
+        url,
+        method="PUT",
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "orchestrator-e2e/1.0",
+        },
+    )
     with request.urlopen(req, timeout=60):  # nosec B310 - presigned URL
         return
 

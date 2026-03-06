@@ -29,7 +29,10 @@ def _prefect_headers() -> dict[str, str]:
 
 def _json_request(method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
     body = None
-    headers = {"Accept": "application/json"}
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "orchestrator-e2e/1.0",
+    }
     headers.update(_prefect_headers())
     if payload is not None:
         headers["Content-Type"] = "application/json"

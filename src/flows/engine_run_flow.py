@@ -14,6 +14,8 @@ from prefect.runtime import flow_run
 from flows.checkpoint_store import load_checkpoint, resolve_checkpoint_path, save_checkpoint
 from runner.git_runner import cleanup_workdir, resolve_commit, run_entrypoint
 
+WORKER_HTTP_USER_AGENT = "orchestrator-worker/1.0"
+
 
 @dataclass(frozen=True)
 class ArtifactLink:
@@ -40,6 +42,7 @@ def _gateway_headers() -> dict[str, str]:
     return {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
+        "User-Agent": WORKER_HTTP_USER_AGENT,
     }
 
 
@@ -52,7 +55,15 @@ def _http_json(method: str, url: str, payload: dict[str, object]) -> dict[str, o
 
 def _upload_file(put_url: str, path: Path) -> None:
     data = path.read_bytes()
-    req = request.Request(put_url, method="PUT", data=data, headers={"Content-Type": "application/octet-stream"})
+    req = request.Request(
+        put_url,
+        method="PUT",
+        data=data,
+        headers={
+            "Content-Type": "application/octet-stream",
+            "User-Agent": WORKER_HTTP_USER_AGENT,
+        },
+    )
     with request.urlopen(req):  # nosec B310 - presigned URL
         return
 
