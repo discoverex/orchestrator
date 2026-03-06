@@ -4,10 +4,18 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from urllib import error, request
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR / "src") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "src"))
+
+from flows.job_spec import JobSpecError, parse_job_spec_json  # noqa: E402
 
 
 def _env(name: str, default: str = "") -> str:
@@ -109,11 +117,14 @@ def _find_deployment_id(deployment_name: str) -> str:
     raise RuntimeError(f"deployment not found: {deployment_name}")
 
 
-def _create_flow_run(deployment_id: str, parameters: dict[str, Any]) -> dict[str, Any]:
+def _create_flow_run(deployment_id: str, parameters: dict[str, Any], flow_run_name: str | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {"parameters": parameters}
+    if flow_run_name:
+        payload["name"] = flow_run_name
     row = _http_json(
         "POST",
         f"deployments/{deployment_id}/create_flow_run",
-        {"parameters": parameters},
+        payload,
     )
     if not isinstance(row, dict):
         raise RuntimeError("unexpected create_flow_run response shape")
@@ -143,13 +154,20 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--colab-deployment", default=_env("ROUTER_COLAB_DEPLOYMENT", "engine-run-colab"))
     parser.add_argument("--fixed-queue", default=_env("ROUTER_FIXED_QUEUE", "gpu-fixed"))
     parser.add_argument("--colab-queue", default=_env("ROUTER_COLAB_QUEUE", "gpu-colab"))
-    parser.add_argument("--repo-url", required=True)
-    parser.add_argument("--ref", default="main")
-    parser.add_argument("--entrypoint", default='["/bin/sh","-lc","echo hello-from-router"]')
+    parser.add_argument("--job-spec-json", default=None, help="JobSpec JSON string.")
+    parser.add_argument("--job-spec-file", default=None, help="Path to JobSpec JSON file.")
     parser.add_argument("--resume-key", default=None)
     parser.add_argument("--checkpoint-dir", default=None)
-    parser.add_argument("--parameters-json", default=None, help="Optional JSON object merged into deployment parameters.")
+    parser.add_argument("--parameters-json", default=None, help="Optional JSON object merged into JobSpec JSON.")
     return parser
+
+
+def _load_job_spec_raw(args: argparse.Namespace) -> str:
+    if bool(args.job_spec_json) == bool(args.job_spec_file):
+        raise SystemExit("exactly one of --job-spec-json or --job-spec-file is required")
+    if args.job_spec_json:
+        return str(args.job_spec_json)
+    return Path(str(args.job_spec_file)).read_text(encoding="utf-8")
 
 
 def main() -> int:
@@ -184,21 +202,29 @@ def main() -> int:
             selected = secondary_deployment
             decision_reason = "backlog-diverted-to-secondary"
 
-    params: dict[str, Any] = {
-        "repo_url": args.repo_url,
-        "ref": args.ref,
-        "entrypoint": json.loads(args.entrypoint),
-        "resume_key": args.resume_key,
-        "checkpoint_dir": args.checkpoint_dir,
-    }
+    job_spec_raw = _load_job_spec_raw(args)
+    try:
+        job_spec = parse_job_spec_json(job_spec_raw).model_dump(mode="json")
+    except JobSpecError as exc:
+        raise SystemExit(str(exc)) from exc
     if args.parameters_json:
         extra = json.loads(args.parameters_json)
         if not isinstance(extra, dict):
             raise SystemExit("--parameters-json must be a JSON object")
-        params.update(extra)
+        job_spec.update(extra)
+        job_spec_raw = json.dumps(job_spec, ensure_ascii=True)
+        try:
+            parse_job_spec_json(job_spec_raw)
+        except JobSpecError as exc:
+            raise SystemExit(f"invalid merged job spec: {exc}") from exc
 
     dep_id = _find_deployment_id(selected)
-    created = _create_flow_run(dep_id, params)
+    params: dict[str, Any] = {
+        "job_spec_json": job_spec_raw,
+        "resume_key": args.resume_key,
+        "checkpoint_dir": args.checkpoint_dir,
+    }
+    created = _create_flow_run(dep_id, params, flow_run_name=job_spec.get("job_name"))
 
     output = {
         "ok": True,
@@ -213,6 +239,7 @@ def main() -> int:
         "colab_queue_running": colab_depth.running_count,
         "selected_deployment": selected,
         "selected_deployment_id": dep_id,
+        "engine": job_spec.get("engine"),
         "reason": decision_reason,
         "flow_run_id": created.get("id"),
         "flow_run_name": created.get("name"),

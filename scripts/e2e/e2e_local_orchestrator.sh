@@ -217,10 +217,11 @@ if [[ "${MODE}" == "mlflow" ]]; then
 fi
 run_step "prefect.ensure_work_pool" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect work-pool create ${PREFECT_WORK_POOL} --type process >/dev/null 2>&1 || true"
 
+run_step "build.register_image" compose_local build register
 run_step "register.apply_deployment" compose_local run --rm register
-run_step "register.verify_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls | grep -q 'engine-run/engine-run'"
+run_step "register.verify_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls | grep -q 'run-job/engine-run'"
 
-run_step "prefect.submit_flow_run" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment run 'engine-run/engine-run' -p repo_url='https://github.com/octocat/Hello-World.git' -p ref='master' -p entrypoint='[\"/bin/sh\",\"-lc\",\"echo hello-prefect\"]' > '${LOG_DIR}/prefect-submit.log'"
+run_step "prefect.submit_flow_run" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment run 'run-job/engine-run' -p job_spec_json='{\"engine\":\"shell\",\"repo_url\":\"https://github.com/octocat/Hello-World.git\",\"ref\":\"master\",\"entrypoint\":[\"/bin/sh\",\"-lc\",\"echo hello-prefect\"],\"config\":null,\"inputs\":{},\"env\":{},\"outputs_prefix\":null}' > '${LOG_DIR}/prefect-submit.log'"
 FLOW_RUN_ID="$(grep -Eo '[0-9a-fA-F-]{36}' "${LOG_DIR}/prefect-submit.log" | head -n1 || true)"
 if [[ -z "${FLOW_RUN_ID}" ]]; then
   record_step "prefect.extract_flow_run_id" "fail" "unable to parse flow run id"

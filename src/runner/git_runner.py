@@ -48,6 +48,14 @@ def run_entrypoint(
     resolved_commit: str,
     entrypoint: list[str],
     env: dict[str, str] | None = None,
+    *,
+    engine: str,
+    config_rel_path: str | None,
+    inputs: dict[str, object] | None,
+    flow_run_id: str,
+    attempt: int,
+    outputs_prefix: str,
+    job_name: str | None = None,
 ) -> RunArtifacts:
     workdir = Path(mkdtemp(prefix="orchestrator-run-"))
 
@@ -59,6 +67,30 @@ def run_entrypoint(
     result_path = workdir / "result.json"
 
     merged_env = os.environ.copy()
+    config_path = ""
+    if config_rel_path:
+        candidate = (workdir / config_rel_path).resolve()
+        if not str(candidate).startswith(str(workdir.resolve()) + os.sep):
+            raise RunnerError("config path escapes repository root")
+        if not candidate.exists() or not candidate.is_file():
+            raise RunnerError(f"config file not found: {config_rel_path}")
+        config_path = str(candidate)
+
+    merged_env.update(
+        {
+            "ORCH_ENGINE": engine,
+            "ORCH_FLOW_RUN_ID": flow_run_id,
+            "ORCH_ATTEMPT": str(attempt),
+            "ORCH_OUTPUTS_PREFIX": outputs_prefix,
+            "ORCH_RESOLVED_COMMIT": resolved_commit,
+            "ORCH_JOB_INPUTS_JSON": json.dumps(inputs or {}, ensure_ascii=True),
+        }
+    )
+    if job_name:
+        merged_env["ORCH_JOB_NAME"] = job_name
+    if config_path:
+        merged_env["ORCH_JOB_CONFIG_PATH"] = config_path
+
     if env:
         merged_env.update(env)
 

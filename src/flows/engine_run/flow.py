@@ -9,7 +9,8 @@ from prefect.context import get_run_context
 from prefect.runtime import flow_run
 
 from flows.checkpoint_store import load_checkpoint, resolve_checkpoint_path, save_checkpoint
-from flows.engine_run.tasks import prepare_manifest_task, resolve_commit_task, run_entrypoint_task, upload_outputs_task
+from flows.engine_run.tasks import prepare_manifest_task, resolve_commit_task, run_entrypoint_job_task, upload_outputs_task
+from flows.job_spec import parse_job_spec_json
 from runner.git_runner import cleanup_workdir
 
 
@@ -25,19 +26,20 @@ def _artifact_paths_exist(local_paths: dict[str, str]) -> bool:
     return all(Path(local_paths[k]).exists() for k in ("stdout", "stderr", "result"))
 
 
-@flow(name="engine-run", retries=3, retry_delay_seconds=30)
-def engine_run_flow(
-    repo_url: str,
-    ref: str,
-    entrypoint: list[str],
-    inputs_ref: list[str] | None = None,
-    env: dict[str, str] | None = None,
-    outputs_prefix: str | None = None,
+@flow(name="run-job", retries=3, retry_delay_seconds=30)
+def run_job_flow(
+    job_spec_json: str | dict[str, Any],
     resume_key: str | None = None,
     checkpoint_dir: str | None = None,
 ) -> dict[str, object]:
-    _ = (inputs_ref, outputs_prefix)
     run_id = flow_run.get_id()
+    if isinstance(job_spec_json, dict):
+        import json
+
+        job_spec_raw = json.dumps(job_spec_json, ensure_ascii=True)
+    else:
+        job_spec_raw = job_spec_json
+    job = parse_job_spec_json(job_spec_raw)
     active_resume_key = resume_key or run_id
     checkpoint_path = resolve_checkpoint_path(
         checkpoint_dir=checkpoint_dir or os.getenv("ORCHESTRATOR_CHECKPOINT_DIR"),
@@ -58,7 +60,7 @@ def engine_run_flow(
     if _step_done(state, "resolve_commit"):
         resolved_commit = str(state["resolved_commit"])
     else:
-        resolved_commit = resolve_commit_task(repo_url, ref)
+        resolved_commit = resolve_commit_task(job.repo_url, job.ref)
         state["resolved_commit"] = resolved_commit
         _mark_step(state, "resolve_commit")
         save_checkpoint(checkpoint_path, state)
@@ -75,7 +77,20 @@ def engine_run_flow(
         local_paths = state["local_paths"]
         exit_code = int(state.get("exit_code", 1))
     else:
-        local_paths, exit_code = run_entrypoint_task(repo_url, resolved_commit, entrypoint, env or {})
+        effective_outputs_prefix = job.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/"
+        local_paths, exit_code = run_entrypoint_job_task(
+            repo_url=job.repo_url,
+            resolved_commit=resolved_commit,
+            entrypoint=job.entrypoint,
+            env=job.env,
+            engine=job.engine,
+            config_rel_path=job.config,
+            inputs=job.inputs,
+            flow_run_id=run_id,
+            attempt=attempt,
+            outputs_prefix=effective_outputs_prefix,
+            job_name=job.job_name,
+        )
         state["local_paths"] = local_paths
         state["exit_code"] = exit_code
         _mark_step(state, "run_entrypoint")
@@ -109,14 +124,20 @@ def engine_run_flow(
         _mark_step(state, "cleanup")
         save_checkpoint(checkpoint_path, state)
 
+    effective_outputs_prefix = job.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/"
     return {
         "flow_run_id": run_id,
         "attempt": attempt,
+        "engine": job.engine,
+        "job_name": job.job_name,
         "resolved_commit": resolved_commit,
-        "outputs_prefix": f"jobs/{run_id}/attempt-{attempt}/",
+        "outputs_prefix": effective_outputs_prefix,
         "stdout_uri": uploaded.get("stdout"),
         "stderr_uri": uploaded.get("stderr"),
         "result_uri": uploaded.get("result"),
         "manifest_uri": uploaded.get("manifest"),
         "exit_code": exit_code,
     }
+
+
+engine_run_flow = run_job_flow
