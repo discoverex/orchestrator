@@ -8,9 +8,13 @@ from prefect import flow
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Register Prefect deployment for engine_run_flow")
-    parser.add_argument("--name", default="engine-run", help="Deployment name")
-    parser.add_argument("--pool", default="colab-gpu", help="Prefect work pool name")
-    parser.add_argument("--queue", default="default", help="Prefect work queue name")
+    parser.add_argument("--single-name", default=None, help="Single deployment name (compat mode)")
+    parser.add_argument("--single-queue", default="default", help="Single deployment queue (compat mode)")
+    parser.add_argument("--pool", default="gpu-pool", help="Prefect work pool name")
+    parser.add_argument("--fixed-name", default="engine-run", help="Fixed deployment name")
+    parser.add_argument("--fixed-queue", default="gpu-fixed", help="Fixed deployment queue")
+    parser.add_argument("--colab-name", default="engine-run-colab", help="Colab deployment name")
+    parser.add_argument("--colab-queue", default="gpu-colab", help="Colab deployment queue")
     parser.add_argument("--version", default=None, help="Deployment version")
     return parser.parse_args()
 
@@ -21,20 +25,43 @@ def main() -> None:
         source=str(Path.cwd()),
         entrypoint="src/flows/engine_run_flow.py:engine_run_flow",
     )
+    base_parameters = {
+        "repo_url": "https://github.com/example/repo.git",
+        "ref": "main",
+        "entrypoint": ["/bin/sh", "-lc", "echo hello"],
+        "resume_key": None,
+        "checkpoint_dir": None,
+    }
+
+    if args.single_name:
+        source_flow.deploy(
+            name=args.single_name,
+            work_pool_name=args.pool,
+            work_queue_name=args.single_queue,
+            version=args.version,
+            build=False,
+            push=False,
+            parameters=base_parameters,
+        )
+        return
+
     source_flow.deploy(
-        name=args.name,
+        name=args.fixed_name,
         work_pool_name=args.pool,
-        work_queue_name=args.queue,
+        work_queue_name=args.fixed_queue,
         version=args.version,
         build=False,
         push=False,
-        parameters={
-            "repo_url": "https://github.com/example/repo.git",
-            "ref": "main",
-            "entrypoint": ["/bin/sh", "-lc", "echo hello"],
-            "resume_key": None,
-            "checkpoint_dir": None,
-        },
+        parameters=base_parameters,
+    )
+    source_flow.deploy(
+        name=args.colab_name,
+        work_pool_name=args.pool,
+        work_queue_name=args.colab_queue,
+        version=args.version,
+        build=False,
+        push=False,
+        parameters=base_parameters,
     )
 
 

@@ -23,8 +23,8 @@ if [[ -f "${ROOT_DIR}/infra/stacks/storage-node/.env" ]]; then
 fi
 
 PREFECT_API_URL="${PREFECT_API_URL:-}"
-PREFECT_WORK_POOL="${PREFECT_WORK_POOL:-colab-gpu}"
-PREFECT_WORK_QUEUE="${PREFECT_WORK_QUEUE:-default}"
+PREFECT_WORK_POOL="${PREFECT_WORK_POOL:-gpu-pool}"
+PREFECT_WORK_QUEUE="${PREFECT_WORK_QUEUE:-gpu-fixed}"
 PREFECT_CF_ACCESS_CLIENT_ID="${PREFECT_CF_ACCESS_CLIENT_ID:-${CF_ACCESS_CLIENT_ID:-}}"
 PREFECT_CF_ACCESS_CLIENT_SECRET="${PREFECT_CF_ACCESS_CLIENT_SECRET:-${CF_ACCESS_CLIENT_SECRET:-}}"
 STORAGE_GATEWAY_URL="${STORAGE_GATEWAY_URL:-http://127.0.0.1:8100}"
@@ -46,8 +46,8 @@ Usage:
 
 Options:
   --prefect-api-url URL         Remote Prefect API URL (e.g. https://<host>/api)
-  --work-pool NAME              Prefect work pool name (default: colab-gpu)
-  --work-queue NAME             Prefect work queue name (default: default)
+  --work-pool NAME              Prefect work pool name (default: gpu-pool)
+  --work-queue NAME             Prefect work queue name (default: gpu-fixed)
   --prefect-cf-access-client-id ID
   --prefect-cf-access-client-secret SECRET
   --storage-gateway-url URL     Local storage-gateway URL (default: http://127.0.0.1:8100)

@@ -19,7 +19,7 @@ docker compose -f docker-compose.local.yml up -d --build minio prefect storage-g
 Register deployment and run:
 
 ```bash
-docker compose -f docker-compose.local.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect work-pool create ${PREFECT_WORK_POOL:-colab-gpu} --type process || true
+docker compose -f docker-compose.local.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect work-pool create ${PREFECT_WORK_POOL:-gpu-pool} --type process || true
 docker compose -f docker-compose.local.yml run --rm register
 docker compose -f docker-compose.local.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment run 'engine-run/engine-run' \
   -p repo_url='https://github.com/octocat/Hello-World.git' \
@@ -55,16 +55,16 @@ prefect deployment run 'engine-run/engine-run' \
 Primary operation should be script-first:
 
 ```bash
-PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py start \
+PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py start \
   --checkpoint-dir /content/drive/MyDrive/orchestrator/checkpoints
 ```
 
 Other commands:
 
 ```bash
-PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py status
-PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py logs --tail 80
-PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py stop
+PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py status
+PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py logs --tail 80
+PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py stop
 ```
 
 Optional notebook: `infra/stacks/worker/colab/worker_colab.ipynb`
@@ -81,6 +81,7 @@ Artifact and experiment policy:
 Use this when this machine is dedicated storage node:
 
 ```bash
+./bin/project runtime init storage
 cp infra/stacks/storage-node/.env.example infra/stacks/storage-node/.env
 set -a; source infra/stacks/storage-node/.env; set +a
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml build base-runtime
@@ -109,6 +110,7 @@ Runbook: `docs/ops/prefect-server.md`
 `bin/project` is the canonical local operator command:
 
 ```bash
+./bin/project runtime init all
 ./bin/project e2e full --keep-on-fail
 ./bin/project e2e-remote --prefect-api-url https://prefect.example.com/api --prune-mode apply
 ./bin/project storage up
@@ -118,7 +120,15 @@ Runbook: `docs/ops/prefect-server.md`
 ./bin/project prefect flush
 ./bin/project prefect prune
 ./bin/project register run
+./bin/project worker fixed up
+./bin/project worker register-gpu
+./bin/project worker submit --repo-url https://github.com/octocat/Hello-World.git --ref master
 ```
+
+Runtime data policy:
+
+- Run commands from project root (`orchestrator`).
+- Keep runtime data outside repo under `../runtime` (for example `../runtime/storage`, `../runtime/worker`).
 
 `bin/remote` provides remote VM control for Prefect stack:
 
