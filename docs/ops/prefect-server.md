@@ -81,3 +81,6 @@ Operational notes:
 - `register` is a one-shot container (`run --rm`) that exits after deployment registration.
 - The validation script assumes production worker is already polling the target pool/queue.
 - `--bootstrap-worker` exists only as temporary bootstrap support and should be removed when production worker validation is fully adopted.
+- Recommended production split:
+  - fixed worker: `gpu-pool` + `gpu-fixed`
+  - colab workers: `gpu-pool` + `gpu-colab`

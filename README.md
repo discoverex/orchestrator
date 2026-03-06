@@ -19,7 +19,7 @@ docker compose -f docker-compose.local.yml up -d --build minio prefect storage-g
 Register deployment and run:
 
 ```bash
-docker compose -f docker-compose.local.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect work-pool create ${PREFECT_WORK_POOL:-colab-gpu} --type process || true
+docker compose -f docker-compose.local.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect work-pool create ${PREFECT_WORK_POOL:-gpu-pool} --type process || true
 docker compose -f docker-compose.local.yml run --rm register
 docker compose -f docker-compose.local.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment run 'engine-run/engine-run' \
   -p repo_url='https://github.com/octocat/Hello-World.git' \
@@ -55,16 +55,16 @@ prefect deployment run 'engine-run/engine-run' \
 Primary operation should be script-first:
 
 ```bash
-PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py start \
+PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py start \
   --checkpoint-dir /content/drive/MyDrive/orchestrator/checkpoints
 ```
 
 Other commands:
 
 ```bash
-PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py status
-PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py logs --tail 80
-PYTHONPATH=src uv run python infra/stacks/worker/colab/colab_worker_runner.py stop
+PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py status
+PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py logs --tail 80
+PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py stop
 ```
 
 Optional notebook: `infra/stacks/worker/colab/worker_colab.ipynb`
@@ -118,6 +118,9 @@ Runbook: `docs/ops/prefect-server.md`
 ./bin/project prefect flush
 ./bin/project prefect prune
 ./bin/project register run
+./bin/project worker fixed up
+./bin/project worker register-gpu
+./bin/project worker submit --repo-url https://github.com/octocat/Hello-World.git --ref master
 ```
 
 `bin/remote` provides remote VM control for Prefect stack:

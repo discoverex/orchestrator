@@ -45,6 +45,8 @@ from root `.env` by default.
 External workers should use:
 
 - `PREFECT_API_URL=https://<your-domain>/api`
+- `PREFECT_WORK_POOL=gpu-pool`
+- `PREFECT_WORK_QUEUE=gpu-fixed` (fixed) or `gpu-colab` (burst)
 - If Cloudflare Access is enabled on the domain, pass service token headers:
   - `CF-Access-Client-Id`
   - `CF-Access-Client-Secret`
