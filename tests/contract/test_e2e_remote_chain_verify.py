@@ -16,7 +16,7 @@ def _load_module():
     return mod
 
 
-def test_storage_objects_success(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+def test_e2e_remote_chain__storage_objects__returns_ok(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
     mod = _load_module()
     flow_run_id = "8de7d74e-4728-4a23-859a-5fd3bcc34abb"
     bucket = "orchestrator-artifacts"
@@ -53,7 +53,7 @@ def test_storage_objects_success(tmp_path: Path, monkeypatch) -> None:  # noqa: 
     assert Path(args.output_json).exists()
 
 
-def test_prune_verify_apply_uses_404_as_success(monkeypatch) -> None:  # noqa: ANN001
+def test_e2e_remote_chain__prune_verify_apply__treats_404_as_success(monkeypatch) -> None:  # noqa: ANN001
     mod = _load_module()
 
     args = argparse.Namespace(
