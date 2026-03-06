@@ -6,6 +6,26 @@ Prefect-based orchestration workspace with three responsibilities:
 - `runner`: git checkout (resolved commit) + entrypoint execution
 - `storage_gateway`: presigned URL gateway for MinIO (workers never hold MinIO credentials)
 
+## Conceptual topology
+
+- Prefect server node:
+  - Prefect API/UI + metadata DB
+  - deployment registration + orchestration state
+- Worker nodes:
+  - fixed docker worker (`gpu-fixed`)
+  - optional colab workers (`gpu-colab`)
+- Storage node:
+  - MinIO + storage-gateway + MLflow
+  - artifact/object persistence and metadata tracking
+
+Core interaction path:
+
+1. register deployment to Prefect
+2. submit flow run to work pool/queue
+3. worker executes `engine_run_flow` + uploads outputs via storage-gateway
+4. flush exports completed run snapshots to storage
+5. prune handles retention (optional apply mode)
+
 ## Local quickstart (dev)
 
 ```bash
@@ -138,13 +158,17 @@ Runtime data policy:
 ./bin/remote prefect-up
 ./bin/remote prefect-ps
 ./bin/remote prefect-logs
+./bin/remote worker ps
 ```
 
 ## Test
 
 ```bash
 uv run ruff check .
-uv run pytest tests -q
+uv run pytest -q
+uv run pytest tests/unit
+uv run pytest tests/integration
+uv run pytest tests/contract
 ```
 
 E2E (register -> worker -> storage, optional MLflow/external):

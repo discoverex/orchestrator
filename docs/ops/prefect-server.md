@@ -30,6 +30,7 @@ Remote helper flow:
 ./bin/remote prefect-install
 ./bin/remote prefect-up
 ./bin/remote prefect-ps
+./bin/remote worker ps
 ```
 
 ## 3) Manual maintenance commands
