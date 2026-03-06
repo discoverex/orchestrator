@@ -57,3 +57,27 @@ curl -fsS "http://127.0.0.1:${PREFECT_BIND_PORT}/api/health"
 Expected external API endpoint:
 
 `https://<domain>/api`
+
+## 6) Remote chain validation (register -> run -> storage -> flush/prune)
+
+Run from the storage-node machine:
+
+```bash
+./bin/project e2e-remote \
+  --prefect-api-url https://<domain>/api
+```
+
+PoC-only destructive prune verification:
+
+```bash
+./bin/project e2e-remote \
+  --prefect-api-url https://<domain>/api \
+  --prune-mode apply \
+  --prune-ttl-hours 0
+```
+
+Operational notes:
+
+- `register` is a one-shot container (`run --rm`) that exits after deployment registration.
+- The validation script assumes production worker is already polling the target pool/queue.
+- `--bootstrap-worker` exists only as temporary bootstrap support and should be removed when production worker validation is fully adopted.

@@ -110,6 +110,7 @@ Runbook: `docs/ops/prefect-server.md`
 
 ```bash
 ./bin/project e2e full --keep-on-fail
+./bin/project e2e-remote --prefect-api-url https://prefect.example.com/api --prune-mode apply
 ./bin/project storage up
 ./bin/project storage down
 ./bin/project prefect up
@@ -168,3 +169,22 @@ curl -fsSI https://mlflow.discoverex.qzz.io \
 
 If `verify-mlflow-tags` fails with `mlflow runs/create failed: HTTP 403`, adjust
 Cloudflare Access policy to allow MLflow write APIs for the configured service token.
+
+Remote Prefect + local storage E2E (production-worker oriented):
+
+```bash
+# register + run + storage verify + flush + prune dry-run
+./bin/project e2e-remote \
+  --prefect-api-url https://prefect.example.com/api
+
+# PoC mode (allow prune apply)
+./bin/project e2e-remote \
+  --prefect-api-url https://prefect.example.com/api \
+  --prune-mode apply \
+  --prune-ttl-hours 0
+```
+
+Notes:
+
+- Default flow assumes an existing operational worker in the target work pool.
+- `--bootstrap-worker` is available only for temporary bootstrapping and should be removed during production cutover.
