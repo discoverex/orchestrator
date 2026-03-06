@@ -35,7 +35,7 @@ def _base_env(deploy_dir: Path, bin_dir: Path) -> dict[str, str]:
 def _write_runtime_env(deploy_dir: Path, *, include_flush_token: bool = True) -> None:
     lines = [
         "PREFECT_SERVER_IMAGE=ghcr.io/org/orchestrator/prefect-server:sha-test",
-        "PREFECT_HOSTNAME=prefect.example.com",
+        "PREFECT_HOSTNAMES=prefect.example.com,prefect-api.example.com",
         "PREFECT_API_PUBLIC_URL=https://prefect.example.com/api",
         "PREFECT_DB_PASSWORD=pw",
         "FLUSH_TARGET_URL=https://storage.example.com",

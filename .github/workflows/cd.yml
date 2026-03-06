@@ -84,7 +84,7 @@ jobs:
           cp infra/stacks/prefect-server/deploy.sh deploy.sh
           cat > .env.runtime <<'EOF'
           PREFECT_SERVER_IMAGE=${{ needs.build-images.outputs.image }}
-          PREFECT_HOSTNAME=${{ vars.PREFECT_HOSTNAME }}
+          PREFECT_HOSTNAMES=${{ vars.PREFECT_HOSTNAMES }}
           PREFECT_PORT=${{ vars.PREFECT_PORT }}
           PREFECT_BIND_PORT=${{ vars.PREFECT_BIND_PORT }}
           PREFECT_BIND_ADDRESS=${{ vars.PREFECT_BIND_ADDRESS }}

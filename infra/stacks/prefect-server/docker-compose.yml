@@ -83,7 +83,7 @@ services:
       prefect-server:
         condition: service_healthy
     environment:
-      PREFECT_HOSTNAMES: ${PREFECT_HOSTNAMES:-${PREFECT_HOSTNAME}}
+      PREFECT_HOSTNAMES: ${PREFECT_HOSTNAMES}
       PREFECT_PORT: ${PREFECT_PORT:-4200}
       CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:-}
     ports:
