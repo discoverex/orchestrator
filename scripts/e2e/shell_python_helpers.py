@@ -67,7 +67,13 @@ def _http_text(
     headers: dict[str, str] | None = None,
     timeout: int = 15,
 ) -> str:
-    req = request.Request(url, method="GET", headers=headers or {})
+    req_headers = {
+        "Accept": "application/json",
+        "User-Agent": "orchestrator-e2e/1.0",
+    }
+    if headers:
+        req_headers.update(headers)
+    req = request.Request(url, method="GET", headers=req_headers)
     with request.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8")
 
@@ -156,7 +162,8 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
     )
 
     manifest_url = str(manifest_link.get("url", ""))
-    manifest = json.loads(_http_text(manifest_url, timeout=15))
+    download_headers = {"Authorization": f"Bearer {token}"}
+    manifest = json.loads(_http_text(manifest_url, headers=download_headers, timeout=15))
 
     if manifest.get("flow_run_id") != flow_run_id:
         raise SystemExit("manifest flow_run_id mismatch")
@@ -198,13 +205,16 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
     )
     result_url = str(result_link.get("url", ""))
     result_payload = cast(
-        dict[str, object], json.loads(_http_text(result_url, timeout=15))
+        dict[str, object],
+        json.loads(_http_text(result_url, headers=download_headers, timeout=15)),
     )
     exit_code = int(result_payload.get("exit_code", -1))
     if exit_code != 0:
         raise SystemExit(f"engine entrypoint exited with code {exit_code}")
 
-    engine_output = _extract_json_object(_http_text(stdout_url, timeout=15))
+    engine_output = _extract_json_object(
+        _http_text(stdout_url, headers=download_headers, timeout=15)
+    )
     scene_id = str(engine_output.get("scene_id", "")).strip()
     version_id = str(engine_output.get("version_id", "")).strip()
     if not scene_id or not version_id:

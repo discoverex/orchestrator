@@ -24,6 +24,7 @@ PREFECT_CF_ACCESS_CLIENT_SECRET="${PREFECT_CF_ACCESS_CLIENT_SECRET:-${CF_ACCESS_
 STORAGE_GATEWAY_URL="${STORAGE_GATEWAY_URL:-http://127.0.0.1:8100}"
 STORAGE_GATEWAY_TOKEN="${STORAGE_GATEWAY_TOKEN:-}"
 ARTIFACT_BUCKET="${ARTIFACT_BUCKET:-orchestrator-artifacts}"
+MINIO_API_PORT="${MINIO_API_PORT:-9000}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-600}"
 PRUNE_MODE="${PRUNE_MODE:-dry-run}"
 PRUNE_TTL_HOURS="${PRUNE_TTL_HOURS:-72}"
@@ -38,10 +39,21 @@ ENGINE_REPO_REF="${ENGINE_REPO_REF:-$(git -C "${ENGINE_DIR}" branch --show-curre
 ENGINE_BACKGROUND_ASSET_REF="${ENGINE_BACKGROUND_ASSET_REF:-bg://dummy}"
 ENGINE_EXECUTION_PROFILE="${ENGINE_EXECUTION_PROFILE:-remote-gpu-hf}"
 ENGINE_MLFLOW_TRACKING_URI="${ENGINE_MLFLOW_TRACKING_URI:-${MLFLOW_TRACKING_URI:-}}"
-ENGINE_MLFLOW_S3_ENDPOINT_URL="${ENGINE_MLFLOW_S3_ENDPOINT_URL:-${MLFLOW_S3_ENDPOINT_URL:-}}"
+ENGINE_MLFLOW_S3_ENDPOINT_URL="${ENGINE_MLFLOW_S3_ENDPOINT_URL:-${MLFLOW_S3_ENDPOINT_URL:-http://127.0.0.1:${MINIO_API_PORT}}}"
 ENGINE_AWS_ACCESS_KEY_ID="${ENGINE_AWS_ACCESS_KEY_ID:-${MINIO_ACCESS_KEY:-}}"
 ENGINE_AWS_SECRET_ACCESS_KEY="${ENGINE_AWS_SECRET_ACCESS_KEY:-${MINIO_SECRET_KEY:-}}"
 MLFLOW_RUN_ID=""
+
+normalize_public_git_url() {
+  local raw="$1"
+  if [[ "$raw" =~ ^git@github\.com:(.+)$ ]]; then
+    printf 'https://github.com/%s\n' "${BASH_REMATCH[1]}"
+    return
+  fi
+  printf '%s\n' "$raw"
+}
+
+ENGINE_REPO_URL="$(normalize_public_git_url "${ENGINE_REPO_URL}")"
 
 usage() {
   cat <<'EOF'
@@ -268,7 +280,9 @@ build_engine_job_spec() {
     --mlflow-s3-endpoint-url "${ENGINE_MLFLOW_S3_ENDPOINT_URL}" \
     --aws-access-key-id "${ENGINE_AWS_ACCESS_KEY_ID}" \
     --aws-secret-access-key "${ENGINE_AWS_SECRET_ACCESS_KEY}" \
-    --artifact-bucket "${ARTIFACT_BUCKET}" >"${LOG_DIR}/job-spec.json"
+    --artifact-bucket "${ARTIFACT_BUCKET}" \
+    --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" \
+    --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" >"${LOG_DIR}/job-spec.json"
 }
 
 bootstrap_temp_worker() {
@@ -300,7 +314,6 @@ fi
 
 must_step "preflight.tools" bash -lc "command -v docker >/dev/null && command -v curl >/dev/null && command -v python3 >/dev/null"
 must_step "preflight.storage_gateway_health" curl -fsS "${STORAGE_GATEWAY_URL%/}/healthz"
-MINIO_API_PORT="${MINIO_API_PORT:-9000}"
 must_step "preflight.minio_health" curl -fsS "http://127.0.0.1:${MINIO_API_PORT}/minio/health/live"
 must_step "engine.build_job_spec" build_engine_job_spec
 must_step "build.base_register_worker_images" docker compose -f "${LOCAL_TEST_COMPOSE}" build base-runtime register worker
@@ -331,7 +344,7 @@ fi
 record_step "prefect.extract_flow_run_id" "pass" "${FLOW_RUN_ID}"
 
 must_step "prefect.wait_flow_completion" python3 "${VERIFY_SCRIPT}" prefect-wait-completed --prefect-api-url "${PREFECT_API_URL}" --flow-run-id "${FLOW_RUN_ID}" --timeout-sec "${TIMEOUT_SEC}" --prefect-cf-access-client-id "${PREFECT_CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${PREFECT_CF_ACCESS_CLIENT_SECRET}"
-must_step "storage.verify_objects" python3 "${VERIFY_SCRIPT}" storage-objects --storage-gateway-url "${STORAGE_GATEWAY_URL}" --storage-gateway-token "${STORAGE_GATEWAY_TOKEN}" --artifact-bucket "${ARTIFACT_BUCKET}" --flow-run-id "${FLOW_RUN_ID}" --attempt 1 --output-json "${LOG_DIR}/storage-objects.json"
+must_step "storage.verify_objects" python3 "${PY_HELPER}" verify-storage-objects --flow-run-id "${FLOW_RUN_ID}" --storage-gateway-url "${STORAGE_GATEWAY_URL}" --storage-gateway-token "${STORAGE_GATEWAY_TOKEN}" --artifact-bucket "${ARTIFACT_BUCKET}" --log-dir "${LOG_DIR}"
 if MLFLOW_RUN_ID="$(python3 "${PY_HELPER}" verify-engine-mlflow-run --mlflow-tracking-uri "${ENGINE_MLFLOW_TRACKING_URI}" --log-dir "${LOG_DIR}" --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" 2>>"${RUN_LOG}")"; then
   record_step "mlflow.verify_engine_run" "pass" "${MLFLOW_RUN_ID}"
 else
