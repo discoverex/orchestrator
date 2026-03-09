@@ -1,4 +1,5 @@
 FROM orchestrator-base:local
+COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /usr/local/bin/uv
 
 COPY --chown=appuser:appuser src/common /app/src/common
 COPY --chown=appuser:appuser src/flows /app/src/flows

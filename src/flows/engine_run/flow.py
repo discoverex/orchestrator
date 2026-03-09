@@ -73,9 +73,16 @@ def run_job_flow(
     state["attempt"] = attempt
     save_checkpoint(checkpoint_path, state)
 
-    if _step_done(state, "resolve_commit"):
+    if job.run_mode == "inline":
+        resolved_commit = "inline"
+        state["resolved_commit"] = resolved_commit
+        _mark_step(state, "resolve_commit")
+        save_checkpoint(checkpoint_path, state)
+    elif _step_done(state, "resolve_commit"):
         resolved_commit = str(state["resolved_commit"])
     else:
+        if not job.repo_url or not job.ref:
+            raise RuntimeError("repo_url/ref required for run_mode=repo")
         resolved_commit = resolve_commit_task(job.repo_url, job.ref)
         state["resolved_commit"] = resolved_commit
         _mark_step(state, "resolve_commit")
@@ -111,6 +118,7 @@ def run_job_flow(
             resolved_commit=resolved_commit,
             entrypoint=job.entrypoint,
             env=job.env,
+            run_mode=job.run_mode,
             engine=job.engine,
             config_rel_path=job.config,
             inputs=job.inputs,
@@ -157,6 +165,7 @@ def run_job_flow(
         "flow_run_id": run_id,
         "attempt": attempt,
         "engine": job.engine,
+        "run_mode": job.run_mode,
         "job_name": job.job_name,
         "resolved_commit": resolved_commit,
         "outputs_prefix": effective_outputs_prefix,

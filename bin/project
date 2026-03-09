@@ -23,7 +23,7 @@ usage() {
   cat <<'EOF'
 Usage:
   project e2e [core|mlflow] [--keep-on-fail] [--timeout-sec N]
-  project e2e-remote --prefect-api-url URL [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
+  project e2e-remote [--prefect-api-url URL] [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
   project base <build> [args...]
   project storage <up|down|ps|logs|build> [args...]
   project prefect <up|down|ps|logs|build|flush|prune> [args...]
@@ -83,6 +83,17 @@ case "${cmd}" in
 
   e2e-remote)
     require_executable "${REMOTE_E2E_SCRIPT}" || exit 1
+    if ! has_prefect_api_url_arg "$@"; then
+      if [[ -z "${PREFECT_API_URL:-}" && -f "${ROOT_DIR}/.env" ]]; then
+        set -a
+        # shellcheck disable=SC1090
+        source "${ROOT_DIR}/.env"
+        set +a
+      fi
+      if [[ -n "${PREFECT_API_URL:-}" ]]; then
+        set -- --prefect-api-url "${PREFECT_API_URL}" "$@"
+      fi
+    fi
     if ! has_prune_mode_arg "$@"; then
       exec "${REMOTE_E2E_SCRIPT}" --prune-mode dry-run "$@"
     fi
@@ -208,7 +219,10 @@ case "${cmd}" in
         action="${1:-}"
         shift || true
         case "${action}" in
-          up) run_worker_fixed up -d --build "$@" ;;
+          up)
+            ensure_worker_gpu_runtime
+            run_worker_fixed up -d --build "$@"
+            ;;
           down) run_worker_fixed down "$@" ;;
           ps) run_worker_fixed ps "$@" ;;
           logs) run_worker_fixed logs --tail=120 "$@" ;;

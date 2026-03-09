@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -86,7 +87,10 @@ def run_ops_script(
     script_rel_path: str, env_overrides: dict[str, str], argv: list[str]
 ) -> dict[str, Any]:
     script_path = Path(__file__).resolve().parents[2] / "ops" / script_rel_path
-    cmd = [sys.executable, str(script_path), *argv]
+    if shutil.which("uv"):
+        cmd = ["uv", "run", "python", str(script_path), *argv]
+    else:
+        cmd = [sys.executable, str(script_path), *argv]
     env = os.environ.copy()
     env.update(env_overrides)
     proc = subprocess.run(cmd, check=False, text=True, capture_output=True, env=env)
