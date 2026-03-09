@@ -11,6 +11,7 @@ from tempfile import mkdtemp
 from urllib.parse import unquote, urlsplit
 
 from .models import RunArtifacts
+from .mlflow_proxy import maybe_start_mlflow_proxy
 
 _SHA1 = re.compile(r"^[0-9a-f]{40}$")
 
@@ -195,21 +196,22 @@ def run_entrypoint(
     if env:
         merged_env.update(env)
 
-    if run_mode == "repo":
-        _prepare_per_repo_venv(workdir, merged_env)
+    with maybe_start_mlflow_proxy(merged_env) as child_env:
+        if run_mode == "repo":
+            _prepare_per_repo_venv(workdir, child_env)
 
-    with (
-        stdout_path.open("w", encoding="utf-8") as stdout_f,
-        stderr_path.open("w", encoding="utf-8") as stderr_f,
-    ):
-        proc = subprocess.run(
-            entrypoint,
-            cwd=workdir,
-            env=merged_env,
-            stdout=stdout_f,
-            stderr=stderr_f,
-            text=True,
-        )
+        with (
+            stdout_path.open("w", encoding="utf-8") as stdout_f,
+            stderr_path.open("w", encoding="utf-8") as stderr_f,
+        ):
+            proc = subprocess.run(
+                entrypoint,
+                cwd=workdir,
+                env=child_env,
+                stdout=stdout_f,
+                stderr=stderr_f,
+                text=True,
+            )
 
     result_path.write_text(
         json.dumps(
