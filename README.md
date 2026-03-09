@@ -157,6 +157,12 @@ Runtime data policy:
 ./bin/remote worker ps
 ```
 
+`prefect-*` commands run under `REMOTE_PREFECT_PATH` (default:
+`/opt/services/orchestrator-prefect`) and use remote-specific
+`REMOTE_PREFECT_ENV` / `REMOTE_PREFECT_COMPOSE` defaults (`.env`,
+`docker-compose.yml`).
+`prefect-install` still uses `REMOTE_PROJECT_PATH` because it bootstraps from the repo checkout.
+
 ## Test
 
 ```bash

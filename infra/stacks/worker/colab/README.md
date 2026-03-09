@@ -12,6 +12,9 @@ Set these before start:
 - `PREFECT_WORK_QUEUE` (recommended: `gpu-colab`)
 - `STORAGE_GATEWAY_URL`
 - `STORAGE_GATEWAY_TOKEN`
+- If Prefect is behind Cloudflare Access, also set either:
+  - `PREFECT_CF_ACCESS_CLIENT_ID` / `PREFECT_CF_ACCESS_CLIENT_SECRET`
+  - or `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`
 
 ## 2) Start (recommended)
 
@@ -22,6 +25,8 @@ PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py start \
 
 `colab_worker_runner.py` installs `infra/stacks/worker/colab/requirements-colab.txt`
 only when compatible Prefect is not already installed.
+When Cloudflare Access env vars are present, it also exports
+`PREFECT_CLIENT_CUSTOM_HEADERS` automatically for Prefect CLI/worker requests.
 
 ## 3) Status / logs / stop
 

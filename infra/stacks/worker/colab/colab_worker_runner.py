@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.metadata
+import json
 import os
 import signal
 import subprocess
@@ -62,6 +63,19 @@ def _prefect_env() -> dict[str, str]:
     pythonpath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = f"src:{pythonpath}" if pythonpath else "src"
     env.setdefault("PREFECT_WORK_QUEUE", "gpu-colab")
+    if not env.get("PREFECT_CLIENT_CUSTOM_HEADERS"):
+        cf_id = env.get("PREFECT_CF_ACCESS_CLIENT_ID") or env.get("CF_ACCESS_CLIENT_ID")
+        cf_secret = env.get("PREFECT_CF_ACCESS_CLIENT_SECRET") or env.get(
+            "CF_ACCESS_CLIENT_SECRET"
+        )
+        if cf_id and cf_secret:
+            env["PREFECT_CLIENT_CUSTOM_HEADERS"] = json.dumps(
+                {
+                    "CF-Access-Client-Id": cf_id,
+                    "CF-Access-Client-Secret": cf_secret,
+                },
+                ensure_ascii=True,
+            )
     return env
 
 
