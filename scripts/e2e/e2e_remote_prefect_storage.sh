@@ -8,6 +8,8 @@ REGISTER_ENV="${ROOT_DIR}/infra/stacks/register/.env"
 REGISTER_COMPOSE="${ROOT_DIR}/infra/stacks/register/docker-compose.yml"
 VERIFY_SCRIPT="${ROOT_DIR}/scripts/e2e/verify_remote_chain.py"
 PY_HELPER="${ROOT_DIR}/scripts/e2e/shell_python_helpers.py"
+ENGINE_DIR="${ENGINE_DIR:-$(cd "${ROOT_DIR}/../engine" && pwd)}"
+ENGINE_JOB_SCRIPT="${ENGINE_DIR}/scripts/register_orchestrator_job.py"
 LOCAL_TEST_COMPOSE="${ROOT_DIR}/scripts/e2e/docker-compose.local.test.yml"
 source "${ROOT_DIR}/scripts/e2e/lib/common.sh"
 
@@ -22,6 +24,7 @@ PREFECT_CF_ACCESS_CLIENT_SECRET="${PREFECT_CF_ACCESS_CLIENT_SECRET:-${CF_ACCESS_
 STORAGE_GATEWAY_URL="${STORAGE_GATEWAY_URL:-http://127.0.0.1:8100}"
 STORAGE_GATEWAY_TOKEN="${STORAGE_GATEWAY_TOKEN:-}"
 ARTIFACT_BUCKET="${ARTIFACT_BUCKET:-orchestrator-artifacts}"
+MINIO_API_PORT="${MINIO_API_PORT:-9000}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-600}"
 PRUNE_MODE="${PRUNE_MODE:-dry-run}"
 PRUNE_TTL_HOURS="${PRUNE_TTL_HOURS:-72}"
@@ -30,7 +33,27 @@ REGISTER_ONLY="false"
 BOOTSTRAP_WORKER="false"
 WORKER_CONTAINER_NAME="orchestrator-e2e-temp-worker"
 FLOW_RUN_ID=""
-JOB_SPEC_JSON='{"run_mode":"inline","engine":"shell","entrypoint":["/bin/sh","-lc","if [ -r /proc/driver/nvidia/version ]; then echo \"nvidia-driver-present\"; cat /proc/driver/nvidia/version; exit 0; fi; if command -v nvidia-smi >/dev/null 2>&1; then echo \"nvidia-smi-present\"; nvidia-smi -L; exit 0; fi; echo \"nvidia-driver-not-found\" >&2; exit 42"],"config":null,"inputs":{},"env":{},"outputs_prefix":null,"job_name":"gpu-driver-smoke"}'
+JOB_SPEC_JSON=""
+ENGINE_REPO_URL="${ENGINE_REPO_URL:-$(git -C "${ENGINE_DIR}" remote get-url origin)}"
+ENGINE_REPO_REF="${ENGINE_REPO_REF:-$(git -C "${ENGINE_DIR}" branch --show-current)}"
+ENGINE_BACKGROUND_ASSET_REF="${ENGINE_BACKGROUND_ASSET_REF:-bg://dummy}"
+ENGINE_EXECUTION_PROFILE="${ENGINE_EXECUTION_PROFILE:-remote-gpu-hf}"
+ENGINE_MLFLOW_TRACKING_URI="${ENGINE_MLFLOW_TRACKING_URI:-${MLFLOW_TRACKING_URI:-}}"
+ENGINE_MLFLOW_S3_ENDPOINT_URL="${ENGINE_MLFLOW_S3_ENDPOINT_URL:-${MLFLOW_S3_ENDPOINT_URL:-http://127.0.0.1:${MINIO_API_PORT}}}"
+ENGINE_AWS_ACCESS_KEY_ID="${ENGINE_AWS_ACCESS_KEY_ID:-${MINIO_ACCESS_KEY:-}}"
+ENGINE_AWS_SECRET_ACCESS_KEY="${ENGINE_AWS_SECRET_ACCESS_KEY:-${MINIO_SECRET_KEY:-}}"
+MLFLOW_RUN_ID=""
+
+normalize_public_git_url() {
+  local raw="$1"
+  if [[ "$raw" =~ ^git@github\.com:(.+)$ ]]; then
+    printf 'https://github.com/%s\n' "${BASH_REMATCH[1]}"
+    return
+  fi
+  printf '%s\n' "$raw"
+}
+
+ENGINE_REPO_URL="$(normalize_public_git_url "${ENGINE_REPO_URL}")"
 
 usage() {
   cat <<'EOF'
@@ -47,7 +70,7 @@ Options:
   --storage-gateway-token TOK   storage-gateway bearer token
   --artifact-bucket NAME        Artifact bucket name (default: orchestrator-artifacts)
   --timeout-sec N               Timeout for flow completion (default: 600)
-  --job-spec-json JSON          JobSpec payload (default: inline nvidia driver existence check)
+  --job-spec-json JSON          JobSpec payload (default: engine generate repo job built from engine wrapper)
   --prune-mode dry-run|apply    Prune validation mode (default: dry-run)
   --prune-ttl-hours N           TTL hours passed to prune (default: 72)
   --register-only               Stop after deployment register/verify
@@ -149,6 +172,11 @@ if [[ -z "${STORAGE_GATEWAY_TOKEN}" ]]; then
   exit 2
 fi
 
+if [[ -z "${ENGINE_REPO_REF}" ]]; then
+  echo "missing engine repo ref; set ENGINE_REPO_REF or ensure engine repo is on a branch" >&2
+  exit 2
+fi
+
 if [[ "${PRUNE_MODE}" != "dry-run" && "${PRUNE_MODE}" != "apply" ]]; then
   echo "--prune-mode must be dry-run or apply" >&2
   exit 2
@@ -224,6 +252,39 @@ must_step() {
   exit 1
 }
 
+build_engine_job_spec() {
+  if [[ -n "${JOB_SPEC_JSON}" ]]; then
+    printf '%s' "${JOB_SPEC_JSON}" >"${LOG_DIR}/job-spec.json"
+    return 0
+  fi
+  if [[ -z "${ENGINE_MLFLOW_TRACKING_URI}" ]]; then
+    echo "missing ENGINE_MLFLOW_TRACKING_URI or MLFLOW_TRACKING_URI" >&2
+    return 1
+  fi
+  if [[ -z "${ENGINE_MLFLOW_S3_ENDPOINT_URL}" ]]; then
+    echo "missing ENGINE_MLFLOW_S3_ENDPOINT_URL or MLFLOW_S3_ENDPOINT_URL" >&2
+    return 1
+  fi
+  if [[ -z "${ENGINE_AWS_ACCESS_KEY_ID}" || -z "${ENGINE_AWS_SECRET_ACCESS_KEY}" ]]; then
+    echo "missing MinIO access credentials for engine runtime" >&2
+    return 1
+  fi
+  python3 "${ENGINE_JOB_SCRIPT}" \
+    --dry-run \
+    --execution-profile "${ENGINE_EXECUTION_PROFILE}" \
+    --command generate \
+    --repo-url "${ENGINE_REPO_URL}" \
+    --ref "${ENGINE_REPO_REF}" \
+    --background-asset-ref "${ENGINE_BACKGROUND_ASSET_REF}" \
+    --mlflow-tracking-uri "${ENGINE_MLFLOW_TRACKING_URI}" \
+    --mlflow-s3-endpoint-url "${ENGINE_MLFLOW_S3_ENDPOINT_URL}" \
+    --aws-access-key-id "${ENGINE_AWS_ACCESS_KEY_ID}" \
+    --aws-secret-access-key "${ENGINE_AWS_SECRET_ACCESS_KEY}" \
+    --artifact-bucket "${ARTIFACT_BUCKET}" \
+    --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" \
+    --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" >"${LOG_DIR}/job-spec.json"
+}
+
 bootstrap_temp_worker() {
   # This block is isolated for easy removal once production worker validation is fully adopted.
   must_step "worker.remove_existing_temp" bash -lc "docker rm -f '${WORKER_CONTAINER_NAME}' >/dev/null 2>&1 || true"
@@ -253,8 +314,8 @@ fi
 
 must_step "preflight.tools" bash -lc "command -v docker >/dev/null && command -v curl >/dev/null && command -v python3 >/dev/null"
 must_step "preflight.storage_gateway_health" curl -fsS "${STORAGE_GATEWAY_URL%/}/healthz"
-MINIO_API_PORT="${MINIO_API_PORT:-9000}"
 must_step "preflight.minio_health" curl -fsS "http://127.0.0.1:${MINIO_API_PORT}/minio/health/live"
+must_step "engine.build_job_spec" build_engine_job_spec
 must_step "build.base_register_worker_images" docker compose -f "${LOCAL_TEST_COMPOSE}" build base-runtime register worker
 must_step "prefect.ensure_work_pool" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e WORK_POOL='${PREFECT_WORK_POOL}' prefecthq/prefect:3-latest sh -lc 'prefect work-pool inspect \"\$WORK_POOL\" >/dev/null 2>&1 || prefect work-pool create \"\$WORK_POOL\" --type process'"
 must_step "register.apply_deployment" bash -lc "run_register_compose() { if [[ -f '${REGISTER_ENV}' ]]; then docker compose --env-file '${REGISTER_ENV}' -f '${REGISTER_COMPOSE}' \"\$@\"; else docker compose -f '${REGISTER_COMPOSE}' \"\$@\"; fi; }; run_register_compose run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e PREFECT_WORK_POOL='${PREFECT_WORK_POOL}' -e PREFECT_WORK_QUEUE='${PREFECT_WORK_QUEUE}' register"
@@ -272,7 +333,7 @@ else
   record_step "worker.bootstrap_temp" "pass" "skipped (production worker expected)"
 fi
 
-JOB_SPEC_JSON_B64="$(printf '%s' "${JOB_SPEC_JSON}" | base64 -w0)"
+JOB_SPEC_JSON_B64="$(base64 -w0 <"${LOG_DIR}/job-spec.json")"
 must_step "prefect.submit_flow_run" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e JOB_SPEC_JSON_B64='${JOB_SPEC_JSON_B64}' prefecthq/prefect:3-latest sh -lc 'JOB_SPEC_JSON=\"\$(printf %s \"\$JOB_SPEC_JSON_B64\" | base64 -d)\" && prefect deployment run \"run-job/engine-run\" -p \"job_spec_json=\$JOB_SPEC_JSON\"' > '${LOG_DIR}/prefect-submit.log'"
 FLOW_RUN_ID="$(grep -Eo '[0-9a-fA-F-]{36}' "${LOG_DIR}/prefect-submit.log" | head -n1 || true)"
 if [[ -z "${FLOW_RUN_ID}" ]]; then
@@ -283,7 +344,14 @@ fi
 record_step "prefect.extract_flow_run_id" "pass" "${FLOW_RUN_ID}"
 
 must_step "prefect.wait_flow_completion" python3 "${VERIFY_SCRIPT}" prefect-wait-completed --prefect-api-url "${PREFECT_API_URL}" --flow-run-id "${FLOW_RUN_ID}" --timeout-sec "${TIMEOUT_SEC}" --prefect-cf-access-client-id "${PREFECT_CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${PREFECT_CF_ACCESS_CLIENT_SECRET}"
-must_step "storage.verify_objects" python3 "${VERIFY_SCRIPT}" storage-objects --storage-gateway-url "${STORAGE_GATEWAY_URL}" --storage-gateway-token "${STORAGE_GATEWAY_TOKEN}" --artifact-bucket "${ARTIFACT_BUCKET}" --flow-run-id "${FLOW_RUN_ID}" --attempt 1 --output-json "${LOG_DIR}/storage-objects.json"
+must_step "storage.verify_objects" python3 "${PY_HELPER}" verify-storage-objects --flow-run-id "${FLOW_RUN_ID}" --storage-gateway-url "${STORAGE_GATEWAY_URL}" --storage-gateway-token "${STORAGE_GATEWAY_TOKEN}" --artifact-bucket "${ARTIFACT_BUCKET}" --log-dir "${LOG_DIR}"
+if MLFLOW_RUN_ID="$(python3 "${PY_HELPER}" verify-engine-mlflow-run --mlflow-tracking-uri "${ENGINE_MLFLOW_TRACKING_URI}" --log-dir "${LOG_DIR}" --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" 2>>"${RUN_LOG}")"; then
+  record_step "mlflow.verify_engine_run" "pass" "${MLFLOW_RUN_ID}"
+else
+  record_step "mlflow.verify_engine_run" "fail" "matching run not found"
+  collect_diagnostics
+  exit 1
+fi
 must_step "prefect.verify_flush" python3 "${VERIFY_SCRIPT}" flush-verify --prefect-api-url "${PREFECT_API_URL}" --storage-gateway-url "${STORAGE_GATEWAY_URL}" --storage-gateway-token "${STORAGE_GATEWAY_TOKEN}" --flow-run-id "${FLOW_RUN_ID}" --cursor-path "${LOG_DIR}/prefect-flush-cursor.json" --prefect-cf-access-client-id "${PREFECT_CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${PREFECT_CF_ACCESS_CLIENT_SECRET}"
 
 if [[ "${PRUNE_MODE}" == "apply" ]]; then

@@ -78,6 +78,8 @@ services:
       PREFECT_WORK_POOL: colab-gpu
       STORAGE_GATEWAY_URL: http://storage-gateway:8100
       STORAGE_GATEWAY_TOKEN: dev-storage-token
+    volumes:
+      - ${ENGINE_LOCAL_REPO_PATH_HOST:-../../engine}:/opt/engine-src:ro
     depends_on:
       prefect:
         condition: service_healthy

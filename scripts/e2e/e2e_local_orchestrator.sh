@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")/../.."
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "${ROOT_DIR}"
 source "./scripts/e2e/lib/common.sh"
+
 PY_HELPER="./scripts/e2e/shell_python_helpers.py"
 LOCAL_COMPOSE_FILE="scripts/e2e/docker-compose.local.test.yml"
 LOCAL_PROJECT_NAME="orchestrator-e2e-local"
+ENGINE_DIR="${ENGINE_DIR:-$(cd "${ROOT_DIR}/../engine" && pwd)}"
+ENGINE_JOB_SCRIPT="${ENGINE_DIR}/scripts/register_orchestrator_job.py"
+ENGINE_REPO_URL_CONTAINER="${ENGINE_REPO_URL_CONTAINER:-/opt/engine-src}"
+ENGINE_BACKGROUND_ASSET_REF="${ENGINE_BACKGROUND_ASSET_REF:-bg://dummy}"
 
 compose_local() {
   docker compose -p "${LOCAL_PROJECT_NAME}" -f "${LOCAL_COMPOSE_FILE}" "$@"
 }
 
-MODE="core"
+MODE="mlflow"
 KEEP_ON_FAIL="false"
 TIMEOUT_SEC="600"
 
@@ -60,7 +66,15 @@ PREFECT_WORK_POOL="${PREFECT_WORK_POOL:-colab-gpu}"
 STORAGE_GATEWAY_URL="${STORAGE_GATEWAY_URL:-http://127.0.0.1:28100}"
 STORAGE_GATEWAY_TOKEN="${STORAGE_GATEWAY_TOKEN:-dev-storage-token}"
 ARTIFACT_BUCKET="${ARTIFACT_BUCKET:-orchestrator-artifacts}"
+ENGINE_REPO_REF="${ENGINE_REPO_REF:-$(git -C "${ENGINE_DIR}" rev-parse HEAD)}"
+ENGINE_LOCAL_REPO_PATH_HOST="${ENGINE_LOCAL_REPO_PATH_HOST:-${ENGINE_DIR}}"
+ENGINE_MLFLOW_VERIFY_URI="${MLFLOW_TRACKING_URI:-http://127.0.0.1:25000}"
+ENGINE_MLFLOW_TRACKING_URI="${ENGINE_MLFLOW_TRACKING_URI:-http://mlflow:5000}"
+ENGINE_MLFLOW_S3_ENDPOINT_URL="${ENGINE_MLFLOW_S3_ENDPOINT_URL:-http://minio:9000}"
+ENGINE_AWS_ACCESS_KEY_ID="${ENGINE_AWS_ACCESS_KEY_ID:-minioadmin}"
+ENGINE_AWS_SECRET_ACCESS_KEY="${ENGINE_AWS_SECRET_ACCESS_KEY:-minioadmin}"
 export PREFECT_API_URL PREFECT_WORK_POOL STORAGE_GATEWAY_URL STORAGE_GATEWAY_TOKEN ARTIFACT_BUCKET
+export ENGINE_LOCAL_REPO_PATH_HOST
 
 FLOW_RUN_ID=""
 MLFLOW_RUN_ID=""
@@ -69,21 +83,11 @@ log() { log_step_line "${RUN_LOG}" "$@"; }
 record_step() { record_step_line "${STEPS_FILE}" "$1" "$2" "$3"; }
 run_step() { run_step_cmd "${RUN_LOG}" "${STEPS_FILE}" "$@"; }
 
-require_env() {
-  local key="$1"
-  if [[ -z "${!key:-}" ]]; then
-    log "missing required env: ${key}"
-    record_step "env.required_${key}" "fail" "missing required env"
-    exit 1
-  fi
-}
-
 collect_logs() {
   log "collecting diagnostic logs"
   compose_local ps >"${LOG_DIR}/docker-local-ps.log" 2>&1 || true
   compose_local logs --no-color >"${LOG_DIR}/docker-local.log" 2>&1 || true
-  docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml ps >"${LOG_DIR}/docker-storage-ps.log" 2>&1 || true
-  docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml logs --no-color >"${LOG_DIR}/docker-storage.log" 2>&1 || true
+  compose_local exec -T worker sh -lc 'env | sort' >"${LOG_DIR}/worker-env.log" 2>&1 || true
   compose_local exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls >"${LOG_DIR}/prefect-deployments.log" 2>&1 || true
 }
 
@@ -97,7 +101,9 @@ write_summary() {
 }
 
 cleanup() {
-  compose_local down -v --remove-orphans >/dev/null 2>&1 || true
+  if [[ "${KEEP_ON_FAIL}" != "true" ]]; then
+    compose_local down -v --remove-orphans >/dev/null 2>&1 || true
+  fi
   write_summary
 }
 trap cleanup EXIT
@@ -130,52 +136,10 @@ verify_storage_objects() {
     --log-dir "${LOG_DIR}"
 }
 
-create_and_verify_mlflow_tags() {
-  python3 "${PY_HELPER}" create-and-verify-mlflow-tags \
-    --mlflow-tracking-uri "${MLFLOW_TRACKING_URI}" \
-    --flow-run-id "${FLOW_RUN_ID}" \
-    --log-dir "${LOG_DIR}" \
-    --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" \
-    --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}"
-}
-
-check_mlflow_tracking_access() {
-  require_env MLFLOW_TRACKING_URI
-  local code
-
-  if [[ -n "${CF_ACCESS_CLIENT_ID:-}" && -n "${CF_ACCESS_CLIENT_SECRET:-}" ]]; then
-    code="$(
-      curl -sS -o /dev/null -w "%{http_code}" \
-        -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
-        -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
-        -H "Content-Type: application/json" \
-        -d '{"max_results": 1}' \
-        "${MLFLOW_TRACKING_URI%/}/api/2.0/mlflow/experiments/search"
-    )"
-  else
-    code="$(
-      curl -sS -o /dev/null -w "%{http_code}" \
-        -H "Content-Type: application/json" \
-        -d '{"max_results": 1}' \
-        "${MLFLOW_TRACKING_URI%/}/api/2.0/mlflow/experiments/search"
-    )"
-  fi
-
-  [[ "${code}" == "200" ]]
-}
-
-uri_host() {
-  local uri="$1"
-  python3 "${PY_HELPER}" uri-host --uri "${uri}"
-}
-
-verify_mlflow_prereqs() {
-  require_env MLFLOW_TRACKING_URI
-
-  local tracking_host
-  tracking_host="$(uri_host "${MLFLOW_TRACKING_URI}")"
-
-  getent ahosts "${tracking_host}" >/dev/null
+verify_engine_mlflow_run() {
+  python3 "${PY_HELPER}" verify-engine-mlflow-run \
+    --mlflow-tracking-uri "${ENGINE_MLFLOW_VERIFY_URI}" \
+    --log-dir "${LOG_DIR}"
 }
 
 verify_prefect_flush() {
@@ -201,10 +165,57 @@ verify_prefect_prune() {
     --flow-run-id "${FLOW_RUN_ID}"
 }
 
+build_engine_job_spec() {
+  local job_spec_path="${LOG_DIR}/job-spec.json"
+  local profile="local-tiny-cpu"
+  local extra_args=()
+  if [[ "${MODE}" == "core" ]]; then
+    profile="none"
+    extra_args+=(
+      -o runtime/model_runtime=cpu
+      -o models/hidden_region=tiny_torch
+      -o models/inpaint=tiny_torch
+      -o models/perception=tiny_torch
+      -o models/fx=tiny_torch
+      -o adapters/artifact_store=local
+      -o adapters/metadata_store=local_json
+      -o adapters/tracker=mlflow_file
+    )
+  else
+    extra_args+=(
+      --mlflow-tracking-uri "${ENGINE_MLFLOW_TRACKING_URI}"
+      --mlflow-s3-endpoint-url "${ENGINE_MLFLOW_S3_ENDPOINT_URL}"
+      --aws-access-key-id "${ENGINE_AWS_ACCESS_KEY_ID}"
+      --aws-secret-access-key "${ENGINE_AWS_SECRET_ACCESS_KEY}"
+      --artifact-bucket "${ARTIFACT_BUCKET}"
+    )
+  fi
+  python3 "${ENGINE_JOB_SCRIPT}" \
+    --dry-run \
+    --run-mode inline \
+    --entrypoint-shell-command "tmpdir=\$(mktemp -d /tmp/discoverex-engine-XXXXXX) && tar -C ${ENGINE_REPO_URL_CONTAINER} --exclude=.git --exclude=.venv --exclude=.cache --exclude=.ruff_cache -cf - . | tar -C \"\$tmpdir\" -xf - && cd \"\$tmpdir\" && PYTHONPATH=src python -m discoverex.orchestrator_contract.launcher" \
+    --execution-profile "${profile}" \
+    --command generate \
+    --background-asset-ref "${ENGINE_BACKGROUND_ASSET_REF}" \
+    "${extra_args[@]}" >"${job_spec_path}"
+  echo "${job_spec_path}"
+}
+
+submit_prefect_run() {
+  local job_spec_path="$1"
+  local job_spec_b64
+  job_spec_b64="$(base64 -w0 <"${job_spec_path}")"
+  docker compose -p "${LOCAL_PROJECT_NAME}" -f "${LOCAL_COMPOSE_FILE}" exec -T \
+    -e PREFECT_API_URL=http://127.0.0.1:4200/api \
+    -e JOB_SPEC_JSON_B64="${job_spec_b64}" \
+    prefect sh -lc \
+    'JOB_SPEC_JSON="$(printf %s "$JOB_SPEC_JSON_B64" | base64 -d)" && prefect deployment run "run-job/engine-run" -p "job_spec_json=$JOB_SPEC_JSON"' \
+    | tee "${LOG_DIR}/prefect-submit.log"
+}
+
 run_step "build.base_runtime" compose_local build base-runtime
+compose_local down -v --remove-orphans >/dev/null 2>&1 || true
 if [[ "${MODE}" == "mlflow" ]]; then
-  MLFLOW_TRACKING_URI="${MLFLOW_TRACKING_URI:-http://127.0.0.1:25000}"
-  export MLFLOW_TRACKING_URI
   run_step "compose.up_local_services" compose_local up -d --build minio prefect storage-gateway worker mlflow
 else
   run_step "compose.up_local_services" compose_local up -d --build minio prefect storage-gateway worker
@@ -220,8 +231,8 @@ run_step "prefect.ensure_work_pool" bash -lc "docker compose -p '${LOCAL_PROJECT
 run_step "build.register_image" compose_local build register
 run_step "register.apply_deployment" compose_local run --rm register
 run_step "register.verify_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls | grep -q 'run-job/engine-run'"
-
-run_step "prefect.submit_flow_run" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment run 'run-job/engine-run' -p job_spec_json='{\"engine\":\"shell\",\"repo_url\":\"https://github.com/octocat/Hello-World.git\",\"ref\":\"master\",\"entrypoint\":[\"/bin/sh\",\"-lc\",\"echo hello-prefect\"],\"config\":null,\"inputs\":{},\"env\":{},\"outputs_prefix\":null}' > '${LOG_DIR}/prefect-submit.log'"
+run_step "engine.build_job_spec" build_engine_job_spec
+run_step "prefect.submit_flow_run" submit_prefect_run "${LOG_DIR}/job-spec.json"
 FLOW_RUN_ID="$(grep -Eo '[0-9a-fA-F-]{36}' "${LOG_DIR}/prefect-submit.log" | head -n1 || true)"
 if [[ -z "${FLOW_RUN_ID}" ]]; then
   record_step "prefect.extract_flow_run_id" "fail" "unable to parse flow run id"
@@ -239,11 +250,21 @@ else
 fi
 
 if verify_storage_objects >>"${RUN_LOG}" 2>&1; then
-  record_step "storage.verify_objects" "pass" "stdout/stderr/result/manifest present"
+  record_step "storage.verify_objects" "pass" "flow artifacts + engine scene bundle present"
 else
-  record_step "storage.verify_objects" "fail" "missing object or invalid manifest"
+  record_step "storage.verify_objects" "fail" "missing flow or engine artifacts"
   collect_logs
   exit 1
+fi
+
+if [[ "${MODE}" == "mlflow" ]]; then
+  if MLFLOW_RUN_ID="$(verify_engine_mlflow_run 2>>"${RUN_LOG}")"; then
+    record_step "mlflow.verify_engine_run" "pass" "${MLFLOW_RUN_ID}"
+  else
+    record_step "mlflow.verify_engine_run" "fail" "matching run not found"
+    collect_logs
+    exit 1
+  fi
 fi
 
 if verify_prefect_flush >>"${RUN_LOG}" 2>&1; then
@@ -262,28 +283,4 @@ else
   exit 1
 fi
 
-if [[ "${MODE}" == "mlflow" ]]; then
-  if verify_mlflow_prereqs >>"${RUN_LOG}" 2>&1; then
-    record_step "mlflow.verify_prereqs" "pass" "tracking env present + DNS resolved"
-  else
-    record_step "mlflow.verify_prereqs" "fail" "missing env or DNS not resolved"
-    collect_logs
-    exit 1
-  fi
-  if check_mlflow_tracking_access >>"${RUN_LOG}" 2>&1; then
-    record_step "mlflow.verify_tracking_access" "pass" "mlflow API reachable"
-  else
-    record_step "mlflow.verify_tracking_access" "fail" "mlflow API returned non-200"
-    collect_logs
-    exit 1
-  fi
-  if MLFLOW_RUN_ID="$(create_and_verify_mlflow_tags 2>>"${RUN_LOG}")"; then
-    record_step "mlflow.verify_tags" "pass" "${MLFLOW_RUN_ID}"
-  else
-    record_step "mlflow.verify_tags" "fail" "mlflow create/get tag check failed"
-    collect_logs
-    exit 1
-  fi
-fi
-
-log "E2E succeeded: mode=${MODE} flow_run_id=${FLOW_RUN_ID} mlflow_run_id=${MLFLOW_RUN_ID:-N/A}"
+log "Local e2e succeeded: flow_run_id=${FLOW_RUN_ID}"
