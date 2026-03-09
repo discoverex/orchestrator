@@ -51,7 +51,10 @@ def test_e2e_remote_chain__storage_objects__returns_ok(
         if method == "POST" and url.endswith("/v1/object/head"):
             return {"exists": True}
         if method == "POST" and url.endswith("/v1/presign/get"):
-            return {"url": "https://presigned/manifest"}
+            if payload and payload.get("kind") == "manifest":
+                return {"url": "https://presigned/manifest"}
+            if payload and payload.get("kind") == "stdout":
+                return {"url": "https://presigned/stdout"}
         if method == "GET" and url == "https://presigned/manifest":
             return {
                 "flow_run_id": flow_run_id,
@@ -70,6 +73,12 @@ def test_e2e_remote_chain__storage_objects__returns_ok(
                         "object_uri": f"s3://{bucket}/jobs/{flow_run_id}/attempt-1/result.json",
                     },
                 ],
+            }
+        if method == "GET" and url == "https://presigned/stdout":
+            return {
+                "scene_id": "scene-1",
+                "version_id": "ver-1",
+                "scene_json": "artifacts/scenes/scene-1/ver-1/scene.json",
             }
         raise AssertionError(f"unexpected call: {method} {url}")
 

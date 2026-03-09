@@ -8,6 +8,7 @@ import subprocess
 from hashlib import sha256
 from pathlib import Path
 from tempfile import mkdtemp
+from urllib.parse import unquote, urlsplit
 
 from .models import RunArtifacts
 
@@ -34,17 +35,45 @@ def _repo_cache_path(repo_url: str) -> Path:
     return _repo_cache_root() / key
 
 
+def _local_repo_path(repo_url: str) -> Path | None:
+    split = urlsplit(repo_url)
+    if split.scheme == "file":
+        return Path(unquote(split.path))
+    if split.scheme:
+        return None
+    candidate = Path(repo_url)
+    if candidate.exists():
+        return candidate
+    return None
+
+
+def _safe_directory_args(repo_path: Path) -> list[str]:
+    resolved = repo_path.resolve()
+    return [
+        "-c",
+        f"safe.directory={resolved}",
+        "-c",
+        f"safe.directory={resolved / '.git'}",
+    ]
+
+
 def _prepare_cached_repo(repo_url: str, resolved_commit: str) -> Path:
     cache_root = _repo_cache_root()
     cache_root.mkdir(parents=True, exist_ok=True)
     cache_repo = _repo_cache_path(repo_url)
+    local_repo = _local_repo_path(repo_url)
+    clone_source = local_repo.resolve().as_uri() if local_repo is not None else repo_url
 
     if (cache_repo / ".git").exists():
         _run(["git", "fetch", "--all", "--tags", "--prune"], cwd=cache_repo)
     else:
         if cache_repo.exists():
             shutil.rmtree(cache_repo, ignore_errors=True)
-        _run(["git", "clone", "--filter=blob:none", repo_url, str(cache_repo)])
+        clone_cmd = ["git"]
+        if local_repo is not None:
+            clone_cmd.extend(_safe_directory_args(local_repo))
+        clone_cmd.extend(["clone", "--filter=blob:none", clone_source, str(cache_repo)])
+        _run(clone_cmd)
 
     _run(["git", "checkout", "--detach", resolved_commit], cwd=cache_repo)
     _run(["git", "reset", "--hard"], cwd=cache_repo)
@@ -74,6 +103,19 @@ def resolve_commit(repo_url: str, ref: str) -> str:
     candidate = ref.strip().lower()
     if _SHA1.match(candidate):
         return candidate
+
+    local_repo = _local_repo_path(repo_url)
+    if local_repo is not None:
+        return _run(
+            [
+                "git",
+                *_safe_directory_args(local_repo),
+                "-C",
+                str(local_repo),
+                "rev-parse",
+                ref,
+            ]
+        )
 
     for remote_ref in (f"refs/heads/{ref}", f"refs/tags/{ref}", ref):
         try:
