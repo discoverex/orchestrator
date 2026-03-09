@@ -19,6 +19,8 @@ REMOTE_PROJECT_PATH="$(ensure_remote_project_path "${REMOTE_PROJECT_PATH}" "${RE
 
 PREFECT_ENV="infra/stacks/prefect-server/.env"
 PREFECT_COMPOSE="infra/stacks/prefect-server/docker-compose.yml"
+REMOTE_PREFECT_ENV="${REMOTE_PREFECT_ENV:-.env}"
+REMOTE_PREFECT_COMPOSE="${REMOTE_PREFECT_COMPOSE:-docker-compose.yml}"
 
 usage() {
   cat <<'EOF'
@@ -40,6 +42,21 @@ Examples:
 EOF
 }
 
+remote_prefect_compose() {
+  if [[ "$#" -eq 0 ]]; then
+    echo "missing prefect compose args" >&2
+    usage
+    exit 1
+  fi
+  local compose_cmd
+  compose_cmd="if [[ -n \"${REMOTE_PREFECT_ENV}\" && -f \"${REMOTE_PREFECT_ENV}\" ]]; then docker compose --env-file ${REMOTE_PREFECT_ENV} -f ${REMOTE_PREFECT_COMPOSE}"
+  compose_cmd+="$(join_quoted "$@")"
+  compose_cmd+="; else docker compose -f ${REMOTE_PREFECT_COMPOSE}"
+  compose_cmd+="$(join_quoted "$@")"
+  compose_cmd+="; fi"
+  remote_prefect_exec "${compose_cmd}"
+}
+
 case "${COMMAND}" in
   connect)
     require_remote_env
@@ -58,12 +75,7 @@ case "${COMMAND}" in
     remote_project_exec "scripts/ops/prefect_vm_bootstrap.sh"
     ;;
   prefect)
-    if [[ "$#" -eq 0 ]]; then
-      echo "missing prefect compose args" >&2
-      usage
-      exit 1
-    fi
-    remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE}$(join_quoted "$@")"
+    remote_prefect_compose "$@"
     ;;
   worker)
     sub="${1:-}"
@@ -86,16 +98,16 @@ case "${COMMAND}" in
     ;;
   # Backward-compatible aliases
   prefect-up)
-    remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE} up -d --build"
+    remote_prefect_compose up -d --build
     ;;
   prefect-down)
-    remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE} down"
+    remote_prefect_compose down
     ;;
   prefect-ps)
-    remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE} ps"
+    remote_prefect_compose ps
     ;;
   prefect-logs)
-    remote_project_exec "docker compose --env-file ${PREFECT_ENV} -f ${PREFECT_COMPOSE} logs --tail=120$(join_quoted "$@")"
+    remote_prefect_compose logs --tail=120 "$@"
     ;;
   worker-ps)
     remote_prefect_worker_ls
