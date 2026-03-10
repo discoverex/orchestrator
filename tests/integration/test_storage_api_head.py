@@ -27,25 +27,3 @@ def test_head_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
     assert yes.json() == {"exists": True, "size": 13}
     assert no.status_code == 200
     assert no.json() == {"exists": False, "size": None}
-
-
-def test_storage_compatibility_alias(monkeypatch: pytest.MonkeyPatch) -> None:
-    c = client(monkeypatch)
-
-    res = c.post(
-        "/storage/artifact/v1/presign/get",
-        json={
-            "flow_run_id": "f3",
-            "attempt": 1,
-            "kind": "result",
-            "filename": "payload.bin",
-        },
-    )
-
-    assert res.status_code == 200
-    payload = res.json()
-    assert (
-        payload["object_uri"]
-        == "s3://orchestrator-artifacts/jobs/f3/attempt-1/payload.bin"
-    )
-    assert payload["url"].startswith("https://object.example/payload.bin")

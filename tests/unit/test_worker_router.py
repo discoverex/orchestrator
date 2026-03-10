@@ -101,25 +101,6 @@ def test_storage_human_host_skips_service_token_check(
     assert res.json()["url"].startswith("https://object.example/")
 
 
-def test_storage_compatibility_path_still_works(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("GATEWAY_REQUIRE_CF_ACCESS", "false")
-    client = _client(monkeypatch)
-
-    res = client.post(
-        "/storage/artifact/v1/presign/batch",
-        json={
-            "flow_run_id": "f1",
-            "attempt": 1,
-            "entries": [{"flow_run_id": "f1", "attempt": 1, "kind": "stdout"}],
-        },
-    )
-
-    assert res.status_code == 200
-    assert res.json()[0]["url"].startswith("https://object.example/")
-
-
 def test_mlflow_proxy_normalizes_network_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

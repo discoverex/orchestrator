@@ -9,7 +9,7 @@ from flows.engine_run import http
 
 
 def test_gateway_headers_use_cf_service_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("WORKER_ROUTER_URL", "https://discoverex.qzz.io")
+    monkeypatch.setenv("STORAGE_API_URL", "https://storage-api.discoverex.qzz.io")
     monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
     monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
 
@@ -23,51 +23,39 @@ def test_gateway_headers_use_cf_service_token(monkeypatch: pytest.MonkeyPatch) -
     }
 
 
-def test_gateway_headers_require_storage_or_router_env(
+def test_gateway_headers_require_storage_api_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("WORKER_ROUTER_URL", raising=False)
     monkeypatch.delenv("STORAGE_API_URL", raising=False)
     monkeypatch.delenv("CF_ACCESS_CLIENT_ID", raising=False)
     monkeypatch.delenv("CF_ACCESS_CLIENT_SECRET", raising=False)
 
     with pytest.raises(
         RuntimeError,
-        match="STORAGE_API_URL or WORKER_ROUTER_URL, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET",
+        match="STORAGE_API_URL, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET",
     ):
         http.gateway_headers()
 
 
-def test_storage_base_url_prefers_storage_api(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_storage_base_url_uses_storage_api(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("STORAGE_API_URL", "https://storage-api.discoverex.qzz.io")
-    monkeypatch.setenv("WORKER_ROUTER_URL", "https://discoverex.qzz.io")
 
     assert http.storage_base_url() == "https://storage-api.discoverex.qzz.io/artifact"
 
 
-def test_storage_base_url_falls_back_to_worker_router(
+def test_storage_base_url_requires_storage_api(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("STORAGE_API_URL", raising=False)
-    monkeypatch.setenv("WORKER_ROUTER_URL", "https://discoverex.qzz.io")
 
-    assert http.storage_base_url() == "https://discoverex.qzz.io/storage/artifact"
-
-
-def test_storage_base_url_requires_storage_or_worker_router(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("STORAGE_API_URL", raising=False)
-    monkeypatch.delenv("WORKER_ROUTER_URL", raising=False)
-
-    with pytest.raises(RuntimeError, match="STORAGE_API_URL or WORKER_ROUTER_URL"):
+    with pytest.raises(RuntimeError, match="STORAGE_API_URL"):
         http.storage_base_url()
 
 
 def test_http_json_raises_with_response_preview(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("WORKER_ROUTER_URL", "https://discoverex.qzz.io")
+    monkeypatch.setenv("STORAGE_API_URL", "https://storage-api.discoverex.qzz.io")
     monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
     monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
 
@@ -96,7 +84,7 @@ def test_http_json_raises_with_response_preview(
 
 
 def test_http_json_returns_rows(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("WORKER_ROUTER_URL", "https://discoverex.qzz.io")
+    monkeypatch.setenv("STORAGE_API_URL", "https://storage-api.discoverex.qzz.io")
     monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
     monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
     payload = json.dumps([{"kind": "stdout", "url": "https://example"}]).encode("utf-8")

@@ -200,7 +200,7 @@ class _ThreadingHTTPServer(ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True
 
 
-def test_run_entrypoint_proxies_remote_mlflow_with_worker_auth() -> None:
+def test_run_entrypoint_proxies_remote_mlflow_with_cf_access() -> None:
     seen: dict[str, str] = {}
 
     class Handler(http.server.BaseHTTPRequestHandler):
@@ -306,8 +306,7 @@ def test_run_entrypoint_proxies_mlflow_via_worker_router() -> None:
         ],
         run_mode="inline",
         env={
-            "MLFLOW_TRACKING_URI": "https://mlflow.discoverex.qzz.io",
-            "WORKER_ROUTER_URL": upstream,
+            "MLFLOW_TRACKING_URI": upstream,
             "CF_ACCESS_CLIENT_ID": "worker-id",
             "CF_ACCESS_CLIENT_SECRET": "worker-secret",
         },
@@ -317,7 +316,7 @@ def test_run_entrypoint_proxies_mlflow_via_worker_router() -> None:
         flow_run_id="flow-inline",
         attempt=1,
         outputs_prefix="jobs/flow-inline/attempt-1/",
-        job_name="inline-mlflow-router",
+        job_name="inline-mlflow-proxy",
     )
     try:
         assert artifacts.exit_code == 0
@@ -347,7 +346,6 @@ def test_run_entrypoint_does_not_enable_mlflow_proxy_without_tracking_uri(
         ],
         run_mode="inline",
         env={
-            "WORKER_ROUTER_URL": "https://discoverex.qzz.io",
             "CF_ACCESS_CLIENT_ID": "worker-id",
             "CF_ACCESS_CLIENT_SECRET": "worker-secret",
         },
@@ -357,7 +355,7 @@ def test_run_entrypoint_does_not_enable_mlflow_proxy_without_tracking_uri(
         flow_run_id="flow-inline",
         attempt=1,
         outputs_prefix="jobs/flow-inline/attempt-1/",
-        job_name="inline-no-mlflow-router",
+        job_name="inline-no-mlflow-proxy",
     )
     try:
         assert artifacts.exit_code == 0
