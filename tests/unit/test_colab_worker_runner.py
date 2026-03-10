@@ -114,7 +114,7 @@ def test_prepare_cache_dirs_creates_pip_and_xdg_only(tmp_path: Path) -> None:
     assert sorted(path.name for path in cache_root.iterdir()) == ["pip", "xdg"]
 
 
-def test_bootstrap_runtime_uses_editable_no_build_isolation_and_fast_deps(
+def test_bootstrap_runtime_installs_runtime_requirements(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     runtime = _load_module("colab_runtime")
@@ -136,38 +136,42 @@ def test_bootstrap_runtime_uses_editable_no_build_isolation_and_fast_deps(
         return SimpleNamespace(output="ok")
 
     monkeypatch.setattr(bootstrap, "ensure_drive_mounted", lambda: None)
+    monkeypatch.setattr(
+        bootstrap,
+        "project_runtime_requirements",
+        lambda _: ["prefect>=3.0.0", "fastapi>=0.116.0"],
+    )
     monkeypatch.setattr(bootstrap, "run_command", fake_run)
 
     bootstrap.bootstrap_runtime(config)
 
     assert commands == [
-        [
-            "python3",
-            "-m",
-            "pip",
-            "install",
-            "-U",
-            "pip",
-            "setuptools",
-            "wheel",
-        ],
-        [
-            "python3",
-            "-m",
-            "pip",
-            "install",
-            "-e",
-            str(config.repo_dir),
-            "--no-build-isolation",
-            "--use-feature=fast-deps",
-        ],
-        ["python3", "-m", "pip", "show", "orchestrator"],
+        ["python3", "-m", "pip", "install", "prefect>=3.0.0", "fastapi>=0.116.0"],
+        ["python3", "-m", "pip", "show", "prefect"],
         ["python3", "--version"],
     ]
     output = capsys.readouterr().out
     assert f"ready repo={config.repo_dir}" in output
     assert f"ready cache={config.cache_root}" in output
     assert "ready python=python3" in output
+
+
+def test_project_runtime_requirements_reads_project_dependencies(tmp_path: Path) -> None:
+    bootstrap = _load_module("colab_bootstrap")
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    (repo_dir / "pyproject.toml").write_text(
+        """
+[project]
+dependencies = ["prefect>=3.0.0", "fastapi>=0.116.0"]
+""".strip(),
+        encoding="utf-8",
+    )
+
+    assert bootstrap.project_runtime_requirements(repo_dir) == [
+        "prefect>=3.0.0",
+        "fastapi>=0.116.0",
+    ]
 
 
 def test_ensure_drive_mounted_requires_drive(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -224,6 +228,82 @@ def test_read_worker_logs_returns_tail(tmp_path: Path) -> None:
     lines = worker.read_worker_logs(log_file, 2)
 
     assert lines == ["b", "c"]
+
+
+def test_append_worker_log_banner_writes_clear_markers(tmp_path: Path) -> None:
+    worker = _load_module("colab_worker")
+    log_file = tmp_path / "worker.log"
+
+    worker.append_worker_log_banner(
+        log_file,
+        position="top",
+        pid=111,
+        work_pool="gpu-pool",
+        work_queue="gpu-colab",
+    )
+    worker.append_worker_log_banner(log_file, position="bottom", pid=111)
+
+    content = log_file.read_text(encoding="utf-8")
+    assert "worker start |" in content
+    assert "worker stop |" in content
+    assert "pool=gpu-pool" in content
+    assert "queue=gpu-colab" in content
+    assert "=" * 72 in content
+    assert "-" * 72 in content
+
+
+def test_stop_worker_terminates_process_group(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    worker = _load_module("colab_worker")
+    pid_file = tmp_path / "worker.pid"
+    log_file = tmp_path / "worker.log"
+    pid_file.write_text("321", encoding="utf-8")
+    calls: list[tuple[str, int, int]] = []
+
+    monkeypatch.setattr(worker, "wait_for_exit", lambda pid, timeout_seconds=10.0: True)
+
+    def fake_killpg(pid: int, sig: int) -> None:
+        calls.append(("killpg", pid, sig))
+
+    monkeypatch.setattr(worker.os, "killpg", fake_killpg)
+
+    status = worker.stop_worker(pid_file, log_file)
+
+    assert status.running is False
+    assert calls == [("killpg", 321, worker.signal.SIGTERM)]
+    assert pid_file.exists() is False
+    assert "worker stop |" in log_file.read_text(encoding="utf-8")
+
+
+def test_stop_worker_reports_timeout_when_process_survives(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    worker = _load_module("colab_worker")
+    pid_file = tmp_path / "worker.pid"
+    log_file = tmp_path / "worker.log"
+    pid_file.write_text("654", encoding="utf-8")
+    calls: list[tuple[str, int, int]] = []
+
+    monkeypatch.setattr(worker, "wait_for_exit", lambda pid, timeout_seconds=10.0: False)
+
+    def fake_killpg(pid: int, sig: int) -> None:
+        calls.append(("killpg", pid, sig))
+
+    monkeypatch.setattr(worker.os, "killpg", fake_killpg)
+
+    status = worker.stop_worker(pid_file, log_file)
+
+    assert status.running is True
+    assert "timed out" in status.message
+    assert calls == [
+        ("killpg", 654, worker.signal.SIGTERM),
+        ("killpg", 654, worker.signal.SIGKILL),
+    ]
+    assert pid_file.exists() is True
+    assert "stop timed out; process still running" in log_file.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_runner_main_dispatches_status(monkeypatch: pytest.MonkeyPatch) -> None:
