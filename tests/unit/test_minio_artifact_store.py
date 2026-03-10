@@ -91,3 +91,20 @@ def test_upload_bytes_autocreate_bucket_and_store_object() -> None:
 
     assert "artifacts" in fake.buckets
     assert fake.objects == [("artifacts", "jobs/1/stdout.log", b"hello")]
+
+
+def test_presigned_urls_can_split_public_and_internal_bases() -> None:
+    store = MinioObjectStore(
+        endpoint="127.0.0.1:9000",
+        access_key="a",
+        secret_key="b",
+        public_base_url="http://127.0.0.1:29000",
+        internal_presign_base_url="http://minio:9000",
+        client=FakeMinio(),
+    )
+
+    put_url = store.generate_presigned_put("s3://artifacts/jobs/1/stdout.log", 60)
+    get_url = store.generate_presigned_get("s3://artifacts/jobs/1/stdout.log", 60)
+
+    assert put_url.startswith("http://minio:9000/")
+    assert get_url.startswith("http://127.0.0.1:29000/")

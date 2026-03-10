@@ -330,3 +330,37 @@ def test_run_entrypoint_proxies_mlflow_via_worker_router() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_run_entrypoint_does_not_enable_mlflow_proxy_without_tracking_uri(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
+    artifacts = run_entrypoint(
+        repo_url=None,
+        ref=None,
+        resolved_commit=None,
+        entrypoint=[
+            sys.executable,
+            "-c",
+            "import os; print(os.environ.get('MLFLOW_TRACKING_URI', ''))",
+        ],
+        run_mode="inline",
+        env={
+            "WORKER_ROUTER_URL": "https://discoverex.qzz.io",
+            "CF_ACCESS_CLIENT_ID": "worker-id",
+            "CF_ACCESS_CLIENT_SECRET": "worker-secret",
+        },
+        engine="discoverex",
+        config_rel_path=None,
+        inputs={"contract_version": "v2", "command": "generate"},
+        flow_run_id="flow-inline",
+        attempt=1,
+        outputs_prefix="jobs/flow-inline/attempt-1/",
+        job_name="inline-no-mlflow-router",
+    )
+    try:
+        assert artifacts.exit_code == 0
+        assert artifacts.stdout_path.read_text(encoding="utf-8").strip() == ""
+    finally:
+        cleanup_workdir(artifacts.workdir)
