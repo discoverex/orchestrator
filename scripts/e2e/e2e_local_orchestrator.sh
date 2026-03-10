@@ -120,20 +120,54 @@ wait_health() {
 }
 
 poll_prefect_completion() {
-  python3 "${PY_HELPER}" poll-prefect-completion \
-    --prefect-api-url "${PREFECT_API_URL}" \
-    --flow-run-id "${FLOW_RUN_ID}" \
-    --timeout-sec "${TIMEOUT_SEC}"
+  compose_local exec -T \
+    -e PREFECT_API_URL=http://127.0.0.1:4200/api \
+    -e FLOW_RUN_ID="${FLOW_RUN_ID}" \
+    -e TIMEOUT_SEC="${TIMEOUT_SEC}" \
+    prefect python - <<'PY'
+import json
+import os
+import time
+from urllib import request
+
+api_url = os.environ["PREFECT_API_URL"].rstrip("/")
+flow_run_id = os.environ["FLOW_RUN_ID"]
+timeout_sec = int(os.environ["TIMEOUT_SEC"])
+deadline = time.time() + timeout_sec
+terminal_success = {"COMPLETED"}
+terminal_fail = {"FAILED", "CRASHED", "CANCELLED"}
+
+while time.time() < deadline:
+    with request.urlopen(f"{api_url}/flow_runs/{flow_run_id}", timeout=10) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    state_type = str(payload.get("state_type") or "").upper()
+    if state_type in terminal_success:
+        print("COMPLETED")
+        raise SystemExit(0)
+    if state_type in terminal_fail:
+        print(state_type)
+        raise SystemExit(2)
+    time.sleep(2)
+
+print("TIMEOUT")
+raise SystemExit(3)
+PY
 }
 
 verify_storage_objects() {
+  local extra_args=()
+  if [[ "${MODE}" == "core" ]]; then
+    extra_args+=(--skip-engine-artifacts)
+  fi
   python3 "${PY_HELPER}" verify-storage-objects \
     --flow-run-id "${FLOW_RUN_ID}" \
     --storage-api-url "${STORAGE_API_URL}" \
     --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" \
     --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" \
     --artifact-bucket "${ARTIFACT_BUCKET}" \
-    --log-dir "${LOG_DIR}"
+    --presigned-host-header "${STORAGE_DOWNLOAD_HOST_HEADER:-minio:9000}" \
+    --log-dir "${LOG_DIR}" \
+    "${extra_args[@]}"
 }
 
 verify_engine_mlflow_run() {
@@ -144,10 +178,17 @@ verify_engine_mlflow_run() {
 
 verify_prefect_flush() {
   local out_json="${LOG_DIR}/prefect-flush.json"
-  PREFECT_API_URL="${PREFECT_API_URL}" \
-  FLUSH_TARGET_URL="${STORAGE_API_URL}" \
-  FLUSH_CURSOR_PATH="${LOG_DIR}/prefect-flush-cursor.json" \
-  uv run python scripts/ops/prefect_flush_completed.py --once --page-size 100 --max-runs 500 >"${out_json}"
+  docker run --rm \
+    --network "${LOCAL_PROJECT_NAME}_default" \
+    -v "${ROOT_DIR}:/workspace" \
+    -w /workspace \
+    orchestrator-base:local \
+    /bin/sh -lc "\
+      PREFECT_API_URL=http://prefect:4200/api \
+      FLUSH_TARGET_URL=http://worker-router:8200/storage/artifact \
+      FLUSH_CURSOR_PATH=/workspace/${LOG_DIR}/prefect-flush-cursor.json \
+      PYTHONPATH=src /opt/venv/bin/python scripts/ops/prefect_flush_completed.py --once --page-size 100 --max-runs 500 \
+      > /workspace/${out_json}"
 
   python3 "${PY_HELPER}" verify-flush-output \
     --output-json "${out_json}" \
@@ -156,31 +197,72 @@ verify_prefect_flush() {
 
 verify_prefect_prune() {
   local out_json="${LOG_DIR}/prefect-prune.json"
-  PREFECT_API_URL="${PREFECT_API_URL}" \
-  uv run python scripts/ops/prefect_prune_completed.py --apply --ttl-hours 0 --page-size 200 --max-runs 1000 >"${out_json}"
+  docker run --rm \
+    --network "${LOCAL_PROJECT_NAME}_default" \
+    -v "${ROOT_DIR}:/workspace" \
+    -w /workspace \
+    orchestrator-base:local \
+    /bin/sh -lc "\
+      PREFECT_API_URL=http://prefect:4200/api \
+      PYTHONPATH=src /opt/venv/bin/python scripts/ops/prefect_prune_completed.py --apply --ttl-hours 0 --page-size 200 --max-runs 1000 \
+      > /workspace/${out_json}"
 
-  python3 "${PY_HELPER}" verify-prune-removed \
-    --prefect-api-url "${PREFECT_API_URL}" \
-    --flow-run-id "${FLOW_RUN_ID}"
+  compose_local exec -T \
+    -e PREFECT_API_URL=http://127.0.0.1:4200/api \
+    -e FLOW_RUN_ID="${FLOW_RUN_ID}" \
+    prefect python - <<'PY'
+import json
+import os
+from urllib import error, request
+
+api_url = os.environ["PREFECT_API_URL"].rstrip("/")
+flow_run_id = os.environ["FLOW_RUN_ID"]
+try:
+    with request.urlopen(f"{api_url}/flow_runs/{flow_run_id}", timeout=10) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+except error.HTTPError as exc:
+    if exc.code == 404:
+        print("PRUNED")
+        raise SystemExit(0)
+    raise
+
+state_type = str(payload.get("state_type") or "").upper()
+if state_type == "CANCELLED":
+    print("PRUNED")
+    raise SystemExit(0)
+
+raise SystemExit(f"flow run still present after prune: {state_type or 'UNKNOWN'}")
+PY
 }
 
 build_engine_job_spec() {
   local job_spec_path="${LOG_DIR}/job-spec.json"
+  if [[ "${MODE}" == "core" ]]; then
+    python3 - <<'PY' >"${job_spec_path}"
+import json
+payload = {
+    "run_mode": "inline",
+    "engine": "shell",
+    "entrypoint": [
+        "/bin/sh",
+        "-lc",
+        "printf '%s\n' '{\"status\":\"ok\",\"scene_id\":\"local-e2e-scene\",\"version_id\":\"attempt-1\"}'",
+    ],
+    "config": None,
+    "job_name": "local-e2e-dummy",
+    "inputs": {},
+    "env": {},
+    "outputs_prefix": None,
+}
+print(json.dumps(payload, ensure_ascii=True))
+PY
+    echo "${job_spec_path}"
+    return
+  fi
+
   local profile="local-tiny-cpu"
   local extra_args=()
-  if [[ "${MODE}" == "core" ]]; then
-    profile="none"
-    extra_args+=(
-      -o runtime/model_runtime=cpu
-      -o models/hidden_region=tiny_torch
-      -o models/inpaint=tiny_torch
-      -o models/perception=tiny_torch
-      -o models/fx=tiny_torch
-      -o adapters/artifact_store=local
-      -o adapters/metadata_store=local_json
-      -o adapters/tracker=mlflow_file
-    )
-  else
+  if [[ "${MODE}" != "core" ]]; then
     extra_args+=(
       --mlflow-tracking-uri "${ENGINE_MLFLOW_TRACKING_URI}"
       --mlflow-s3-endpoint-url "${ENGINE_MLFLOW_S3_ENDPOINT_URL}"

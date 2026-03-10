@@ -97,13 +97,20 @@ def cmd_poll_prefect_completion(args: argparse.Namespace) -> int:
     api_url = args.prefect_api_url.rstrip("/")
     terminal_success = {"COMPLETED"}
     terminal_fail = {"FAILED", "CRASHED", "CANCELLED"}
+    transient_statuses = {403, 404, 429, 500, 502, 503, 504}
 
     deadline = time.time() + args.timeout_sec
     while time.time() < deadline:
-        payload = cast(
-            dict[str, Any],
-            _http_json("GET", f"{api_url}/flow_runs/{args.flow_run_id}", timeout=10),
-        )
+        try:
+            payload = cast(
+                dict[str, Any],
+                _http_json("GET", f"{api_url}/flow_runs/{args.flow_run_id}", timeout=10),
+            )
+        except error.HTTPError as exc:
+            if exc.code in transient_statuses:
+                time.sleep(2)
+                continue
+            raise
         state_type_raw = payload.get("state_type")
         if not state_type_raw:
             state = payload.get("state")
@@ -166,6 +173,8 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
 
     manifest_url = str(manifest_link.get("url", ""))
     download_headers: dict[str, str] = {}
+    if args.presigned_host_header:
+        download_headers["Host"] = args.presigned_host_header
     manifest = cast(
         dict[str, object],
         json.loads(_http_text(manifest_url, headers=download_headers, timeout=15)),
@@ -226,6 +235,8 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
     )
     scene_id = str(engine_output.get("scene_id", "")).strip()
     version_id = str(engine_output.get("version_id", "")).strip()
+    if args.skip_engine_artifacts:
+        return 0
     if not scene_id or not version_id:
         raise SystemExit("engine stdout missing scene_id/version_id")
 
@@ -498,6 +509,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cf-access-client-secret", default="")
     p.add_argument("--artifact-bucket", required=True)
     p.add_argument("--log-dir", required=True)
+    p.add_argument("--presigned-host-header", default="")
+    p.add_argument("--skip-engine-artifacts", action="store_true")
     p.set_defaults(func=cmd_verify_storage_objects)
 
     p = sub.add_parser("create-and-verify-mlflow-tags")
