@@ -191,12 +191,4 @@ def create_app() -> FastAPI:
             prefix="/artifact",
         )
     )
-    # Compatibility path for existing WORKER_ROUTER_URL clients.
-    app.include_router(
-        build_artifact_router(
-            storage_app,
-            _authorize_storage_request,
-            prefix="/storage/artifact",
-        )
-    )
     return app

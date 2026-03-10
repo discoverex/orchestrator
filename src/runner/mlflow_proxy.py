@@ -126,27 +126,9 @@ class MLflowProxy:
 
 @contextlib.contextmanager
 def maybe_start_mlflow_proxy(env: dict[str, str]) -> Iterator[dict[str, str]]:
-    router_url = env.get("WORKER_ROUTER_URL", "").strip().rstrip("/")
     tracking_uri = env.get("MLFLOW_TRACKING_URI", "").strip()
     cf_id = env.get("CF_ACCESS_CLIENT_ID", "").strip()
     cf_secret = env.get("CF_ACCESS_CLIENT_SECRET", "").strip()
-    if router_url and tracking_uri and cf_id and cf_secret:
-        proxy = MLflowProxy(
-            upstream_url=f"{router_url}/mlflow",
-            cf_access_client_id=cf_id,
-            cf_access_client_secret=cf_secret,
-        )
-        proxy.start()
-        proxied_env = env.copy()
-        proxied_env["MLFLOW_TRACKING_URI"] = proxy.local_url
-        proxied_env["ORCH_REMOTE_MLFLOW_TRACKING_URI"] = f"{router_url}/mlflow"
-        proxied_env.pop("CF_ACCESS_CLIENT_ID", None)
-        proxied_env.pop("CF_ACCESS_CLIENT_SECRET", None)
-        try:
-            yield proxied_env
-        finally:
-            proxy.close()
-        return
 
     if (
         not tracking_uri

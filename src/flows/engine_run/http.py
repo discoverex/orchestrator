@@ -12,27 +12,15 @@ def storage_base_url() -> str:
     storage_api_url = os.getenv("STORAGE_API_URL", "").strip().rstrip("/")
     if storage_api_url:
         return f"{storage_api_url}/artifact"
-    router_url = os.getenv("WORKER_ROUTER_URL", "").strip().rstrip("/")
-    if not router_url:
-        raise RuntimeError(
-            "missing required environment variable: STORAGE_API_URL or WORKER_ROUTER_URL"
-        )
-    return f"{router_url}/storage/artifact"
+    raise RuntimeError("missing required environment variable: STORAGE_API_URL")
 
 
 def gateway_headers() -> dict[str, str]:
     cf_id = os.getenv("CF_ACCESS_CLIENT_ID", "").strip()
     cf_secret = os.getenv("CF_ACCESS_CLIENT_SECRET", "").strip()
-    if (
-        not (
-            os.getenv("STORAGE_API_URL", "").strip()
-            or os.getenv("WORKER_ROUTER_URL", "").strip()
-        )
-        or not cf_id
-        or not cf_secret
-    ):
+    if not os.getenv("STORAGE_API_URL", "").strip() or not cf_id or not cf_secret:
         raise RuntimeError(
-            "missing required environment variables: STORAGE_API_URL or WORKER_ROUTER_URL, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET"
+            "missing required environment variables: STORAGE_API_URL, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET"
         )
     return {
         "Content-Type": "application/json",

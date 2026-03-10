@@ -21,7 +21,7 @@ DEFAULT_BOOTSTRAP_PYTHON = "python3"
 REQUIRED_ENV = (
     "PREFECT_API_URL",
     "PREFECT_WORK_POOL",
-    "WORKER_ROUTER_URL",
+    "STORAGE_API_URL",
     "CF_ACCESS_CLIENT_ID",
     "CF_ACCESS_CLIENT_SECRET",
 )
@@ -95,7 +95,7 @@ def populate_colab_env(
     optional_keys = (
         "CF_ACCESS_CLIENT_ID",
         "CF_ACCESS_CLIENT_SECRET",
-        "WORKER_ROUTER_URL",
+        "STORAGE_API_URL",
     )
 
     os.environ["PYTHONPATH"] = str(config.repo_dir / "src")
@@ -161,7 +161,7 @@ def runtime_snapshot(config: ColabRuntimeConfig) -> dict[str, object]:
         "has_prefect_custom_headers": bool(
             os.environ.get("PREFECT_CLIENT_CUSTOM_HEADERS")
         ),
-        "worker_router_url": os.environ.get("WORKER_ROUTER_URL", ""),
+        "storage_api_url": os.environ.get("STORAGE_API_URL", ""),
     }
 
 

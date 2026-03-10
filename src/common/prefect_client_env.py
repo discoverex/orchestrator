@@ -18,7 +18,6 @@ class WorkerStartupSummary(StrictModel):
     prefect_api_url: str
     prefect_work_pool: str
     prefect_work_queue: str
-    worker_router_url: str
     checkpoint_dir: str
     custom_header_keys: list[str]
     cf_access_configured: bool
@@ -113,7 +112,6 @@ def startup_summary(
         prefect_api_url=updated.get("PREFECT_API_URL", ""),
         prefect_work_pool=updated.get("PREFECT_WORK_POOL", ""),
         prefect_work_queue=updated.get("PREFECT_WORK_QUEUE", ""),
-        worker_router_url=updated.get("WORKER_ROUTER_URL", ""),
         checkpoint_dir=updated.get("ORCHESTRATOR_CHECKPOINT_DIR", ""),
         custom_header_keys=header_keys,
         cf_access_configured=bool(updated.get("CF_ACCESS_CLIENT_ID"))
