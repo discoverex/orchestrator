@@ -55,9 +55,7 @@ def run_command(
     output = "".join(lines)
     if returncode != 0 and check:
         log_step(step, f"FAILED rc={returncode} after {duration:.1f}s")
-        raise RuntimeError(
-            f"{step} failed with rc={returncode}: {format_command(cmd)}"
-        )
+        raise RuntimeError(f"{step} failed with rc={returncode}: {format_command(cmd)}")
 
     status = "DONE" if returncode == 0 else "FAILED"
     log_step(step, f"{status} rc={returncode} after {duration:.1f}s")

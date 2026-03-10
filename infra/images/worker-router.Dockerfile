@@ -1,6 +1,7 @@
 FROM orchestrator-base:local
 
 COPY --chown=appuser:appuser src/common /app/src/common
+COPY --chown=appuser:appuser src/storage /app/src/storage
 COPY --chown=appuser:appuser src/worker_router /app/src/worker_router
 
 USER appuser

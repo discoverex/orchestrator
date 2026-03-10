@@ -75,7 +75,8 @@ def _http_text(
         req_headers.update(headers)
     req = request.Request(url, method="GET", headers=req_headers)
     with request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8")
+        body = cast(bytes, resp.read())
+    return body.decode("utf-8")
 
 
 def _extract_json_object(raw: str) -> dict[str, object]:
@@ -123,8 +124,7 @@ def cmd_poll_prefect_completion(args: argparse.Namespace) -> int:
 
 def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
     flow_run_id = args.flow_run_id
-    gateway = args.storage_gateway_url.rstrip("/")
-    token = args.storage_gateway_token
+    gateway = args.storage_api_url.rstrip("/")
     bucket = args.artifact_bucket
     log_dir = Path(args.log_dir)
     attempt = 1
@@ -135,7 +135,10 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         "result": f"s3://{bucket}/jobs/{flow_run_id}/attempt-{attempt}/result.json",
         "manifest": f"s3://{bucket}/jobs/{flow_run_id}/attempt-{attempt}/artifacts.json",
     }
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json"}
+    if args.cf_access_client_id and args.cf_access_client_secret:
+        headers["CF-Access-Client-Id"] = args.cf_access_client_id
+        headers["CF-Access-Client-Secret"] = args.cf_access_client_secret
 
     for object_uri in uris.values():
         payload = _http_json(
@@ -162,15 +165,21 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
     )
 
     manifest_url = str(manifest_link.get("url", ""))
-    download_headers = {"Authorization": f"Bearer {token}"}
-    manifest = json.loads(_http_text(manifest_url, headers=download_headers, timeout=15))
+    download_headers: dict[str, str] = {}
+    manifest = cast(
+        dict[str, object],
+        json.loads(_http_text(manifest_url, headers=download_headers, timeout=15)),
+    )
 
     if manifest.get("flow_run_id") != flow_run_id:
         raise SystemExit("manifest flow_run_id mismatch")
-    if int(manifest.get("attempt", -1)) != attempt:
+    manifest_attempt = manifest.get("attempt", -1)
+    if int(str(manifest_attempt)) != attempt:
         raise SystemExit("manifest attempt mismatch")
 
     rows = manifest.get("artifacts", [])
+    if not isinstance(rows, list):
+        raise SystemExit("manifest artifacts mismatch")
     kinds = {
         row.get("kind"): row.get("object_uri") for row in rows if isinstance(row, dict)
     }
@@ -208,7 +217,7 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         dict[str, object],
         json.loads(_http_text(result_url, headers=download_headers, timeout=15)),
     )
-    exit_code = int(result_payload.get("exit_code", -1))
+    exit_code = int(str(result_payload.get("exit_code", -1)))
     if exit_code != 0:
         raise SystemExit(f"engine entrypoint exited with code {exit_code}")
 
@@ -484,8 +493,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("verify-storage-objects")
     p.add_argument("--flow-run-id", required=True)
-    p.add_argument("--storage-gateway-url", required=True)
-    p.add_argument("--storage-gateway-token", required=True)
+    p.add_argument("--storage-api-url", required=True)
+    p.add_argument("--cf-access-client-id", default="")
+    p.add_argument("--cf-access-client-secret", default="")
     p.add_argument("--artifact-bucket", required=True)
     p.add_argument("--log-dir", required=True)
     p.set_defaults(func=cmd_verify_storage_objects)

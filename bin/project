@@ -123,7 +123,7 @@ case "${cmd}" in
       logs) run_storage logs --tail=120 "$@" ;;
       build)
         build_base_runtime
-        run_storage build base-runtime storage-gateway mlflow "$@"
+        run_storage build base-runtime worker-router mlflow "$@"
         ;;
       *)
         echo "unknown storage command: ${sub}" >&2
@@ -165,7 +165,7 @@ case "${cmd}" in
       logs) run_local logs --tail=120 "$@" ;;
       build)
         build_base_runtime
-        run_local build base-runtime storage-gateway worker register "$@"
+        run_local build base-runtime worker-router worker register "$@"
         ;;
       *)
         echo "unknown local command: ${sub}" >&2

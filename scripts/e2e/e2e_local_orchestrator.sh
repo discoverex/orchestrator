@@ -63,8 +63,7 @@ mkdir -p "${LOG_DIR}"
 
 PREFECT_API_URL="${PREFECT_API_URL:-http://127.0.0.1:24200/api}"
 PREFECT_WORK_POOL="${PREFECT_WORK_POOL:-gpu-pool}"
-STORAGE_GATEWAY_URL="${STORAGE_GATEWAY_URL:-http://127.0.0.1:28100}"
-STORAGE_GATEWAY_TOKEN="${STORAGE_GATEWAY_TOKEN:-dev-storage-token}"
+STORAGE_API_URL="${STORAGE_API_URL:-http://127.0.0.1:8200/storage/artifact}"
 ARTIFACT_BUCKET="${ARTIFACT_BUCKET:-orchestrator-artifacts}"
 ENGINE_REPO_REF="${ENGINE_REPO_REF:-$(git -C "${ENGINE_DIR}" rev-parse HEAD)}"
 ENGINE_LOCAL_REPO_PATH_HOST="${ENGINE_LOCAL_REPO_PATH_HOST:-${ENGINE_DIR}}"
@@ -73,7 +72,7 @@ ENGINE_MLFLOW_TRACKING_URI="${ENGINE_MLFLOW_TRACKING_URI:-http://mlflow:5000}"
 ENGINE_MLFLOW_S3_ENDPOINT_URL="${ENGINE_MLFLOW_S3_ENDPOINT_URL:-http://minio:9000}"
 ENGINE_AWS_ACCESS_KEY_ID="${ENGINE_AWS_ACCESS_KEY_ID:-minioadmin}"
 ENGINE_AWS_SECRET_ACCESS_KEY="${ENGINE_AWS_SECRET_ACCESS_KEY:-minioadmin}"
-export PREFECT_API_URL PREFECT_WORK_POOL STORAGE_GATEWAY_URL STORAGE_GATEWAY_TOKEN ARTIFACT_BUCKET
+export PREFECT_API_URL PREFECT_WORK_POOL STORAGE_API_URL ARTIFACT_BUCKET
 export ENGINE_LOCAL_REPO_PATH_HOST
 
 FLOW_RUN_ID=""
@@ -130,8 +129,9 @@ poll_prefect_completion() {
 verify_storage_objects() {
   python3 "${PY_HELPER}" verify-storage-objects \
     --flow-run-id "${FLOW_RUN_ID}" \
-    --storage-gateway-url "${STORAGE_GATEWAY_URL}" \
-    --storage-gateway-token "${STORAGE_GATEWAY_TOKEN}" \
+    --storage-api-url "${STORAGE_API_URL}" \
+    --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" \
+    --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" \
     --artifact-bucket "${ARTIFACT_BUCKET}" \
     --log-dir "${LOG_DIR}"
 }
@@ -145,8 +145,7 @@ verify_engine_mlflow_run() {
 verify_prefect_flush() {
   local out_json="${LOG_DIR}/prefect-flush.json"
   PREFECT_API_URL="${PREFECT_API_URL}" \
-  FLUSH_TARGET_URL="${STORAGE_GATEWAY_URL}" \
-  FLUSH_GATEWAY_TOKEN="${STORAGE_GATEWAY_TOKEN}" \
+  FLUSH_TARGET_URL="${STORAGE_API_URL}" \
   FLUSH_CURSOR_PATH="${LOG_DIR}/prefect-flush-cursor.json" \
   uv run python scripts/ops/prefect_flush_completed.py --once --page-size 100 --max-runs 500 >"${out_json}"
 
@@ -216,13 +215,13 @@ submit_prefect_run() {
 run_step "build.base_runtime" compose_local build base-runtime
 compose_local down -v --remove-orphans >/dev/null 2>&1 || true
 if [[ "${MODE}" == "mlflow" ]]; then
-  run_step "compose.up_local_services" compose_local up -d --build minio prefect storage-gateway worker mlflow
+  run_step "compose.up_local_services" compose_local up -d --build minio prefect worker-router worker mlflow
 else
-  run_step "compose.up_local_services" compose_local up -d --build minio prefect storage-gateway worker
+  run_step "compose.up_local_services" compose_local up -d --build minio prefect worker-router worker
 fi
 run_step "health.wait_minio" wait_health orchestrator-e2e-local-minio 90
 run_step "health.wait_prefect" wait_health orchestrator-e2e-local-prefect 90
-run_step "health.wait_gateway" wait_health orchestrator-e2e-local-storage-gateway 90
+run_step "health.wait_gateway" wait_health orchestrator-e2e-local-worker-router 90
 if [[ "${MODE}" == "mlflow" ]]; then
   run_step "health.wait_mlflow" wait_health orchestrator-e2e-local-mlflow 90
 fi

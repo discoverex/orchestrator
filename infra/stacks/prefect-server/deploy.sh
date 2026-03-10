@@ -43,7 +43,6 @@ require_env PREFECT_HOSTNAMES
 require_env PREFECT_API_PUBLIC_URL
 require_env PREFECT_DB_PASSWORD
 require_env FLUSH_TARGET_URL
-require_env FLUSH_GATEWAY_TOKEN
 
 if [[ -n "${GHCR_TOKEN:-}" ]]; then
   require_env GHCR_USERNAME

@@ -25,40 +25,6 @@ services:
       timeout: 5s
       retries: 10
 
-  storage-gateway:
-    build:
-      context: ../../..
-      dockerfile: infra/images/storage-gateway.Dockerfile
-    image: orchestrator-storage-gateway:local
-    container_name: orchestrator-storage-gateway
-    restart: unless-stopped
-    environment:
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-      MINIO_SECURE: ${MINIO_SECURE:-false}
-      MINIO_AUTO_CREATE_BUCKET: ${MINIO_AUTO_CREATE_BUCKET:-true}
-      ARTIFACT_BUCKET: ${ARTIFACT_BUCKET:-orchestrator-artifacts}
-      PRESIGN_TTL_DEFAULT: ${PRESIGN_TTL_DEFAULT:-900}
-      PRESIGN_TTL_MAX: ${PRESIGN_TTL_MAX:-3600}
-      PRESIGN_MODE: ${PRESIGN_MODE:-gateway}
-      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-}
-      STORAGE_URL_SIGNING_SECRET: ${STORAGE_URL_SIGNING_SECRET:-}
-      STORAGE_GATEWAY_TOKEN: ${STORAGE_GATEWAY_TOKEN}
-      GATEWAY_REQUIRE_CF_ACCESS: ${GATEWAY_REQUIRE_CF_ACCESS:-true}
-      CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-}
-      CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-}
-    ports:
-      - "127.0.0.1:${STORAGE_GATEWAY_PORT:-18100}:8100"
-    depends_on:
-      minio:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8100/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   worker-router:
     build:
       context: ../../..
@@ -67,16 +33,23 @@ services:
     container_name: orchestrator-worker-router
     restart: unless-stopped
     environment:
-      WORKER_ROUTER_TOKEN: ${WORKER_ROUTER_TOKEN}
-      ROUTER_STORAGE_BASE_URL: http://storage-gateway:8100
-      ROUTER_STORAGE_GATEWAY_TOKEN: ${STORAGE_GATEWAY_TOKEN}
-      ROUTER_STORAGE_CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-}
-      ROUTER_STORAGE_CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-}
-      ROUTER_MLFLOW_BASE_URL: http://mlflow:${MLFLOW_PORT:-5000}
-      ROUTER_MLFLOW_CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-}
-      ROUTER_MLFLOW_CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-}
+      GATEWAY_REQUIRE_CF_ACCESS: ${GATEWAY_REQUIRE_CF_ACCESS:-true}
+      CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-}
+      CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-}
+      STORAGE_API_HOST: ${STORAGE_API_HOST:-}
+      STORAGE_HUMAN_HOST: ${STORAGE_HUMAN_HOST:-}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      MINIO_AUTO_CREATE_BUCKET: ${MINIO_AUTO_CREATE_BUCKET:-true}
+      MINIO_PUBLIC_BASE_URL: ${MINIO_PUBLIC_BASE_URL:-}
+      ARTIFACT_BUCKET: ${ARTIFACT_BUCKET:-orchestrator-artifacts}
+      PRESIGN_TTL_DEFAULT: ${PRESIGN_TTL_DEFAULT:-900}
+      PRESIGN_TTL_MAX: ${PRESIGN_TTL_MAX:-3600}
+      MLFLOW_BACKEND_URL: http://mlflow:${MLFLOW_PORT:-5000}
     depends_on:
-      storage-gateway:
+      minio:
         condition: service_healthy
       mlflow:
         condition: service_healthy
@@ -146,8 +119,6 @@ services:
       - ./.cloudflared:/etc/cloudflared:ro
     depends_on:
       worker-router:
-        condition: service_healthy
-      storage-gateway:
         condition: service_healthy
       mlflow:
         condition: service_healthy

@@ -21,8 +21,9 @@ DEFAULT_BOOTSTRAP_PYTHON = "python3"
 REQUIRED_ENV = (
     "PREFECT_API_URL",
     "PREFECT_WORK_POOL",
-    "STORAGE_GATEWAY_URL",
-    "STORAGE_GATEWAY_TOKEN",
+    "WORKER_ROUTER_URL",
+    "CF_ACCESS_CLIENT_ID",
+    "CF_ACCESS_CLIENT_SECRET",
 )
 
 
@@ -92,12 +93,9 @@ def populate_colab_env(
         "XDG_CACHE_HOME": str(config.cache_root / "xdg"),
     }
     optional_keys = (
-        "PREFECT_CF_ACCESS_CLIENT_ID",
-        "PREFECT_CF_ACCESS_CLIENT_SECRET",
         "CF_ACCESS_CLIENT_ID",
         "CF_ACCESS_CLIENT_SECRET",
-        "STORAGE_GATEWAY_TOKEN",
-        "STORAGE_GATEWAY_URL",
+        "WORKER_ROUTER_URL",
     )
 
     os.environ["PYTHONPATH"] = str(config.repo_dir / "src")
@@ -129,12 +127,8 @@ def populate_colab_env(
         if key in os.environ:
             os.environ[key] = clean_env_value(os.environ.get(key))
 
-    cf_id = os.environ.get("PREFECT_CF_ACCESS_CLIENT_ID") or os.environ.get(
-        "CF_ACCESS_CLIENT_ID"
-    )
-    cf_secret = os.environ.get("PREFECT_CF_ACCESS_CLIENT_SECRET") or os.environ.get(
-        "CF_ACCESS_CLIENT_SECRET"
-    )
+    cf_id = os.environ.get("CF_ACCESS_CLIENT_ID")
+    cf_secret = os.environ.get("CF_ACCESS_CLIENT_SECRET")
     if cf_id and cf_secret:
         os.environ["PREFECT_CLIENT_CUSTOM_HEADERS"] = json.dumps(
             {
@@ -150,12 +144,8 @@ def populate_colab_env(
 
 
 def runtime_snapshot(config: ColabRuntimeConfig) -> dict[str, object]:
-    cf_id = os.environ.get("PREFECT_CF_ACCESS_CLIENT_ID") or os.environ.get(
-        "CF_ACCESS_CLIENT_ID"
-    )
-    cf_secret = os.environ.get("PREFECT_CF_ACCESS_CLIENT_SECRET") or os.environ.get(
-        "CF_ACCESS_CLIENT_SECRET"
-    )
+    cf_id = os.environ.get("CF_ACCESS_CLIENT_ID")
+    cf_secret = os.environ.get("CF_ACCESS_CLIENT_SECRET")
     return {
         **asdict(config),
         "repo_dir": str(config.repo_dir),
@@ -171,8 +161,7 @@ def runtime_snapshot(config: ColabRuntimeConfig) -> dict[str, object]:
         "has_prefect_custom_headers": bool(
             os.environ.get("PREFECT_CLIENT_CUSTOM_HEADERS")
         ),
-        "has_storage_gateway_url": bool(os.environ.get("STORAGE_GATEWAY_URL")),
-        "has_storage_gateway_token": bool(os.environ.get("STORAGE_GATEWAY_TOKEN")),
+        "worker_router_url": os.environ.get("WORKER_ROUTER_URL", ""),
     }
 
 

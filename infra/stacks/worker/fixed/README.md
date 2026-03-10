@@ -22,16 +22,14 @@ Required worker env:
 - `PREFECT_WORK_POOL=gpu-pool`
 - `PREFECT_WORK_QUEUE=gpu-fixed`
 - `WORKER_ROUTER_URL=https://discoverex.qzz.io`
-- `WORKER_ROUTER_TOKEN=<worker-router-token>`
 
 If Prefect is behind Cloudflare Access, also set either:
 
-- `PREFECT_CF_ACCESS_CLIENT_ID` / `PREFECT_CF_ACCESS_CLIENT_SECRET`
-- or `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`
+- `CF_ACCESS_CLIENT_ID`
+- `CF_ACCESS_CLIENT_SECRET`
 
 The entrypoint will merge those into `PREFECT_CLIENT_CUSTOM_HEADERS` automatically.
-Storage and MLflow credentials should not be configured on workers once router mode is enabled.
-`STORAGE_GATEWAY_URL` / `STORAGE_GATEWAY_TOKEN` are now legacy fallback values for rollback only.
+Storage and MLflow credentials should not be configured on workers. The worker uses the public gateway with Cloudflare Access only.
 
 ## 3) Operate
 
@@ -44,7 +42,6 @@ docker compose --env-file infra/stacks/worker/fixed/.env -f infra/stacks/worker/
 Expected startup summary:
 
 - `worker_router_url` should be populated
-- `storage_gateway_url` can be empty when router mode is active
 - Prefect custom headers should include Cloudflare keys only when Prefect itself is Access-protected
 
 ## Notes
