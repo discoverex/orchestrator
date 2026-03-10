@@ -31,6 +31,7 @@ packages = [
   "src/runner",
   "src/storage",
   "src/storage_gateway",
+  "src/worker_router",
 ]
 
 [tool.uv]

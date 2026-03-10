@@ -6,7 +6,7 @@ from pathlib import Path
 
 from prefect import task
 
-from flows.engine_run.http import http_json, upload_file
+from flows.engine_run.http import http_json, storage_base_url, upload_file
 from flows.engine_run.models import ArtifactLink
 from runner.git_runner import resolve_commit, run_entrypoint
 
@@ -18,7 +18,7 @@ def resolve_commit_task(repo_url: str, ref: str) -> str:
 
 @task
 def prepare_manifest_task(flow_run_id: str, attempt: int) -> list[ArtifactLink]:
-    gateway = os.getenv("STORAGE_GATEWAY_URL", "http://127.0.0.1:18100")
+    gateway = storage_base_url()
     payload = {
         "flow_run_id": flow_run_id,
         "attempt": attempt,

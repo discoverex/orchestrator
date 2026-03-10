@@ -25,6 +25,7 @@ class MLflowProxy:
     upstream_url: str
     cf_access_client_id: str
     cf_access_client_secret: str
+    extra_headers: dict[str, str] | None = None
     bind_host: str = "127.0.0.1"
 
     def __post_init__(self) -> None:
@@ -52,6 +53,7 @@ class MLflowProxy:
         upstream_url = self.upstream_url.rstrip("/")
         cf_id = self.cf_access_client_id
         cf_secret = self.cf_access_client_secret
+        extra_headers = dict(self.extra_headers or {})
 
         class ProxyHandler(http.server.BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"
@@ -85,8 +87,10 @@ class MLflowProxy:
                     for key, value in self.headers.items()
                     if key.lower() not in {"host", "content-length"}
                 }
-                headers["CF-Access-Client-Id"] = cf_id
-                headers["CF-Access-Client-Secret"] = cf_secret
+                if cf_id and cf_secret:
+                    headers["CF-Access-Client-Id"] = cf_id
+                    headers["CF-Access-Client-Secret"] = cf_secret
+                headers.update(extra_headers)
                 req = request.Request(
                     target,
                     method=self.command,
@@ -120,6 +124,27 @@ class MLflowProxy:
 
 @contextlib.contextmanager
 def maybe_start_mlflow_proxy(env: dict[str, str]) -> Iterator[dict[str, str]]:
+    router_url = env.get("WORKER_ROUTER_URL", "").strip().rstrip("/")
+    router_token = env.get("WORKER_ROUTER_TOKEN", "").strip()
+    if router_url and router_token:
+        proxy = MLflowProxy(
+            upstream_url=f"{router_url}/mlflow",
+            cf_access_client_id="",
+            cf_access_client_secret="",
+            extra_headers={"Authorization": f"Bearer {router_token}"},
+        )
+        proxy.start()
+        proxied_env = env.copy()
+        proxied_env["MLFLOW_TRACKING_URI"] = proxy.local_url
+        proxied_env["ORCH_REMOTE_MLFLOW_TRACKING_URI"] = f"{router_url}/mlflow"
+        proxied_env.pop("CF_ACCESS_CLIENT_ID", None)
+        proxied_env.pop("CF_ACCESS_CLIENT_SECRET", None)
+        try:
+            yield proxied_env
+        finally:
+            proxy.close()
+        return
+
     tracking_uri = env.get("MLFLOW_TRACKING_URI", "").strip()
     cf_id = env.get("CF_ACCESS_CLIENT_ID", "").strip()
     cf_secret = env.get("CF_ACCESS_CLIENT_SECRET", "").strip()

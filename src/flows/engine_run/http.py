@@ -8,7 +8,21 @@ from urllib import request
 WORKER_HTTP_USER_AGENT = "orchestrator-worker/1.0"
 
 
+def storage_base_url() -> str:
+    router_url = os.getenv("WORKER_ROUTER_URL", "").strip().rstrip("/")
+    if router_url:
+        return f"{router_url}/storage"
+    return os.getenv("STORAGE_GATEWAY_URL", "http://127.0.0.1:18100").rstrip("/")
+
+
 def gateway_headers() -> dict[str, str]:
+    router_token = os.getenv("WORKER_ROUTER_TOKEN", "").strip()
+    if router_token and os.getenv("WORKER_ROUTER_URL", "").strip():
+        return {
+            "Authorization": f"Bearer {router_token}",
+            "Content-Type": "application/json",
+            "User-Agent": WORKER_HTTP_USER_AGENT,
+        }
     token = os.getenv("STORAGE_GATEWAY_TOKEN", "dev-storage-token")
     return {
         "Authorization": f"Bearer {token}",
