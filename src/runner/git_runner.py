@@ -10,8 +10,8 @@ from pathlib import Path
 from tempfile import mkdtemp
 from urllib.parse import unquote, urlsplit
 
-from .models import RunArtifacts
 from .mlflow_proxy import maybe_start_mlflow_proxy
+from .models import RunArtifacts
 
 _SHA1 = re.compile(r"^[0-9a-f]{40}$")
 _GITHUB_SSH = re.compile(r"^git@github\.com:(?P<repo>.+?)(?:\.git)?$")
@@ -113,10 +113,18 @@ def _prepare_per_repo_venv(workdir: Path, merged_env: dict[str, str]) -> None:
     if not (workdir / "pyproject.toml").exists():
         return
 
-    sync_cmd = [uv_bin, "sync", "--frozen"] if (workdir / "uv.lock").exists() else [uv_bin, "sync"]
-    proc = subprocess.run(sync_cmd, cwd=workdir, env=merged_env, capture_output=True, text=True)
+    sync_cmd = (
+        [uv_bin, "sync", "--frozen"]
+        if (workdir / "uv.lock").exists()
+        else [uv_bin, "sync"]
+    )
+    proc = subprocess.run(
+        sync_cmd, cwd=workdir, env=merged_env, capture_output=True, text=True
+    )
     if proc.returncode != 0:
-        raise RunnerError(f"venv setup failed: {' '.join(sync_cmd)}\n{proc.stderr.strip()}")
+        raise RunnerError(
+            f"venv setup failed: {' '.join(sync_cmd)}\n{proc.stderr.strip()}"
+        )
 
 
 def resolve_commit(repo_url: str, ref: str) -> str:

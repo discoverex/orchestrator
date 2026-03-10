@@ -5,9 +5,12 @@ import os
 import uuid
 from dataclasses import dataclass
 from urllib import error, request
-from urllib.parse import urlencode
 
-from fastapi import APIRouter, FastAPI, Header, HTTPException, Request, Response
+from fastapi import APIRouter, FastAPI, Header, Request, Response
+
+from common.cloudflare_access import normalize_host, require_service_token
+from storage.composition.container import build_storage_app_from_env
+from storage.interfaces import build_artifact_router
 
 logger = logging.getLogger("worker_router")
 
@@ -19,50 +22,56 @@ class UpstreamConfig:
     headers: dict[str, str]
 
 
-def _optional_cf_headers(prefix: str = "") -> dict[str, str]:
-    cf_id = os.getenv(f"{prefix}CF_ACCESS_CLIENT_ID", "").strip()
-    cf_secret = os.getenv(f"{prefix}CF_ACCESS_CLIENT_SECRET", "").strip()
-    if cf_id and cf_secret:
-        return {
-            "CF-Access-Client-Id": cf_id,
-            "CF-Access-Client-Secret": cf_secret,
-        }
-    return {}
-
-
-def _worker_auth_token() -> str:
-    return os.getenv("WORKER_ROUTER_TOKEN", "dev-worker-router-token")
-
-
-def _storage_upstream() -> UpstreamConfig:
-    token = os.getenv("ROUTER_STORAGE_GATEWAY_TOKEN", os.getenv("STORAGE_GATEWAY_TOKEN", "dev-storage-token"))
-    headers = {
-        "Authorization": f"Bearer {token}",
-    }
-    headers.update(_optional_cf_headers("ROUTER_STORAGE_"))
-    return UpstreamConfig(
-        name="storage",
-        base_url=os.getenv("ROUTER_STORAGE_BASE_URL", "http://storage-gateway:8100"),
-        headers=headers,
-    )
-
-
 def _mlflow_upstream() -> UpstreamConfig:
-    headers = _optional_cf_headers("ROUTER_MLFLOW_")
-    auth = os.getenv("ROUTER_MLFLOW_AUTHORIZATION", "").strip()
+    headers: dict[str, str] = {}
+    auth = os.getenv("MLFLOW_INTERNAL_AUTHORIZATION", "").strip()
     if auth:
         headers["Authorization"] = auth
     return UpstreamConfig(
         name="mlflow",
-        base_url=os.getenv("ROUTER_MLFLOW_BASE_URL", "http://mlflow:5000"),
+        base_url=os.getenv("MLFLOW_BACKEND_URL", "http://mlflow:5000"),
         headers=headers,
     )
 
 
-def _check_worker_auth(authorization: str | None) -> None:
-    expected = f"Bearer {_worker_auth_token()}"
-    if authorization != expected:
-        raise HTTPException(status_code=401, detail="unauthorized")
+def _check_gateway_auth(
+    cf_access_client_id: str | None, cf_access_client_secret: str | None
+) -> None:
+    require_service_token(
+        enabled=os.getenv("GATEWAY_REQUIRE_CF_ACCESS", "true").lower()
+        in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        },
+        expected_id=os.getenv("CF_ACCESS_CLIENT_ID", "").strip(),
+        expected_secret=os.getenv("CF_ACCESS_CLIENT_SECRET", "").strip(),
+        provided_id=cf_access_client_id,
+        provided_secret=cf_access_client_secret,
+    )
+
+
+def _storage_host_mode(request_in: Request) -> str:
+    host = normalize_host(request_in.headers.get("host"))
+    storage_api_host = normalize_host(os.getenv("STORAGE_API_HOST", ""))
+    storage_human_host = normalize_host(os.getenv("STORAGE_HUMAN_HOST", ""))
+    if storage_api_host and host == storage_api_host:
+        return "machine"
+    if storage_human_host and host == storage_human_host:
+        return "human"
+    return "compat"
+
+
+def _authorize_storage_request(
+    request_in: Request,
+    cf_access_client_id: str | None,
+    cf_access_client_secret: str | None,
+) -> None:
+    mode = _storage_host_mode(request_in)
+    if mode == "human":
+        return
+    _check_gateway_auth(cf_access_client_id, cf_access_client_secret)
 
 
 async def _proxy(request_in: Request, upstream: UpstreamConfig, path: str) -> Response:
@@ -77,7 +86,13 @@ async def _proxy(request_in: Request, upstream: UpstreamConfig, path: str) -> Re
         key: value
         for key, value in request_in.headers.items()
         if key.lower()
-        not in {"host", "content-length", "authorization", "cf-access-client-id", "cf-access-client-secret"}
+        not in {
+            "host",
+            "content-length",
+            "authorization",
+            "cf-access-client-id",
+            "cf-access-client-secret",
+        }
     }
     forward_headers.update(upstream.headers)
     forward_headers["X-Request-Id"] = request_id
@@ -93,7 +108,8 @@ async def _proxy(request_in: Request, upstream: UpstreamConfig, path: str) -> Re
             headers = {
                 key: value
                 for key, value in resp.headers.items()
-                if key.lower() not in {"transfer-encoding", "content-length", "connection"}
+                if key.lower()
+                not in {"transfer-encoding", "content-length", "connection"}
             }
             headers["X-Request-Id"] = request_id
             logger.info(
@@ -120,7 +136,10 @@ async def _proxy(request_in: Request, upstream: UpstreamConfig, path: str) -> Re
         return Response(
             content=payload,
             status_code=exc.code,
-            headers={"X-Request-Id": request_id, "Content-Type": exc.headers.get("Content-Type", "application/json")},
+            headers={
+                "X-Request-Id": request_id,
+                "Content-Type": exc.headers.get("Content-Type", "application/json"),
+            },
         )
     except error.URLError as exc:
         logger.error(
@@ -134,7 +153,7 @@ async def _proxy(request_in: Request, upstream: UpstreamConfig, path: str) -> Re
         return Response(
             content=(
                 f'{{"upstream":"{upstream.name}","detail":"{str(exc.reason)}","request_id":"{request_id}"}}'
-            ).encode("utf-8"),
+            ).encode(),
             status_code=502,
             media_type="application/json",
             headers={"X-Request-Id": request_id},
@@ -144,30 +163,40 @@ async def _proxy(request_in: Request, upstream: UpstreamConfig, path: str) -> Re
 def create_app() -> FastAPI:
     app = FastAPI(title="orchestrator-worker-router")
     router = APIRouter()
-    storage = _storage_upstream()
     mlflow = _mlflow_upstream()
+    storage_app = build_storage_app_from_env()
+    app.state.storage_app = storage_app
 
     @router.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
-    @router.api_route("/storage/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"])
-    async def storage_proxy(
-        path: str,
-        request_in: Request,
-        authorization: str | None = Header(default=None),
-    ) -> Response:
-        _check_worker_auth(authorization)
-        return await _proxy(request_in, storage, path)
-
-    @router.api_route("/mlflow/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"])
+    @router.api_route(
+        "/mlflow/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]
+    )
     async def mlflow_proxy(
         path: str,
         request_in: Request,
-        authorization: str | None = Header(default=None),
+        cf_access_client_id: str | None = Header(default=None),
+        cf_access_client_secret: str | None = Header(default=None),
     ) -> Response:
-        _check_worker_auth(authorization)
+        _check_gateway_auth(cf_access_client_id, cf_access_client_secret)
         return await _proxy(request_in, mlflow, path)
 
     app.include_router(router)
+    app.include_router(
+        build_artifact_router(
+            storage_app,
+            _authorize_storage_request,
+            prefix="/artifact",
+        )
+    )
+    # Compatibility path for existing WORKER_ROUTER_URL clients.
+    app.include_router(
+        build_artifact_router(
+            storage_app,
+            _authorize_storage_request,
+            prefix="/storage/artifact",
+        )
+    )
     return app

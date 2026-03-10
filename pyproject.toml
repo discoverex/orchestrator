@@ -1,7 +1,7 @@
 [project]
 name = "orchestrator"
 version = "0.1.0"
-description = "Prefect-based orchestration with runner and storage gateway"
+description = "Prefect-based orchestration with runner and storage API"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -30,7 +30,6 @@ packages = [
   "src/flows",
   "src/runner",
   "src/storage",
-  "src/storage_gateway",
   "src/worker_router",
 ]
 

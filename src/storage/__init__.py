@@ -8,6 +8,18 @@ from storage.application import (
 )
 from storage.composition import build_storage_app_from_env
 from storage.domain.models.object_ref import ObjectListEntry, ObjectRef, ObjectStat
+from storage.interfaces import (
+    ArtifactKind,
+    BatchPresignRequest,
+    HeadRequest,
+    HeadResponse,
+    PresignRequest,
+    PresignResponse,
+    authorize,
+    authorize_dependency,
+    build_artifact_router,
+)
+from storage.main import app, create_app
 
 __all__ = [
     "ExplorerHeadResult",
@@ -16,9 +28,20 @@ __all__ = [
     "ObjectListEntry",
     "ObjectRef",
     "ObjectStat",
+    "ArtifactKind",
+    "BatchPresignRequest",
+    "HeadRequest",
+    "HeadResponse",
     "PresignEntry",
+    "PresignRequest",
     "PresignResult",
+    "PresignResponse",
     "StorageApplicationService",
+    "app",
+    "authorize",
+    "authorize_dependency",
+    "build_artifact_router",
     "build_storage_app_from_env",
+    "create_app",
     "parse_s3_uri",
 ]

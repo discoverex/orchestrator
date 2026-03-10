@@ -9,32 +9,37 @@ WORKER_HTTP_USER_AGENT = "orchestrator-worker/1.0"
 
 
 def storage_base_url() -> str:
+    storage_api_url = os.getenv("STORAGE_API_URL", "").strip().rstrip("/")
+    if storage_api_url:
+        return f"{storage_api_url}/artifact"
     router_url = os.getenv("WORKER_ROUTER_URL", "").strip().rstrip("/")
-    if router_url:
-        return f"{router_url}/storage"
-    return os.getenv("STORAGE_GATEWAY_URL", "http://127.0.0.1:18100").rstrip("/")
+    if not router_url:
+        raise RuntimeError(
+            "missing required environment variable: STORAGE_API_URL or WORKER_ROUTER_URL"
+        )
+    return f"{router_url}/storage/artifact"
 
 
 def gateway_headers() -> dict[str, str]:
-    router_token = os.getenv("WORKER_ROUTER_TOKEN", "").strip()
-    if router_token and os.getenv("WORKER_ROUTER_URL", "").strip():
-        return {
-            "Authorization": f"Bearer {router_token}",
-            "Content-Type": "application/json",
-            "User-Agent": WORKER_HTTP_USER_AGENT,
-        }
-    token = os.getenv("STORAGE_GATEWAY_TOKEN", "dev-storage-token")
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "User-Agent": WORKER_HTTP_USER_AGENT,
-    }
     cf_id = os.getenv("CF_ACCESS_CLIENT_ID", "").strip()
     cf_secret = os.getenv("CF_ACCESS_CLIENT_SECRET", "").strip()
-    if cf_id and cf_secret:
-        headers["CF-Access-Client-Id"] = cf_id
-        headers["CF-Access-Client-Secret"] = cf_secret
-    return headers
+    if (
+        not (
+            os.getenv("STORAGE_API_URL", "").strip()
+            or os.getenv("WORKER_ROUTER_URL", "").strip()
+        )
+        or not cf_id
+        or not cf_secret
+    ):
+        raise RuntimeError(
+            "missing required environment variables: STORAGE_API_URL or WORKER_ROUTER_URL, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET"
+        )
+    return {
+        "Content-Type": "application/json",
+        "User-Agent": WORKER_HTTP_USER_AGENT,
+        "CF-Access-Client-Id": cf_id,
+        "CF-Access-Client-Secret": cf_secret,
+    }
 
 
 def http_json(
@@ -49,7 +54,7 @@ def http_json(
     except json.JSONDecodeError as exc:
         preview = text[:200].replace("\n", "\\n")
         raise RuntimeError(
-            f"non-json response from storage gateway: {preview}"
+            f"non-json response from storage API: {preview}"
         ) from exc
     if isinstance(parsed, dict):
         return cast(dict[str, object], parsed)

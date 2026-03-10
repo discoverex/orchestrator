@@ -38,7 +38,9 @@ class MLflowProxy:
 
     @property
     def local_url(self) -> str:
-        host, port = self._server.server_address
+        address = self._server.server_address
+        host = str(address[0])
+        port = int(address[1])
         return f"http://{host}:{port}"
 
     def start(self) -> None:
@@ -125,13 +127,13 @@ class MLflowProxy:
 @contextlib.contextmanager
 def maybe_start_mlflow_proxy(env: dict[str, str]) -> Iterator[dict[str, str]]:
     router_url = env.get("WORKER_ROUTER_URL", "").strip().rstrip("/")
-    router_token = env.get("WORKER_ROUTER_TOKEN", "").strip()
-    if router_url and router_token:
+    cf_id = env.get("CF_ACCESS_CLIENT_ID", "").strip()
+    cf_secret = env.get("CF_ACCESS_CLIENT_SECRET", "").strip()
+    if router_url and cf_id and cf_secret:
         proxy = MLflowProxy(
             upstream_url=f"{router_url}/mlflow",
-            cf_access_client_id="",
-            cf_access_client_secret="",
-            extra_headers={"Authorization": f"Bearer {router_token}"},
+            cf_access_client_id=cf_id,
+            cf_access_client_secret=cf_secret,
         )
         proxy.start()
         proxied_env = env.copy()
@@ -146,8 +148,6 @@ def maybe_start_mlflow_proxy(env: dict[str, str]) -> Iterator[dict[str, str]]:
         return
 
     tracking_uri = env.get("MLFLOW_TRACKING_URI", "").strip()
-    cf_id = env.get("CF_ACCESS_CLIENT_ID", "").strip()
-    cf_secret = env.get("CF_ACCESS_CLIENT_SECRET", "").strip()
     if (
         not tracking_uri
         or not _is_remote_http_url(tracking_uri)
