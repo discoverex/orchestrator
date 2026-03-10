@@ -28,11 +28,10 @@ PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py bootstrap
   --cache-root /content/drive/MyDrive/discoverex/cache
 ```
 
-This upgrades `pip/setuptools/wheel` in the current Colab interpreter and installs
-the project in editable mode with:
-
-- `--no-build-isolation`
-- `--use-feature=fast-deps`
+This installs the runtime dependencies declared in `pyproject.toml` into the
+current Colab interpreter. The worker code itself is loaded from the checked-out
+repository through `PYTHONPATH=<repo>/src`, so bootstrap does not need an editable
+package install.
 
 The pip and resolver cache is reused from Drive through:
 
