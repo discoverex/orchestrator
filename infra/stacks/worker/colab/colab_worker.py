@@ -57,7 +57,7 @@ def ensure_runtime_ready(skip_install: bool) -> None:
     raise RuntimeError(
         "prefect>=3 is not installed in the current interpreter. "
         "Run bootstrap first, then start the worker with "
-        f"{Path('/content/venv') / 'bin' / 'python'} "
+        f"{sys.executable} "
         "infra/stacks/worker/colab/colab_worker_runner.py start"
     )
 

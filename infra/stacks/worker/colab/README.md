@@ -5,9 +5,7 @@ Use this runtime layout:
 
 - repo: Google Drive
 - pip/XDG cache: Google Drive
-- virtualenv: `/content/venv`
-
-Do not create the virtualenv on Google Drive.
+- Python packages: current Colab interpreter (global for the VM session)
 
 ## 1) Required env
 
@@ -27,12 +25,11 @@ Set these before start:
 ```bash
 PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py bootstrap \
   --repo-dir /content/drive/MyDrive/discoverex/orchestrator \
-  --cache-root /content/drive/MyDrive/discoverex/cache \
-  --venv-dir /content/venv
+  --cache-root /content/drive/MyDrive/discoverex/cache
 ```
 
-This recreates `/content/venv`, upgrades `pip/setuptools/wheel`, and installs the
-project in editable mode with:
+This upgrades `pip/setuptools/wheel` in the current Colab interpreter and installs
+the project in editable mode with:
 
 - `--no-build-isolation`
 - `--use-feature=fast-deps`
@@ -45,7 +42,7 @@ The pip and resolver cache is reused from Drive through:
 ## 3) Start worker
 
 ```bash
-/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py start \
+python infra/stacks/worker/colab/colab_worker_runner.py start \
   --skip-install \
   --checkpoint-dir /content/drive/MyDrive/orchestrator/checkpoints
 ```
@@ -58,9 +55,9 @@ the current interpreter. When Cloudflare Access env vars are present, it also ex
 ## 4) Status / logs / stop
 
 ```bash
-/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py status
-/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py logs --tail 80
-/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py stop
+python infra/stacks/worker/colab/colab_worker_runner.py status
+python infra/stacks/worker/colab/colab_worker_runner.py logs --tail 80
+python infra/stacks/worker/colab/colab_worker_runner.py stop
 ```
 
 ## Notebook (optional)

@@ -13,7 +13,6 @@ from colab_runtime import (
     DEFAULT_LOG_PATH,
     DEFAULT_PID_PATH,
     DEFAULT_REPO_DIR,
-    DEFAULT_VENV_DIR,
     ColabRuntimeConfig,
     populate_colab_env,
 )
@@ -31,7 +30,6 @@ def build_runtime_config(
     *,
     repo_dir: Path = DEFAULT_REPO_DIR,
     cache_root: Path = DEFAULT_CACHE_ROOT,
-    venv_dir: Path = DEFAULT_VENV_DIR,
     checkpoint_dir: Path = DEFAULT_CHECKPOINT_DIR,
     pid_file: Path = DEFAULT_PID_PATH,
     log_file: Path = DEFAULT_LOG_PATH,
@@ -40,7 +38,6 @@ def build_runtime_config(
     return ColabRuntimeConfig(
         repo_dir=repo_dir,
         cache_root=cache_root,
-        venv_dir=venv_dir,
         checkpoint_dir=checkpoint_dir,
         pid_file=pid_file,
         log_file=log_file,

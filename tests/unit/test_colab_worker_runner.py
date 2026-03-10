@@ -28,7 +28,6 @@ def _build_config(runtime_mod: ModuleType, tmp_path: Path) -> object:
     return runtime_mod.ColabRuntimeConfig(
         repo_dir=tmp_path / "repo",
         cache_root=tmp_path / "cache",
-        venv_dir=tmp_path / "venv",
         checkpoint_dir=tmp_path / "checkpoints",
         pid_file=tmp_path / "worker.pid",
         log_file=tmp_path / "worker.log",
@@ -115,86 +114,6 @@ def test_prepare_cache_dirs_creates_pip_and_xdg_only(tmp_path: Path) -> None:
     assert sorted(path.name for path in cache_root.iterdir()) == ["pip", "xdg"]
 
 
-def test_recreate_venv_removes_existing_dir_before_creation(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    runtime = _load_module("colab_runtime")
-    bootstrap = _load_module("colab_bootstrap")
-    config = _build_config(runtime, tmp_path)
-    config.venv_dir.mkdir(parents=True)
-    calls: list[tuple[str, object]] = []
-
-    def fake_rmtree(path: Path) -> None:
-        calls.append(("rmtree", path))
-
-    def fake_run_command(**kwargs: object) -> object:
-        raise AssertionError("unexpected kwargs-only call")
-
-    def fake_run(
-        cmd: list[str],
-        *,
-        env: dict[str, str] | None = None,
-        cwd: Path | None = None,
-        check: bool = True,
-        step: str,
-    ) -> object:
-        del env, cwd, check, step
-        calls.append(("run", cmd))
-        bin_dir = config.venv_dir / "bin"
-        bin_dir.mkdir(parents=True, exist_ok=True)
-        (bin_dir / "python").write_text("", encoding="utf-8")
-        return SimpleNamespace(output="")
-
-    monkeypatch.setattr(bootstrap.shutil, "rmtree", fake_rmtree)
-    monkeypatch.setattr(bootstrap, "run_command", fake_run)
-
-    python_path = bootstrap.recreate_venv(config, {})
-
-    assert calls == [
-        ("rmtree", config.venv_dir),
-        ("run", ["python3", "-m", "venv", str(config.venv_dir)]),
-    ]
-    assert python_path == config.venv_dir / "bin" / "python"
-
-
-def test_recreate_venv_falls_back_to_virtualenv_when_venv_fails(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    runtime = _load_module("colab_runtime")
-    bootstrap = _load_module("colab_bootstrap")
-    config = _build_config(runtime, tmp_path)
-    calls: list[list[str]] = []
-
-    def fake_run(
-        cmd: list[str],
-        *,
-        env: dict[str, str] | None = None,
-        cwd: Path | None = None,
-        check: bool = True,
-        step: str,
-    ) -> object:
-        del env, cwd, check, step
-        calls.append(cmd)
-        if cmd[:3] == ["python3", "-m", "venv"]:
-            raise RuntimeError("venv failed")
-        if cmd[:3] == ["python3", "-m", "virtualenv"]:
-            bin_dir = config.venv_dir / "bin"
-            bin_dir.mkdir(parents=True, exist_ok=True)
-            (bin_dir / "python").write_text("", encoding="utf-8")
-        return SimpleNamespace(output="")
-
-    monkeypatch.setattr(bootstrap, "run_command", fake_run)
-
-    python_path = bootstrap.recreate_venv(config, {})
-
-    assert calls == [
-        ["python3", "-m", "venv", str(config.venv_dir)],
-        ["python3", "-m", "pip", "install", "-U", "virtualenv"],
-        ["python3", "-m", "virtualenv", str(config.venv_dir)],
-    ]
-    assert python_path == config.venv_dir / "bin" / "python"
-
-
 def test_bootstrap_runtime_uses_editable_no_build_isolation_and_fast_deps(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -203,11 +122,6 @@ def test_bootstrap_runtime_uses_editable_no_build_isolation_and_fast_deps(
     config = _build_config(runtime, tmp_path)
     config.repo_dir.mkdir()
     commands: list[list[str]] = []
-
-    def fake_recreate(target_config: object, env: dict[str, str]) -> Path:
-        assert target_config == config
-        assert env["PIP_CACHE_DIR"] == str(config.cache_root / "pip")
-        return config.venv_python
 
     def fake_run(
         cmd: list[str],
@@ -222,14 +136,13 @@ def test_bootstrap_runtime_uses_editable_no_build_isolation_and_fast_deps(
         return SimpleNamespace(output="ok")
 
     monkeypatch.setattr(bootstrap, "ensure_drive_mounted", lambda: None)
-    monkeypatch.setattr(bootstrap, "recreate_venv", fake_recreate)
     monkeypatch.setattr(bootstrap, "run_command", fake_run)
 
     bootstrap.bootstrap_runtime(config)
 
     assert commands == [
         [
-            str(config.venv_python),
+            "python3",
             "-m",
             "pip",
             "install",
@@ -239,7 +152,7 @@ def test_bootstrap_runtime_uses_editable_no_build_isolation_and_fast_deps(
             "wheel",
         ],
         [
-            str(config.venv_python),
+            "python3",
             "-m",
             "pip",
             "install",
@@ -248,13 +161,13 @@ def test_bootstrap_runtime_uses_editable_no_build_isolation_and_fast_deps(
             "--no-build-isolation",
             "--use-feature=fast-deps",
         ],
-        [str(config.venv_python), "-m", "pip", "show", "orchestrator"],
-        [str(config.venv_python), "--version"],
+        ["python3", "-m", "pip", "show", "orchestrator"],
+        ["python3", "--version"],
     ]
     output = capsys.readouterr().out
     assert f"ready repo={config.repo_dir}" in output
     assert f"ready cache={config.cache_root}" in output
-    assert f"ready venv={config.venv_dir}" in output
+    assert "ready python=python3" in output
 
 
 def test_ensure_drive_mounted_requires_drive(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -326,7 +239,6 @@ def test_runner_main_dispatches_status(monkeypatch: pytest.MonkeyPatch) -> None:
             checkpoint_dir="/tmp/checkpoints",
             repo_dir="/tmp/repo",
             cache_root="/tmp/cache",
-            venv_dir="/tmp/venv",
             python_bin="python3",
             skip_install=False,
         ),

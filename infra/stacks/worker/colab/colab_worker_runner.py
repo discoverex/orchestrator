@@ -20,7 +20,6 @@ DEFAULT_CHECKPOINT_DIR = runtime.DEFAULT_CHECKPOINT_DIR
 DEFAULT_LOG_PATH = runtime.DEFAULT_LOG_PATH
 DEFAULT_PID_PATH = runtime.DEFAULT_PID_PATH
 DEFAULT_REPO_DIR = runtime.DEFAULT_REPO_DIR
-DEFAULT_VENV_DIR = runtime.DEFAULT_VENV_DIR
 resolve_path = runtime.resolve_path
 read_worker_logs = worker.read_worker_logs
 start_worker = worker.start_worker
@@ -41,7 +40,6 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint-dir", default=str(DEFAULT_CHECKPOINT_DIR))
     parser.add_argument("--repo-dir", default=str(DEFAULT_REPO_DIR))
     parser.add_argument("--cache-root", default=str(DEFAULT_CACHE_ROOT))
-    parser.add_argument("--venv-dir", default=str(DEFAULT_VENV_DIR))
     parser.add_argument("--python-bin", default=DEFAULT_BOOTSTRAP_PYTHON)
     parser.add_argument(
         "--skip-install",
@@ -55,7 +53,6 @@ def _config_from_args(args: argparse.Namespace) -> ColabRuntimeConfig:
     return ColabRuntimeConfig(
         repo_dir=resolve_path(Path(args.repo_dir)),
         cache_root=resolve_path(Path(args.cache_root)),
-        venv_dir=resolve_path(Path(args.venv_dir)),
         checkpoint_dir=resolve_path(Path(args.checkpoint_dir)),
         pid_file=resolve_path(Path(args.pid_file)),
         log_file=resolve_path(Path(args.log_file)),

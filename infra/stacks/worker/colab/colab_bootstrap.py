@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,7 +12,6 @@ from colab_runtime import ColabRuntimeConfig
 class BootstrapResult:
     repo_dir: Path
     cache_root: Path
-    venv_dir: Path
     python_version: str
     package_metadata: str
 
@@ -44,53 +42,20 @@ def bootstrap_env(cache_root: Path) -> dict[str, str]:
     return env
 
 
-def recreate_venv(config: ColabRuntimeConfig, env: dict[str, str]) -> Path:
-    if config.venv_dir.exists():
-        log_step("bootstrap", f"remove existing venv {config.venv_dir}")
-        shutil.rmtree(config.venv_dir)
-    try:
-        run_command(
-            [config.python_bin, "-m", "venv", str(config.venv_dir)],
-            env=env,
-            step="bootstrap",
-        )
-    except RuntimeError:
-        log_step(
-            "bootstrap",
-            "python -m venv failed; falling back to virtualenv bootstrap",
-        )
-        run_command(
-            [config.python_bin, "-m", "pip", "install", "-U", "virtualenv"],
-            env=env,
-            step="bootstrap",
-        )
-        run_command(
-            [config.python_bin, "-m", "virtualenv", str(config.venv_dir)],
-            env=env,
-            step="bootstrap",
-        )
-    if not config.venv_python.exists():
-        raise RuntimeError(
-            f"virtualenv creation failed: {config.venv_python} not found"
-        )
-    return config.venv_python
-
-
 def bootstrap_runtime(config: ColabRuntimeConfig) -> BootstrapResult:
     ensure_drive_mounted()
     ensure_repo_dir(config.repo_dir)
     prepare_cache_dirs(config.cache_root)
     env = bootstrap_env(config.cache_root)
-    venv_python = recreate_venv(config, env)
     run_command(
-        [str(venv_python), "-m", "pip", "install", "-U", "pip", "setuptools", "wheel"],
+        [config.python_bin, "-m", "pip", "install", "-U", "pip", "setuptools", "wheel"],
         env=env,
         cwd=config.repo_dir,
         step="bootstrap",
     )
     run_command(
         [
-            str(venv_python),
+            config.python_bin,
             "-m",
             "pip",
             "install",
@@ -104,22 +69,21 @@ def bootstrap_runtime(config: ColabRuntimeConfig) -> BootstrapResult:
         step="bootstrap",
     )
     package_metadata = run_command(
-        [str(venv_python), "-m", "pip", "show", "orchestrator"],
+        [config.python_bin, "-m", "pip", "show", "orchestrator"],
         env=env,
         step="bootstrap",
     ).output.strip()
     python_version = run_command(
-        [str(venv_python), "--version"],
+        [config.python_bin, "--version"],
         env=env,
         step="bootstrap",
     ).output.strip()
     log_step("bootstrap", f"ready repo={config.repo_dir}")
     log_step("bootstrap", f"ready cache={config.cache_root}")
-    log_step("bootstrap", f"ready venv={config.venv_dir}")
+    log_step("bootstrap", f"ready python={config.python_bin}")
     return BootstrapResult(
         repo_dir=config.repo_dir,
         cache_root=config.cache_root,
-        venv_dir=config.venv_dir,
         python_version=python_version,
         package_metadata=package_metadata,
     )

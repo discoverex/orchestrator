@@ -16,7 +16,6 @@ DEFAULT_LOG_PATH = Path("/tmp/orchestrator-colab-worker.log")
 DEFAULT_DRIVE_ROOT = Path("/content/drive/MyDrive/discoverex")
 DEFAULT_REPO_DIR = DEFAULT_DRIVE_ROOT / "orchestrator"
 DEFAULT_CACHE_ROOT = DEFAULT_DRIVE_ROOT / "cache"
-DEFAULT_VENV_DIR = Path("/content/venv")
 DEFAULT_CHECKPOINT_DIR = Path("/content/drive/MyDrive/orchestrator/checkpoints")
 DEFAULT_BOOTSTRAP_PYTHON = "python3"
 REQUIRED_ENV = (
@@ -31,15 +30,10 @@ REQUIRED_ENV = (
 class ColabRuntimeConfig:
     repo_dir: Path
     cache_root: Path
-    venv_dir: Path
     checkpoint_dir: Path
     pid_file: Path
     log_file: Path
     python_bin: str = DEFAULT_BOOTSTRAP_PYTHON
-
-    @property
-    def venv_python(self) -> Path:
-        return self.venv_dir / "bin" / "python"
 
 
 def clean_env_value(value: str | None) -> str:
@@ -166,7 +160,6 @@ def runtime_snapshot(config: ColabRuntimeConfig) -> dict[str, object]:
         **asdict(config),
         "repo_dir": str(config.repo_dir),
         "cache_root": str(config.cache_root),
-        "venv_dir": str(config.venv_dir),
         "checkpoint_dir": str(config.checkpoint_dir),
         "pid_file": str(config.pid_file),
         "log_file": str(config.log_file),
