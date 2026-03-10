@@ -79,7 +79,7 @@ def main() -> int:
                 print(line)
             return 0
         if args.command == "stop":
-            status = stop_worker(config.pid_file)
+            status = stop_worker(config.pid_file, config.log_file)
             print(status.message)
             return 0
     except RuntimeError as exc:

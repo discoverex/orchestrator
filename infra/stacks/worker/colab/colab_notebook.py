@@ -81,7 +81,7 @@ def bootstrap_notebook_runtime(config: ColabRuntimeConfig) -> BootstrapResult:
 
 
 def restart_worker(config: ColabRuntimeConfig, *, tail: int = 120) -> WorkerStartResult:
-    stop_message = stop_worker(config.pid_file)
+    stop_message = stop_worker(config.pid_file, config.log_file)
     print(stop_message.message)
     config.log_file.parent.mkdir(parents=True, exist_ok=True)
     config.log_file.write_text("", encoding="utf-8")
@@ -107,6 +107,6 @@ def show_worker_logs(config: ColabRuntimeConfig, *, tail: int = 120) -> list[str
 
 
 def stop_notebook_worker(config: ColabRuntimeConfig) -> WorkerStatusResult:
-    status = stop_worker(config.pid_file)
+    status = stop_worker(config.pid_file, config.log_file)
     print(status.message)
     return status

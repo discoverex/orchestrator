@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,34 +43,35 @@ def bootstrap_env(cache_root: Path) -> dict[str, str]:
     return env
 
 
+def project_runtime_requirements(repo_dir: Path) -> list[str]:
+    pyproject_path = repo_dir / "pyproject.toml"
+    if not pyproject_path.exists():
+        return []
+    pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    project = pyproject.get("project")
+    if not isinstance(project, dict):
+        return []
+    requires = project.get("dependencies")
+    if not isinstance(requires, list):
+        return []
+    return [str(req) for req in requires]
+
+
 def bootstrap_runtime(config: ColabRuntimeConfig) -> BootstrapResult:
     ensure_drive_mounted()
     ensure_repo_dir(config.repo_dir)
     prepare_cache_dirs(config.cache_root)
     env = bootstrap_env(config.cache_root)
-    run_command(
-        [config.python_bin, "-m", "pip", "install", "-U", "pip", "setuptools", "wheel"],
-        env=env,
-        cwd=config.repo_dir,
-        step="bootstrap",
-    )
-    run_command(
-        [
-            config.python_bin,
-            "-m",
-            "pip",
-            "install",
-            "-e",
-            str(config.repo_dir),
-            "--no-build-isolation",
-            "--use-feature=fast-deps",
-        ],
-        env=env,
-        cwd=config.repo_dir,
-        step="bootstrap",
-    )
+    runtime_deps = project_runtime_requirements(config.repo_dir)
+    if runtime_deps:
+        run_command(
+            [config.python_bin, "-m", "pip", "install", *runtime_deps],
+            env=env,
+            cwd=config.repo_dir,
+            step="bootstrap",
+        )
     package_metadata = run_command(
-        [config.python_bin, "-m", "pip", "show", "orchestrator"],
+        [config.python_bin, "-m", "pip", "show", "prefect"],
         env=env,
         step="bootstrap",
     ).output.strip()

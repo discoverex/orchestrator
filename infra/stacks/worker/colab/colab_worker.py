@@ -6,7 +6,9 @@ import os
 import signal
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from colab_exec import log_step, run_command
@@ -25,6 +27,38 @@ class WorkerStartResult:
     pid: int
     log_file: Path
     checkpoint_dir: Path
+
+
+def _worker_log_timestamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
+def append_worker_log_banner(
+    log_file: Path,
+    *,
+    position: str,
+    pid: int | None,
+    work_pool: str | None = None,
+    work_queue: str | None = None,
+    note: str | None = None,
+) -> None:
+    line = "=" * 72 if position == "top" else "-" * 72
+    details = [f"time={_worker_log_timestamp()}"]
+    if pid is not None:
+        details.append(f"pid={pid}")
+    if work_pool:
+        details.append(f"pool={work_pool}")
+    if work_queue:
+        details.append(f"queue={work_queue}")
+    if note:
+        details.append(note)
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    with log_file.open("a", encoding="utf-8") as logf:
+        logf.write(f"{line}\n")
+        logf.write(f"worker {'start' if position == 'top' else 'stop'} | ")
+        logf.write(" | ".join(details))
+        logf.write("\n")
+        logf.write(f"{line}\n")
 
 
 def ensure_drive_checkpoint_dir(path: Path) -> None:
@@ -120,6 +154,15 @@ def _probe_prefect_api(env: dict[str, str]) -> None:
         raise RuntimeError("prefect API probe failed before worker start")
 
 
+def wait_for_exit(pid: int, timeout_seconds: float = 10.0) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if not is_running(pid):
+            return True
+        time.sleep(0.2)
+    return not is_running(pid)
+
+
 def start_worker(
     config: ColabRuntimeConfig,
     *,
@@ -198,22 +241,63 @@ def start_worker(
             cwd=cwd,
         )
     config.pid_file.write_text(str(proc.pid), encoding="utf-8")
+    append_worker_log_banner(
+        config.log_file,
+        position="top",
+        pid=proc.pid,
+        work_pool=env["PREFECT_WORK_POOL"],
+        work_queue=env["PREFECT_WORK_QUEUE"],
+    )
     log_step("worker", f"worker started pid={proc.pid}")
     log_step("worker", f"log file: {config.log_file}")
     log_step("worker", f"checkpoint dir: {config.checkpoint_dir}")
     return WorkerStartResult(proc.pid, config.log_file, config.checkpoint_dir)
 
 
-def stop_worker(pid_file: Path) -> WorkerStatusResult:
+def stop_worker(
+    pid_file: Path,
+    log_file: Path | None = None,
+) -> WorkerStatusResult:
     pid = read_pid(pid_file)
     if not pid:
         return WorkerStatusResult(False, None, "worker already stopped")
+    stopped = False
     try:
-        os.kill(pid, signal.SIGTERM)
+        os.killpg(pid, signal.SIGTERM)
+        stopped = wait_for_exit(pid)
     except OSError:
-        pass
+        try:
+            os.kill(pid, signal.SIGTERM)
+            stopped = wait_for_exit(pid)
+        except OSError:
+            stopped = True
+    if not stopped:
+        try:
+            os.killpg(pid, signal.SIGKILL)
+            stopped = wait_for_exit(pid, timeout_seconds=2.0)
+        except OSError:
+            try:
+                os.kill(pid, signal.SIGKILL)
+                stopped = wait_for_exit(pid, timeout_seconds=2.0)
+            except OSError:
+                stopped = True
+    if not stopped:
+        if log_file is not None:
+            append_worker_log_banner(
+                log_file,
+                position="bottom",
+                pid=pid,
+                note="stop timed out; process still running",
+            )
+        return WorkerStatusResult(
+            True,
+            pid,
+            f"worker stop timed out pid={pid}; process still running",
+        )
     try:
         pid_file.unlink()
     except OSError:
         pass
+    if log_file is not None:
+        append_worker_log_banner(log_file, position="bottom", pid=pid)
     return WorkerStatusResult(False, pid, f"worker stopped pid={pid}")
