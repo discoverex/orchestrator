@@ -75,7 +75,7 @@ services:
     container_name: orchestrator-e2e-local-worker
     environment:
       PREFECT_API_URL: http://prefect:4200/api
-      PREFECT_WORK_POOL: colab-gpu
+      PREFECT_WORK_POOL: gpu-pool
       STORAGE_GATEWAY_URL: http://storage-gateway:8100
       STORAGE_GATEWAY_TOKEN: dev-storage-token
     volumes:
@@ -94,7 +94,7 @@ services:
     container_name: orchestrator-e2e-local-register
     environment:
       PREFECT_API_URL: http://prefect:4200/api
-      PREFECT_WORK_POOL: colab-gpu
+      PREFECT_WORK_POOL: gpu-pool
       PREFECT_WORK_QUEUE: default
       REGISTER_DEPLOYMENT_NAME: engine-run
       REGISTER_DEPLOYMENT_VERSION: ""

@@ -74,7 +74,7 @@ install_toolkit_debian_like() {
   ${SUDO} install -D -m 0644 "${tmp_keyring}" "${keyring}"
   rm -f "${tmp_keyring}"
 
-  curl -fsSL "https://nvidia.github.io/libnvidia-container/${distribution}/libnvidia-container.list" \
+  curl -fsSL "https://nvidia.github.io/libnvidia-container/stable/deb/libnvidia-container.list" \
     | sed "s#^deb https://#deb [signed-by=${keyring}] https://#g" \
     | ${SUDO} tee "${list_file}" >/dev/null
 

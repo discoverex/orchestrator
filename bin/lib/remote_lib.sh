@@ -70,5 +70,5 @@ join_quoted() {
 }
 
 remote_prefect_worker_ls() {
-  remote_prefect_exec "if [[ -n \"\${REMOTE_PREFECT_ENV:-}\" && -f \"\${REMOTE_PREFECT_ENV}\" ]]; then set -a; source \"\${REMOTE_PREFECT_ENV}\"; set +a; elif [[ -f .env ]]; then set -a; source .env; set +a; fi; pools=\"\${REMOTE_WORKER_POOLS:-gpu-pool,colab-gpu}\"; IFS=',' read -r -a arr <<< \"\$pools\"; for p in \"\${arr[@]}\"; do echo \"== \$p ==\"; curl -fsS -H 'Content-Type: application/json' -d '{\"limit\":100,\"offset\":0}' \"http://127.0.0.1:\${PREFECT_BIND_PORT:-14200}/api/work_pools/\$p/workers/filter\" || true; echo; echo; done"
+  remote_prefect_exec "if [[ -n \"\${REMOTE_PREFECT_ENV:-}\" && -f \"\${REMOTE_PREFECT_ENV}\" ]]; then set -a; source \"\${REMOTE_PREFECT_ENV}\"; set +a; elif [[ -f .env ]]; then set -a; source .env; set +a; fi; pools=\"\${REMOTE_WORKER_POOLS:-gpu-pool}\"; IFS=',' read -r -a arr <<< \"\$pools\"; for p in \"\${arr[@]}\"; do echo \"== \$p ==\"; curl -fsS -H 'Content-Type: application/json' -d '{\"limit\":100,\"offset\":0}' \"http://127.0.0.1:\${PREFECT_BIND_PORT:-14200}/api/work_pools/\$p/workers/filter\" || true; echo; echo; done"
 }
