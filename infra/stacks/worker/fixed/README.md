@@ -31,6 +31,7 @@ If Prefect is behind Cloudflare Access, also set either:
 
 The entrypoint will merge those into `PREFECT_CLIENT_CUSTOM_HEADERS` automatically.
 Storage and MLflow credentials should not be configured on workers once router mode is enabled.
+`STORAGE_GATEWAY_URL` / `STORAGE_GATEWAY_TOKEN` are now legacy fallback values for rollback only.
 
 ## 3) Operate
 
@@ -40,8 +41,15 @@ docker compose --env-file infra/stacks/worker/fixed/.env -f infra/stacks/worker/
 docker compose --env-file infra/stacks/worker/fixed/.env -f infra/stacks/worker/fixed/docker-compose.yml down
 ```
 
+Expected startup summary:
+
+- `worker_router_url` should be populated
+- `storage_gateway_url` can be empty when router mode is active
+- Prefect custom headers should include Cloudflare keys only when Prefect itself is Access-protected
+
 ## Notes
 
 - Default queue target is `gpu-fixed`.
 - This unit is intended to be always-on and low-touch.
 - Runtime data is expected outside repo at `../runtime/worker` by default.
+- GitHub SSH repo URLs are normalized internally to HTTPS for resolution/cache fetches.

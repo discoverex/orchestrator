@@ -1,10 +1,11 @@
 # orchestrator
 
-Prefect-based orchestration workspace with three responsibilities:
+Prefect-based orchestration workspace with four responsibilities:
 
 - `flows`: Prefect workflow definitions (`engine_run_flow`)
 - `runner`: git checkout (resolved commit) + entrypoint execution
 - `storage_gateway`: presigned URL gateway for MinIO (workers never hold MinIO credentials)
+- `worker_router`: worker-facing auth + proxy for storage-gateway and MLflow
 
 ## Conceptual topology
 
@@ -15,16 +16,18 @@ Prefect-based orchestration workspace with three responsibilities:
   - fixed docker worker (`gpu-fixed`)
   - optional colab workers (`gpu-colab`)
 - Storage node:
-  - MinIO + storage-gateway + MLflow
-  - artifact/object persistence and metadata tracking
+  - MinIO + storage-gateway + worker-router + MLflow
+  - artifact/object persistence and worker-facing routing/auth
 
 Core interaction path:
 
 1. register deployment to Prefect
 2. submit flow run to work pool/queue
-3. worker executes `engine_run_flow` + uploads outputs via storage-gateway
-4. flush exports completed run snapshots to storage
-5. prune handles retention (optional apply mode)
+3. worker executes `engine_run_flow`
+4. worker requests presigned URLs via `worker-router` and uploads objects via `storage-gateway`
+5. worker records run metadata via MLflow (direct or router-backed proxy)
+6. flush exports completed run snapshots to storage
+7. prune handles retention (optional apply mode)
 
 ## Local quickstart (dev)
 
@@ -107,9 +110,11 @@ refresh the repo into Drive, and then invoke the checked-out
 Artifact and experiment policy:
 
 - Record experiment metadata in MLflow (params/metrics/tags/status).
+- When `WORKER_ROUTER_URL` is configured, workers request storage presigns via `WORKER_ROUTER_URL/storage/...`.
 - Upload files only through `storage-gateway` (`/v1/presign/*`, `/v1/object/proxy`).
 - Keep MinIO credentials out of workers.
 - Persist uploaded `object_uri` references into MLflow tags (for example `artifact_manifest_uri`).
+- In repo run mode, the runner now checks out the requested `ref` instead of detaching strictly by resolved SHA.
 
 ## Storage-only production profile
 
@@ -124,6 +129,7 @@ docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage
 ```
 
 Operational runbook: `docs/ops/storage-node.md`
+This profile now exposes `discoverex.qzz.io` as the worker-router endpoint and keeps `storage-gateway` internal-only except for object proxy URLs.
 
 ## Prefect server production profile (VM)
 
@@ -223,3 +229,4 @@ Notes:
 
 - Default flow assumes an existing operational worker in the target work pool.
 - `--bootstrap-worker` is available only for temporary bootstrapping and should be removed during production cutover.
+- Worker router mode is the preferred production path for storage and MLflow access from workers.
