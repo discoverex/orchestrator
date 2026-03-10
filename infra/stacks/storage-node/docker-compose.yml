@@ -59,6 +59,33 @@ services:
       timeout: 5s
       retries: 10
 
+  worker-router:
+    build:
+      context: ../../..
+      dockerfile: infra/images/worker-router.Dockerfile
+    image: orchestrator-worker-router:local
+    container_name: orchestrator-worker-router
+    restart: unless-stopped
+    environment:
+      WORKER_ROUTER_TOKEN: ${WORKER_ROUTER_TOKEN}
+      ROUTER_STORAGE_BASE_URL: http://storage-gateway:8100
+      ROUTER_STORAGE_GATEWAY_TOKEN: ${STORAGE_GATEWAY_TOKEN}
+      ROUTER_STORAGE_CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-}
+      ROUTER_STORAGE_CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-}
+      ROUTER_MLFLOW_BASE_URL: http://mlflow:${MLFLOW_PORT:-5000}
+      ROUTER_MLFLOW_CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-}
+      ROUTER_MLFLOW_CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-}
+    depends_on:
+      storage-gateway:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   mlflow-db:
     image: postgres:16
     container_name: orchestrator-mlflow-db
@@ -118,6 +145,8 @@ services:
     volumes:
       - ./.cloudflared:/etc/cloudflared:ro
     depends_on:
+      worker-router:
+        condition: service_healthy
       storage-gateway:
         condition: service_healthy
       mlflow:

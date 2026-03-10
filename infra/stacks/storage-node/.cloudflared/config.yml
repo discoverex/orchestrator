@@ -10,5 +10,5 @@ ingress:
   - hostname: mlflow.discoverex.qzz.io
     service: http://mlflow:5000
   - hostname: discoverex.qzz.io
-    service: http://storage-gateway:8100
+    service: http://worker-router:8200
   - service: http_status:404
