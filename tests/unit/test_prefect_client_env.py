@@ -19,8 +19,8 @@ def test_apply_prefect_client_env_sets_default_queue() -> None:
 def test_build_prefect_client_headers_maps_prefect_cf_headers() -> None:
     headers = build_prefect_client_headers(
         {
-            "PREFECT_CF_ACCESS_CLIENT_ID": "prefect-id",
-            "PREFECT_CF_ACCESS_CLIENT_SECRET": "prefect-secret",
+            "CF_ACCESS_CLIENT_ID": "prefect-id",
+            "CF_ACCESS_CLIENT_SECRET": "prefect-secret",
         }
     )
 
@@ -34,15 +34,15 @@ def test_build_prefect_client_headers_keeps_existing_custom_headers() -> None:
     headers = build_prefect_client_headers(
         {
             "PREFECT_CLIENT_CUSTOM_HEADERS": '{"X-Test":"1"}',
-            "CF_ACCESS_CLIENT_ID": "generic-id",
-            "CF_ACCESS_CLIENT_SECRET": "generic-secret",
+            "CF_ACCESS_CLIENT_ID": "prefect-id",
+            "CF_ACCESS_CLIENT_SECRET": "prefect-secret",
         }
     )
 
     assert headers == {
         "X-Test": "1",
-        "CF-Access-Client-Id": "generic-id",
-        "CF-Access-Client-Secret": "generic-secret",
+        "CF-Access-Client-Id": "prefect-id",
+        "CF-Access-Client-Secret": "prefect-secret",
     }
 
 
@@ -65,8 +65,8 @@ def test_startup_summary_masks_to_presence_not_secret_values() -> None:
         {
             "PREFECT_API_URL": "https://prefect.example/api",
             "PREFECT_WORK_POOL": "gpu-pool",
-            "PREFECT_CF_ACCESS_CLIENT_ID": "id",
-            "PREFECT_CF_ACCESS_CLIENT_SECRET": "secret",
+            "CF_ACCESS_CLIENT_ID": "id",
+            "CF_ACCESS_CLIENT_SECRET": "secret",
             "PREFECT_CLIENT_CUSTOM_HEADERS": '{"X-Test":"1","User-Agent":"ua"}',
         },
         default_queue="gpu-fixed",
@@ -77,7 +77,6 @@ def test_startup_summary_masks_to_presence_not_secret_values() -> None:
         prefect_work_pool="gpu-pool",
         prefect_work_queue="gpu-fixed",
         worker_router_url="",
-        storage_gateway_url="",
         checkpoint_dir="",
         custom_header_keys=[
             "CF-Access-Client-Id",

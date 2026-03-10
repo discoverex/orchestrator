@@ -52,7 +52,6 @@ def test_main_dry_run_collects_without_upload(
 
     monkeypatch.setenv("PREFECT_API_URL", "http://prefect.local/api")
     monkeypatch.setenv("FLUSH_TARGET_URL", "https://discoverex.qzz.io")
-    monkeypatch.setenv("FLUSH_GATEWAY_TOKEN", "token")
     monkeypatch.setenv("FLUSH_CURSOR_PATH", str(cursor_path))
 
     runs = [

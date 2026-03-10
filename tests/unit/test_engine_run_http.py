@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from types import TracebackType
 
 import pytest
 
 from flows.engine_run import http
 
 
-def test_gateway_headers_include_cf_access(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("STORAGE_GATEWAY_TOKEN", "gateway-token")
+def test_gateway_headers_use_cf_service_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("WORKER_ROUTER_URL", "https://discoverex.qzz.io")
     monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
     monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
 
     headers = http.gateway_headers()
 
     assert headers == {
-        "Authorization": "Bearer gateway-token",
         "Content-Type": "application/json",
         "User-Agent": http.WORKER_HTTP_USER_AGENT,
         "CF-Access-Client-Id": "cf-id",
@@ -24,35 +23,64 @@ def test_gateway_headers_include_cf_access(monkeypatch: pytest.MonkeyPatch) -> N
     }
 
 
-def test_gateway_headers_use_worker_router_token(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gateway_headers_require_storage_or_router_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("WORKER_ROUTER_URL", raising=False)
+    monkeypatch.delenv("STORAGE_API_URL", raising=False)
+    monkeypatch.delenv("CF_ACCESS_CLIENT_ID", raising=False)
+    monkeypatch.delenv("CF_ACCESS_CLIENT_SECRET", raising=False)
+
+    with pytest.raises(
+        RuntimeError,
+        match="STORAGE_API_URL or WORKER_ROUTER_URL, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET",
+    ):
+        http.gateway_headers()
+
+
+def test_storage_base_url_prefers_storage_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("STORAGE_API_URL", "https://storage-api.discoverex.qzz.io")
     monkeypatch.setenv("WORKER_ROUTER_URL", "https://discoverex.qzz.io")
-    monkeypatch.setenv("WORKER_ROUTER_TOKEN", "router-token")
-    monkeypatch.setenv("STORAGE_GATEWAY_TOKEN", "gateway-token")
 
-    headers = http.gateway_headers()
-
-    assert headers == {
-        "Authorization": "Bearer router-token",
-        "Content-Type": "application/json",
-        "User-Agent": http.WORKER_HTTP_USER_AGENT,
-    }
+    assert http.storage_base_url() == "https://storage-api.discoverex.qzz.io/artifact"
 
 
-def test_storage_base_url_prefers_worker_router(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_storage_base_url_falls_back_to_worker_router(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("STORAGE_API_URL", raising=False)
     monkeypatch.setenv("WORKER_ROUTER_URL", "https://discoverex.qzz.io")
-    monkeypatch.setenv("STORAGE_GATEWAY_URL", "https://storage.example")
 
-    assert http.storage_base_url() == "https://discoverex.qzz.io/storage"
+    assert http.storage_base_url() == "https://discoverex.qzz.io/storage/artifact"
+
+
+def test_storage_base_url_requires_storage_or_worker_router(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("STORAGE_API_URL", raising=False)
+    monkeypatch.delenv("WORKER_ROUTER_URL", raising=False)
+
+    with pytest.raises(RuntimeError, match="STORAGE_API_URL or WORKER_ROUTER_URL"):
+        http.storage_base_url()
 
 
 def test_http_json_raises_with_response_preview(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("WORKER_ROUTER_URL", "https://discoverex.qzz.io")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
+
     class _FakeResponse:
         def __enter__(self) -> "_FakeResponse":
             return self
 
-        def __exit__(self, exc_type, exc, tb) -> None:
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: TracebackType | None,
+        ) -> None:
             return None
 
         def read(self) -> bytes:
@@ -61,20 +89,28 @@ def test_http_json_raises_with_response_preview(
     def _fake_urlopen(_req: object) -> _FakeResponse:
         return _FakeResponse()
 
-    monkeypatch.setattr(http.request, "urlopen", _fake_urlopen)
+    monkeypatch.setattr("flows.engine_run.http.request.urlopen", _fake_urlopen)
 
-    with pytest.raises(RuntimeError, match="non-json response from storage gateway"):
+    with pytest.raises(RuntimeError, match="non-json response from storage API"):
         http.http_json("POST", "https://gateway.example/v1/presign/batch", {"ok": True})
 
 
 def test_http_json_returns_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("WORKER_ROUTER_URL", "https://discoverex.qzz.io")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
     payload = json.dumps([{"kind": "stdout", "url": "https://example"}]).encode("utf-8")
 
     class _FakeResponse:
         def __enter__(self) -> "_FakeResponse":
             return self
 
-        def __exit__(self, exc_type, exc, tb) -> None:
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: TracebackType | None,
+        ) -> None:
             return None
 
         def read(self) -> bytes:
@@ -83,8 +119,10 @@ def test_http_json_returns_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     def _fake_urlopen(_req: object) -> _FakeResponse:
         return _FakeResponse()
 
-    monkeypatch.setattr(http.request, "urlopen", _fake_urlopen)
+    monkeypatch.setattr("flows.engine_run.http.request.urlopen", _fake_urlopen)
 
-    rows = http.http_json("POST", "https://gateway.example/v1/presign/batch", {"ok": True})
+    rows = http.http_json(
+        "POST", "https://gateway.example/v1/presign/batch", {"ok": True}
+    )
 
     assert rows == [{"kind": "stdout", "url": "https://example"}]

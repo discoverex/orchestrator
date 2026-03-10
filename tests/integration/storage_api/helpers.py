@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+import importlib
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
+import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from storage.application.models import (
-    ExplorerHeadResult,
-    ExplorerListResult,
-    PresignResult,
-)
+from storage.application.models import ExplorerHeadResult, PresignResult
 from storage.domain.models.object_ref import ObjectListEntry, ObjectStat
-from storage_gateway.main import app
+from worker_router.app import create_app
+
+worker_router_app_module = importlib.import_module("worker_router.app")
 
 
 class DummyStorageApp:
@@ -29,47 +30,29 @@ class DummyStorageApp:
         attempt: int,
         filename: str,
         method: str,
-        base_url: str,
         ttl_seconds: int | None,
     ) -> PresignResult:
-        _ = base_url
         ttl = 900 if ttl_seconds is None else ttl_seconds
         if ttl > 3600:
             raise ValueError("ttl_seconds must be <= 3600")
         object_uri = self._object_uri(flow_run_id, attempt, filename)
-        token = f"{method}:{object_uri}"
         return PresignResult(
             object_uri=object_uri,
-            url=f"https://gw.example/v1/object/proxy?token={token}",
+            url=f"https://object.example/{filename}?method={method}&ttl={ttl}",
             expires_at=datetime.now(timezone.utc),
         )
 
-    def issue_batch_put(
-        self, *, entries: list[Any], base_url: str
-    ) -> list[PresignResult]:
+    def issue_batch_put(self, *, entries: list[Any]) -> list[PresignResult]:
         return [
             self.issue_presign(
                 flow_run_id=e.flow_run_id,
                 attempt=e.attempt,
                 filename=e.filename,
                 method="PUT",
-                base_url=base_url,
                 ttl_seconds=e.ttl_seconds,
             )
             for e in entries
         ]
-
-    def proxy_upload(self, *, token: str, data: bytes, content_type: str) -> ObjectStat:
-        _ = content_type
-        method, object_uri = token.split(":", 1)
-        assert method == "PUT"
-        self.objects[object_uri] = data
-        return ObjectStat(uri=object_uri, size=len(data))
-
-    def proxy_download(self, *, token: str) -> bytes:
-        method, object_uri = token.split(":", 1)
-        assert method == "GET"
-        return self.objects[object_uri]
 
     def head_object(self, object_uri: str) -> ExplorerHeadResult:
         if object_uri not in self.objects:
@@ -89,7 +72,7 @@ class DummyStorageApp:
         prefix: str = "",
         cursor: str | None = None,
         limit: int = 200,
-    ) -> ExplorerListResult:
+    ) -> tuple[list[ObjectListEntry], str | None]:
         _ = bucket
         rows: list[ObjectListEntry] = []
         for object_uri, data in sorted(self.objects.items()):
@@ -109,25 +92,32 @@ class DummyStorageApp:
             if len(rows) >= limit:
                 break
         next_cursor = rows[-1].object_key if len(rows) >= limit else None
-        return ExplorerListResult(
-            bucket=bucket, prefix=prefix, next_cursor=next_cursor, entries=rows
-        )
+        return rows, next_cursor
 
     def download_object(self, object_uri: str) -> bytes:
         return self.objects[object_uri]
 
 
-def client() -> TestClient:
-    app.state.storage_app = DummyStorageApp()
-    app.state.token = "test-token"
-    app.state.require_cf_access = False
-    return TestClient(app)
+def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    storage_app = DummyStorageApp()
+    monkeypatch.setattr(
+        worker_router_app_module, "build_storage_app_from_env", lambda: storage_app
+    )
+    monkeypatch.setenv("GATEWAY_REQUIRE_CF_ACCESS", "false")
+    test_client = TestClient(create_app())
+    cast(FastAPI, test_client.app).state.storage_app = storage_app
+    return test_client
 
 
-def cf_client() -> TestClient:
-    app.state.storage_app = DummyStorageApp()
-    app.state.token = "test-token"
-    app.state.require_cf_access = True
-    app.state.cf_client_id = "cf-id"
-    app.state.cf_client_secret = "cf-secret"
-    return TestClient(app)
+def cf_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    storage_app = DummyStorageApp()
+    monkeypatch.setattr(
+        worker_router_app_module, "build_storage_app_from_env", lambda: storage_app
+    )
+    monkeypatch.setenv("GATEWAY_REQUIRE_CF_ACCESS", "true")
+    monkeypatch.setenv("STORAGE_API_HOST", "storage-api.discoverex.qzz.io")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
+    test_client = TestClient(create_app())
+    cast(FastAPI, test_client.app).state.storage_app = storage_app
+    return test_client

@@ -1,83 +1,144 @@
 from __future__ import annotations
 
 import importlib
+from datetime import datetime, timezone
+from typing import Any
 from urllib import error
 
+import pytest
 from fastapi.testclient import TestClient
 
+from storage.application.models import ExplorerHeadResult, PresignResult
+from storage.domain.models.object_ref import ObjectStat
 from worker_router.app import create_app
 
 worker_router_app_module = importlib.import_module("worker_router.app")
 
 
-def _client() -> TestClient:
+class DummyStorageApp:
+    def issue_presign(
+        self,
+        *,
+        flow_run_id: str,
+        attempt: int,
+        filename: str,
+        method: str,
+        ttl_seconds: int | None,
+    ) -> PresignResult:
+        ttl = 900 if ttl_seconds is None else ttl_seconds
+        object_uri = f"s3://bucket/jobs/{flow_run_id}/attempt-{attempt}/{filename}"
+        return PresignResult(
+            object_uri=object_uri,
+            url=f"https://object.example/{filename}?method={method}&ttl={ttl}",
+            expires_at=datetime.now(timezone.utc),
+        )
+
+    def issue_batch_put(self, *, entries: list[Any]) -> list[PresignResult]:
+        return [
+            self.issue_presign(
+                flow_run_id=entry.flow_run_id,
+                attempt=entry.attempt,
+                filename=entry.filename,
+                method="PUT",
+                ttl_seconds=entry.ttl_seconds,
+            )
+            for entry in entries
+        ]
+
+    def head_object(self, object_uri: str) -> ExplorerHeadResult:
+        return ExplorerHeadResult(
+            exists=True,
+            stat=ObjectStat(uri=object_uri, size=13),
+        )
+
+
+def _client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.setattr(
+        worker_router_app_module,
+        "build_storage_app_from_env",
+        lambda: DummyStorageApp(),
+    )
     return TestClient(create_app())
 
 
-def test_rejects_missing_worker_auth() -> None:
-    client = _client()
-    res = client.post("/storage/v1/presign/batch", json={})
-    assert res.status_code == 401
+def test_rejects_missing_storage_service_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GATEWAY_REQUIRE_CF_ACCESS", "true")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
+    client = _client(monkeypatch)
 
-
-def test_storage_proxy_injects_downstream_headers(monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    seen: dict[str, str] = {}
-
-    class _FakeResponse:
-        status = 200
-        headers = {"Content-Type": "application/json"}
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return None
-
-        def read(self) -> bytes:
-            return b'{"ok": true}'
-
-    def _fake_urlopen(req, timeout=None):  # type: ignore[no-untyped-def]
-        _ = timeout
-        header_map = {key.lower(): value for key, value in req.header_items()}
-        seen["url"] = req.full_url
-        seen["authorization"] = header_map.get("authorization")
-        seen["cf_id"] = header_map.get("cf-access-client-id")
-        return _FakeResponse()
-
-    monkeypatch.setenv("WORKER_ROUTER_TOKEN", "worker-token")
-    monkeypatch.setenv("ROUTER_STORAGE_BASE_URL", "http://storage-gateway:8100")
-    monkeypatch.setenv("ROUTER_STORAGE_GATEWAY_TOKEN", "storage-token")
-    monkeypatch.setenv("ROUTER_STORAGE_CF_ACCESS_CLIENT_ID", "storage-cf-id")
-    monkeypatch.setenv("ROUTER_STORAGE_CF_ACCESS_CLIENT_SECRET", "storage-cf-secret")
-    monkeypatch.setattr(worker_router_app_module.request, "urlopen", _fake_urlopen)
-
-    client = _client()
     res = client.post(
-        "/storage/v1/presign/batch",
-        headers={"Authorization": "Bearer worker-token"},
-        json={"flow_run_id": "f1", "attempt": 1, "entries": []},
+        "/artifact/v1/presign/batch",
+        headers={"host": "storage-api.discoverex.qzz.io"},
+        json={
+            "flow_run_id": "f1",
+            "attempt": 1,
+            "entries": [{"flow_run_id": "f1", "attempt": 1, "kind": "stdout"}],
+        },
     )
+
+    assert res.status_code == 403
+
+
+def test_storage_human_host_skips_service_token_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GATEWAY_REQUIRE_CF_ACCESS", "true")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
+    monkeypatch.setenv("STORAGE_HUMAN_HOST", "storage.discoverex.qzz.io")
+    client = _client(monkeypatch)
+
+    res = client.post(
+        "/artifact/v1/presign/get",
+        headers={"host": "storage.discoverex.qzz.io"},
+        json={"flow_run_id": "f1", "attempt": 1, "kind": "stdout"},
+    )
+
     assert res.status_code == 200
-    assert seen == {
-        "url": "http://storage-gateway:8100/v1/presign/batch",
-        "authorization": "Bearer storage-token",
-        "cf_id": "storage-cf-id",
-    }
+    assert res.json()["url"].startswith("https://object.example/")
 
 
-def test_mlflow_proxy_normalizes_network_error(monkeypatch) -> None:  # type: ignore[no-untyped-def]
-    def _fake_urlopen(_req, timeout=None):  # type: ignore[no-untyped-def]
+def test_storage_compatibility_path_still_works(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GATEWAY_REQUIRE_CF_ACCESS", "false")
+    client = _client(monkeypatch)
+
+    res = client.post(
+        "/storage/artifact/v1/presign/batch",
+        json={
+            "flow_run_id": "f1",
+            "attempt": 1,
+            "entries": [{"flow_run_id": "f1", "attempt": 1, "kind": "stdout"}],
+        },
+    )
+
+    assert res.status_code == 200
+    assert res.json()[0]["url"].startswith("https://object.example/")
+
+
+def test_mlflow_proxy_normalizes_network_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _fake_urlopen(_req: object, timeout: object = None) -> object:
         _ = timeout
         raise error.URLError("dns failed")
 
-    monkeypatch.setenv("WORKER_ROUTER_TOKEN", "worker-token")
-    monkeypatch.setenv("ROUTER_MLFLOW_BASE_URL", "http://mlflow:5000")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "worker-id")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "worker-secret")
+    monkeypatch.setenv("MLFLOW_BACKEND_URL", "http://mlflow:5000")
     monkeypatch.setattr(worker_router_app_module.request, "urlopen", _fake_urlopen)
 
-    client = _client()
+    client = _client(monkeypatch)
     res = client.get(
         "/mlflow/api/2.0/mlflow/experiments/search",
-        headers={"Authorization": "Bearer worker-token"},
+        headers={
+            "CF-Access-Client-Id": "worker-id",
+            "CF-Access-Client-Secret": "worker-secret",
+        },
     )
     assert res.status_code == 502
     payload = res.json()

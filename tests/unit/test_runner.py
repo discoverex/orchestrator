@@ -10,7 +10,12 @@ from socketserver import ThreadingMixIn
 import pytest
 
 from runner import git_runner
-from runner.git_runner import RunnerError, cleanup_workdir, resolve_commit, run_entrypoint
+from runner.git_runner import (
+    RunnerError,
+    cleanup_workdir,
+    resolve_commit,
+    run_entrypoint,
+)
 
 
 def test_resolve_commit_accepts_sha() -> None:
@@ -71,7 +76,12 @@ def test_resolve_commit_normalizes_github_ssh_url(
     out = resolve_commit("git@github.com:discoverex/engine.git", "dev")
     assert out == "c" * 40
     assert calls == [
-        ["git", "ls-remote", "https://github.com/discoverex/engine.git", "refs/heads/dev"]
+        [
+            "git",
+            "ls-remote",
+            "https://github.com/discoverex/engine.git",
+            "refs/heads/dev",
+        ]
     ]
 
 
@@ -80,7 +90,9 @@ def test_prepare_cached_repo_removes_broken_cache_dir(
 ) -> None:
     cache_root = tmp_path / "cache"
     monkeypatch.setenv("ORCH_REPO_CACHE_DIR", str(cache_root))
-    broken_cache = git_runner._repo_cache_path("https://github.com/discoverex/engine.git")
+    broken_cache = git_runner._repo_cache_path(
+        "https://github.com/discoverex/engine.git"
+    )
     broken_cache.mkdir(parents=True)
     calls: list[tuple[list[str], Path | None]] = []
 
@@ -115,7 +127,9 @@ def test_prepare_cached_repo_removes_broken_cache_dir(
 
 def test_checkout_target_prefers_named_ref() -> None:
     assert git_runner._checkout_target("dev", "a" * 40) == "dev"
-    assert git_runner._checkout_target("refs/tags/v1.0.0", "a" * 40) == "refs/tags/v1.0.0"
+    assert (
+        git_runner._checkout_target("refs/tags/v1.0.0", "a" * 40) == "refs/tags/v1.0.0"
+    )
     assert git_runner._checkout_target("a" * 40, "b" * 40) == "b" * 40
     assert git_runner._checkout_target(None, "b" * 40) == "b" * 40
 
@@ -145,7 +159,11 @@ def test_run_entrypoint_inline_mode_without_repo() -> None:
         cleanup_workdir(artifacts.workdir)
 
 
-def test_run_entrypoint_merges_job_and_orchestrator_env() -> None:
+def test_run_entrypoint_merges_job_and_orchestrator_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CF_ACCESS_CLIENT_ID", raising=False)
+    monkeypatch.delenv("CF_ACCESS_CLIENT_SECRET", raising=False)
     artifacts = run_entrypoint(
         repo_url=None,
         ref=None,
@@ -256,7 +274,8 @@ def test_run_entrypoint_proxies_mlflow_via_worker_router() -> None:
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
-            seen["authorization"] = self.headers.get("Authorization", "")
+            seen["cf_id"] = self.headers.get("CF-Access-Client-Id", "")
+            seen["cf_secret"] = self.headers.get("CF-Access-Client-Secret", "")
             payload = b'{"ok": true}'
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -289,7 +308,8 @@ def test_run_entrypoint_proxies_mlflow_via_worker_router() -> None:
         env={
             "MLFLOW_TRACKING_URI": "https://mlflow.discoverex.qzz.io",
             "WORKER_ROUTER_URL": upstream,
-            "WORKER_ROUTER_TOKEN": "worker-router-token",
+            "CF_ACCESS_CLIENT_ID": "worker-id",
+            "CF_ACCESS_CLIENT_SECRET": "worker-secret",
         },
         engine="discoverex",
         config_rel_path=None,
@@ -304,7 +324,7 @@ def test_run_entrypoint_proxies_mlflow_via_worker_router() -> None:
         payload = json.loads(artifacts.stdout_path.read_text(encoding="utf-8").strip())
         assert payload["uri"].startswith("http://127.0.0.1:")
         assert payload["body"] == '{"ok": true}'
-        assert seen == {"authorization": "Bearer worker-router-token"}
+        assert seen == {"cf_id": "worker-id", "cf_secret": "worker-secret"}
     finally:
         cleanup_workdir(artifacts.workdir)
         server.shutdown()
