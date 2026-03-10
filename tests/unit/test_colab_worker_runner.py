@@ -157,6 +157,44 @@ def test_recreate_venv_removes_existing_dir_before_creation(
     assert python_path == config.venv_dir / "bin" / "python"
 
 
+def test_recreate_venv_falls_back_to_virtualenv_when_venv_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    runtime = _load_module("colab_runtime")
+    bootstrap = _load_module("colab_bootstrap")
+    config = _build_config(runtime, tmp_path)
+    calls: list[list[str]] = []
+
+    def fake_run(
+        cmd: list[str],
+        *,
+        env: dict[str, str] | None = None,
+        cwd: Path | None = None,
+        check: bool = True,
+        step: str,
+    ) -> object:
+        del env, cwd, check, step
+        calls.append(cmd)
+        if cmd[:3] == ["python3", "-m", "venv"]:
+            raise RuntimeError("venv failed")
+        if cmd[:3] == ["python3", "-m", "virtualenv"]:
+            bin_dir = config.venv_dir / "bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            (bin_dir / "python").write_text("", encoding="utf-8")
+        return SimpleNamespace(output="")
+
+    monkeypatch.setattr(bootstrap, "run_command", fake_run)
+
+    python_path = bootstrap.recreate_venv(config, {})
+
+    assert calls == [
+        ["python3", "-m", "venv", str(config.venv_dir)],
+        ["python3", "-m", "pip", "install", "-U", "virtualenv"],
+        ["python3", "-m", "virtualenv", str(config.venv_dir)],
+    ]
+    assert python_path == config.venv_dir / "bin" / "python"
+
+
 def test_bootstrap_runtime_uses_editable_no_build_isolation_and_fast_deps(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
