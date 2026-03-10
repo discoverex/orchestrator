@@ -21,7 +21,7 @@ Required worker env:
 - `PREFECT_API_URL=https://<your-domain>/api`
 - `PREFECT_WORK_POOL=gpu-pool`
 - `PREFECT_WORK_QUEUE=gpu-fixed`
-- `WORKER_ROUTER_URL=https://discoverex.qzz.io`
+- `STORAGE_API_URL=https://storage-api.discoverex.qzz.io`
 
 If Prefect is behind Cloudflare Access, also set either:
 
@@ -41,7 +41,6 @@ docker compose --env-file infra/stacks/worker/fixed/.env -f infra/stacks/worker/
 
 Expected startup summary:
 
-- `worker_router_url` should be populated
 - Prefect custom headers should include Cloudflare keys only when Prefect itself is Access-protected
 
 ## Notes

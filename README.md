@@ -110,7 +110,7 @@ refresh the repo into Drive, and then invoke the checked-out
 Artifact and experiment policy:
 
 - Record experiment metadata in MLflow (params/metrics/tags/status).
-- Prefer `STORAGE_API_URL/artifact/...` for storage presigns. If unset, workers fall back to `WORKER_ROUTER_URL/storage/artifact/...`.
+- Prefer `STORAGE_API_URL/artifact/...` for storage presigns.
 - Upload and download artifact bytes through object-store presigned URLs, not through router proxying.
 - Keep MinIO credentials out of workers.
 - Persist uploaded `object_uri` references into MLflow tags (for example `artifact_manifest_uri`).

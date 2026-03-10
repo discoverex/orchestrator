@@ -42,9 +42,9 @@
 - `mlflow` healthcheck를 `curl` -> `python urllib`로 변경
 
 4. 워커 접근 경로/실행 보강
-- 워커 env 기본값을 `WORKER_ROUTER_URL` + `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` 기준으로 변경
-- storage presign 요청은 `worker-router` 우선, direct gateway는 fallback으로 유지
-- MLflow 프록시는 `worker-router` 경유 인증을 지원
+- 워커 env 기본값을 `STORAGE_API_URL`, `MLFLOW_TRACKING_URI`, `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` 기준으로 변경
+- storage presign 요청은 `STORAGE_API_URL` 기준으로 통일
+- MLflow 프록시는 `MLFLOW_TRACKING_URI` 직접 경유 인증을 지원
 - repo run 모드에서 `resolved_commit`만이 아니라 요청된 `ref`를 체크아웃 대상으로 보존
 - GitHub SSH repo URL(`git@github.com:...`)은 resolve/fetch 시 HTTPS로 정규화
 
@@ -71,7 +71,7 @@
 
 5. 문서/운영 체크리스트 확정 (진행중)
 - `.env` 필수키와 실행 순서를 README/ops 문서에 최종 고정
-- worker-router 토큰 배포 경로와 회전 절차 정리
+- 서비스별 공개 엔드포인트(`storage-api`, `mlflow`) 배포 경로와 회전 절차 정리
 - `scripts/e2e/e2e_local_orchestrator.sh`에 `full` 모드 사전검증(`full.verify_prereqs`) 추가
 - `scripts/e2e/e2e_local_orchestrator.sh`에 `mlflow.verify_tracking_access` 추가
 
@@ -86,7 +86,7 @@ MLFLOW_TRACKING_URI=https://mlflow.discoverex.qzz.io
 MLFLOW_PUBLIC_URL=https://mlflow.discoverex.qzz.io
 CF_ACCESS_CLIENT_ID=<cloudflare-access-client-id>
 CF_ACCESS_CLIENT_SECRET=<cloudflare-access-client-secret>
-WORKER_ROUTER_URL=https://discoverex.qzz.io
+STORAGE_API_URL=https://storage-api.discoverex.qzz.io
 ```
 
 권장 확인:

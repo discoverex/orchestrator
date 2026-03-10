@@ -38,7 +38,7 @@ Runtime policy:
 - Artifact policy: worker presign/head requests go through storage routes on worker-router, issued upload/download URLs go directly to the object endpoint
 - MLflow responsibility: metadata only (params/metrics/tags/status). Do not use `mlflow.log_artifact()`.
 - MinIO operator access should use localhost-bound console port or a separately protected operator ingress.
-- Worker contract: workers should carry only `STORAGE_API_URL`/`WORKER_ROUTER_URL` and Cloudflare Access credentials; direct storage/MLflow credentials stay on this node.
+- Worker contract: workers should carry only `STORAGE_API_URL`, `MLFLOW_TRACKING_URI`, and Cloudflare Access credentials; direct storage/MLflow credentials stay on this node.
 - Request auth on storage API:
 
 1. Cloudflare Access headers (`CF-Access-Client-Id`, `CF-Access-Client-Secret`) when `GATEWAY_REQUIRE_CF_ACCESS=true`

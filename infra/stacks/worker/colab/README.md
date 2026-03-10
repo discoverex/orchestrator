@@ -14,7 +14,7 @@ Set these before start:
 - `PREFECT_API_URL`
 - `PREFECT_WORK_POOL` (recommended: `gpu-pool`)
 - `PREFECT_WORK_QUEUE` (recommended: `gpu-colab`)
-- `WORKER_ROUTER_URL`
+- `STORAGE_API_URL`
 - If Prefect is behind Cloudflare Access, also set:
   - `CF_ACCESS_CLIENT_ID`
   - `CF_ACCESS_CLIENT_SECRET`
