@@ -76,6 +76,7 @@ def test_startup_summary_masks_to_presence_not_secret_values() -> None:
         prefect_api_url="https://prefect.example/api",
         prefect_work_pool="gpu-pool",
         prefect_work_queue="gpu-fixed",
+        worker_router_url="",
         storage_gateway_url="",
         checkpoint_dir="",
         custom_header_keys=[

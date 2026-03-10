@@ -183,3 +183,64 @@ def test_run_entrypoint_proxies_remote_mlflow_with_worker_auth() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_run_entrypoint_proxies_mlflow_via_worker_router() -> None:
+    seen: dict[str, str] = {}
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            seen["authorization"] = self.headers.get("Authorization", "")
+            payload = b'{"ok": true}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = _ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    upstream = f"http://127.0.0.1:{server.server_address[1]}"
+    artifacts = run_entrypoint(
+        repo_url=None,
+        ref=None,
+        resolved_commit=None,
+        entrypoint=[
+            sys.executable,
+            "-c",
+            (
+                "import json, os, urllib.request; "
+                "uri=os.environ['MLFLOW_TRACKING_URI']; "
+                "body=urllib.request.urlopen(uri + '/api/2.0/mlflow/experiments/list').read().decode('utf-8'); "
+                "print(json.dumps({'uri': uri, 'body': body}))"
+            ),
+        ],
+        run_mode="inline",
+        env={
+            "MLFLOW_TRACKING_URI": "https://mlflow.discoverex.qzz.io",
+            "WORKER_ROUTER_URL": upstream,
+            "WORKER_ROUTER_TOKEN": "worker-router-token",
+        },
+        engine="discoverex",
+        config_rel_path=None,
+        inputs={"contract_version": "v2", "command": "generate"},
+        flow_run_id="flow-inline",
+        attempt=1,
+        outputs_prefix="jobs/flow-inline/attempt-1/",
+        job_name="inline-mlflow-router",
+    )
+    try:
+        assert artifacts.exit_code == 0
+        payload = json.loads(artifacts.stdout_path.read_text(encoding="utf-8").strip())
+        assert payload["uri"].startswith("http://127.0.0.1:")
+        assert payload["body"] == '{"ok": true}'
+        assert seen == {"authorization": "Bearer worker-router-token"}
+    finally:
+        cleanup_workdir(artifacts.workdir)
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
