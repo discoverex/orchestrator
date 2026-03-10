@@ -24,11 +24,17 @@ def gateway_headers() -> dict[str, str]:
             "User-Agent": WORKER_HTTP_USER_AGENT,
         }
     token = os.getenv("STORAGE_GATEWAY_TOKEN", "dev-storage-token")
-    return {
+    headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
         "User-Agent": WORKER_HTTP_USER_AGENT,
     }
+    cf_id = os.getenv("CF_ACCESS_CLIENT_ID", "").strip()
+    cf_secret = os.getenv("CF_ACCESS_CLIENT_SECRET", "").strip()
+    if cf_id and cf_secret:
+        headers["CF-Access-Client-Id"] = cf_id
+        headers["CF-Access-Client-Secret"] = cf_secret
+    return headers
 
 
 def http_json(
@@ -37,7 +43,14 @@ def http_json(
     body = json.dumps(payload).encode("utf-8")
     req = request.Request(url, method=method, data=body, headers=gateway_headers())
     with request.urlopen(req) as resp:  # nosec B310 - controlled endpoint from env
-        parsed = json.loads(resp.read().decode("utf-8"))
+        text = resp.read().decode("utf-8", errors="replace")
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        preview = text[:200].replace("\n", "\\n")
+        raise RuntimeError(
+            f"non-json response from storage gateway: {preview}"
+        ) from exc
     if isinstance(parsed, dict):
         return cast(dict[str, object], parsed)
     if isinstance(parsed, list):

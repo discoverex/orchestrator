@@ -115,6 +115,7 @@ def run_job_flow(
         )
         local_paths, exit_code = run_entrypoint_job_task(
             repo_url=job.repo_url,
+            ref=job.ref,
             resolved_commit=resolved_commit,
             entrypoint=job.entrypoint,
             env=job.env,

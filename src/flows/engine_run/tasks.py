@@ -72,6 +72,7 @@ def run_entrypoint_task(
 def run_entrypoint_job_task(
     *,
     repo_url: str | None,
+    ref: str | None,
     resolved_commit: str | None,
     entrypoint: list[str],
     env: dict[str, str],
@@ -86,6 +87,7 @@ def run_entrypoint_job_task(
 ) -> tuple[dict[str, str], int]:
     artifacts = run_entrypoint(
         repo_url=repo_url,
+        ref=ref,
         resolved_commit=resolved_commit,
         entrypoint=entrypoint,
         env=env,

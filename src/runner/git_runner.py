@@ -14,6 +14,7 @@ from .models import RunArtifacts
 from .mlflow_proxy import maybe_start_mlflow_proxy
 
 _SHA1 = re.compile(r"^[0-9a-f]{40}$")
+_GITHUB_SSH = re.compile(r"^git@github\.com:(?P<repo>.+?)(?:\.git)?$")
 
 
 class RunnerError(RuntimeError):
@@ -34,6 +35,13 @@ def _repo_cache_root() -> Path:
 def _repo_cache_path(repo_url: str) -> Path:
     key = sha256(repo_url.encode("utf-8")).hexdigest()[:16]
     return _repo_cache_root() / key
+
+
+def _normalized_repo_url(repo_url: str) -> str:
+    match = _GITHUB_SSH.match(repo_url.strip())
+    if not match:
+        return repo_url
+    return f"https://github.com/{match.group('repo')}.git"
 
 
 def _local_repo_path(repo_url: str) -> Path | None:
@@ -58,12 +66,22 @@ def _safe_directory_args(repo_path: Path) -> list[str]:
     ]
 
 
-def _prepare_cached_repo(repo_url: str, resolved_commit: str) -> Path:
+def _checkout_target(ref: str | None, resolved_commit: str) -> str:
+    candidate = (ref or "").strip()
+    if candidate and not _SHA1.match(candidate.lower()):
+        return candidate
+    return resolved_commit
+
+
+def _prepare_cached_repo(repo_url: str, ref: str | None, resolved_commit: str) -> Path:
+    normalized_repo_url = _normalized_repo_url(repo_url)
     cache_root = _repo_cache_root()
     cache_root.mkdir(parents=True, exist_ok=True)
-    cache_repo = _repo_cache_path(repo_url)
-    local_repo = _local_repo_path(repo_url)
-    clone_source = local_repo.resolve().as_uri() if local_repo is not None else repo_url
+    cache_repo = _repo_cache_path(normalized_repo_url)
+    local_repo = _local_repo_path(normalized_repo_url)
+    clone_source = (
+        local_repo.resolve().as_uri() if local_repo is not None else normalized_repo_url
+    )
 
     if (cache_repo / ".git").exists():
         _run(["git", "fetch", "--all", "--tags", "--prune"], cwd=cache_repo)
@@ -76,7 +94,8 @@ def _prepare_cached_repo(repo_url: str, resolved_commit: str) -> Path:
         clone_cmd.extend(["clone", "--filter=blob:none", clone_source, str(cache_repo)])
         _run(clone_cmd)
 
-    _run(["git", "checkout", "--detach", resolved_commit], cwd=cache_repo)
+    checkout_target = _checkout_target(ref, resolved_commit)
+    _run(["git", "checkout", checkout_target], cwd=cache_repo)
     _run(["git", "reset", "--hard"], cwd=cache_repo)
     _run(["git", "clean", "-fdx"], cwd=cache_repo)
     return cache_repo
@@ -105,7 +124,8 @@ def resolve_commit(repo_url: str, ref: str) -> str:
     if _SHA1.match(candidate):
         return candidate
 
-    local_repo = _local_repo_path(repo_url)
+    normalized_repo_url = _normalized_repo_url(repo_url)
+    local_repo = _local_repo_path(normalized_repo_url)
     if local_repo is not None:
         return _run(
             [
@@ -120,7 +140,7 @@ def resolve_commit(repo_url: str, ref: str) -> str:
 
     for remote_ref in (f"refs/heads/{ref}", f"refs/tags/{ref}", ref):
         try:
-            out = _run(["git", "ls-remote", repo_url, remote_ref])
+            out = _run(["git", "ls-remote", normalized_repo_url, remote_ref])
         except RunnerError:
             continue
         if not out:
@@ -134,6 +154,7 @@ def resolve_commit(repo_url: str, ref: str) -> str:
 
 def run_entrypoint(
     repo_url: str | None,
+    ref: str | None,
     resolved_commit: str | None,
     entrypoint: list[str],
     env: dict[str, str] | None = None,
@@ -152,11 +173,13 @@ def run_entrypoint(
     if run_mode == "repo":
         if not repo_url:
             raise RunnerError("repo_url is required when run_mode=repo")
+        if not ref:
+            raise RunnerError("ref is required when run_mode=repo")
         if not resolved_commit:
             raise RunnerError("resolved_commit is required when run_mode=repo")
-        cached_repo = _prepare_cached_repo(repo_url, resolved_commit)
+        cached_repo = _prepare_cached_repo(repo_url, ref, resolved_commit)
         _run(["git", "clone", "--no-checkout", str(cached_repo), str(workdir)])
-        _run(["git", "checkout", resolved_commit], cwd=workdir)
+        _run(["git", "checkout", _checkout_target(ref, resolved_commit)], cwd=workdir)
     elif run_mode == "inline":
         if config_rel_path:
             raise RunnerError("config is not supported when run_mode=inline")

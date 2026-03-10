@@ -57,9 +57,73 @@ def test_resolve_commit_uses_safe_directory_for_local_repo(
     ]
 
 
+def test_resolve_commit_normalizes_github_ssh_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+
+    def _fake_run(cmd: list[str], cwd: Path | None = None) -> str:
+        _ = cwd
+        calls.append(cmd)
+        return "c" * 40
+
+    monkeypatch.setattr(git_runner, "_run", _fake_run)
+    out = resolve_commit("git@github.com:discoverex/engine.git", "dev")
+    assert out == "c" * 40
+    assert calls == [
+        ["git", "ls-remote", "https://github.com/discoverex/engine.git", "refs/heads/dev"]
+    ]
+
+
+def test_prepare_cached_repo_removes_broken_cache_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cache_root = tmp_path / "cache"
+    monkeypatch.setenv("ORCH_REPO_CACHE_DIR", str(cache_root))
+    broken_cache = git_runner._repo_cache_path("https://github.com/discoverex/engine.git")
+    broken_cache.mkdir(parents=True)
+    calls: list[tuple[list[str], Path | None]] = []
+
+    def _fake_run(cmd: list[str], cwd: Path | None = None) -> str:
+        calls.append((cmd, cwd))
+        if cmd[:3] == ["git", "clone", "--filter=blob:none"]:
+            target = Path(cmd[-1])
+            (target / ".git").mkdir(parents=True, exist_ok=True)
+        return ""
+
+    monkeypatch.setattr(git_runner, "_run", _fake_run)
+
+    repo = git_runner._prepare_cached_repo(
+        "git@github.com:discoverex/engine.git",
+        "dev",
+        "a" * 40,
+    )
+
+    assert repo == broken_cache
+    assert (broken_cache / ".git").exists()
+    assert calls[0] == (
+        [
+            "git",
+            "clone",
+            "--filter=blob:none",
+            "https://github.com/discoverex/engine.git",
+            str(broken_cache),
+        ],
+        None,
+    )
+
+
+def test_checkout_target_prefers_named_ref() -> None:
+    assert git_runner._checkout_target("dev", "a" * 40) == "dev"
+    assert git_runner._checkout_target("refs/tags/v1.0.0", "a" * 40) == "refs/tags/v1.0.0"
+    assert git_runner._checkout_target("a" * 40, "b" * 40) == "b" * 40
+    assert git_runner._checkout_target(None, "b" * 40) == "b" * 40
+
+
 def test_run_entrypoint_inline_mode_without_repo() -> None:
     artifacts = run_entrypoint(
         repo_url=None,
+        ref=None,
         resolved_commit=None,
         entrypoint=["/bin/sh", "-lc", "echo inline-ok"],
         run_mode="inline",
@@ -84,6 +148,7 @@ def test_run_entrypoint_inline_mode_without_repo() -> None:
 def test_run_entrypoint_merges_job_and_orchestrator_env() -> None:
     artifacts = run_entrypoint(
         repo_url=None,
+        ref=None,
         resolved_commit=None,
         entrypoint=[
             "/bin/sh",
@@ -140,6 +205,7 @@ def test_run_entrypoint_proxies_remote_mlflow_with_worker_auth() -> None:
     upstream = f"http://127.0.0.1:{server.server_address[1]}"
     artifacts = run_entrypoint(
         repo_url=None,
+        ref=None,
         resolved_commit=None,
         entrypoint=[
             sys.executable,
