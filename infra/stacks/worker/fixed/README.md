@@ -21,6 +21,8 @@ Required worker env:
 - `PREFECT_API_URL=https://<your-domain>/api`
 - `PREFECT_WORK_POOL=gpu-pool`
 - `PREFECT_WORK_QUEUE=gpu-fixed`
+- `WORKER_ROUTER_URL=https://discoverex.qzz.io`
+- `WORKER_ROUTER_TOKEN=<worker-router-token>`
 
 If Prefect is behind Cloudflare Access, also set either:
 
@@ -28,6 +30,7 @@ If Prefect is behind Cloudflare Access, also set either:
 - or `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`
 
 The entrypoint will merge those into `PREFECT_CLIENT_CUSTOM_HEADERS` automatically.
+Storage and MLflow credentials should not be configured on workers once router mode is enabled.
 
 ## 3) Operate
 

@@ -4,6 +4,7 @@ This machine is storage-only in production:
 
 - MinIO (object SSOT)
 - storage-gateway (presigned URL API)
+- worker-router (worker-facing auth + routing for storage/MLflow)
 - MLflow Tracking server
 - MLflow metadata Postgres
 
@@ -30,13 +31,13 @@ Runtime policy:
 
 ## 2) Access model
 
-- Public exposure: Cloudflare Tunnel -> `discoverex.qzz.io` (storage-gateway), `mlflow.discoverex.qzz.io` (MLflow)
+- Public exposure: Cloudflare Tunnel -> `discoverex.qzz.io` (worker-router), `storage.discoverex.qzz.io` (`/v1/object/proxy*` + MinIO console split), `mlflow.discoverex.qzz.io` (MLflow)
 - Direct exposure forbidden: MinIO API and console must stay localhost-bound
 - Runtime isolation: storage-gateway runs from a built image (no project source bind-mount, no host `.venv` reuse)
 - Presign URL mode: `PRESIGN_MODE=gateway` (gateway proxy URL issuance for external clients)
 - MLflow worker endpoint: `MLFLOW_TRACKING_URI=https://mlflow.discoverex.qzz.io`
 - MLflow auth model: Cloudflare Access(Service Token) only
-- Artifact policy: all file upload/download must go through `storage-gateway` (single entrypoint)
+- Artifact policy: worker presign requests go through `worker-router`, issued object upload/download URLs go through `storage-gateway`
 - MLflow responsibility: metadata only (params/metrics/tags/status). Do not use `mlflow.log_artifact()`.
 - MinIO operator access should use MinIO Console route (`storage.discoverex...`) or localhost-bound console port.
 - Request auth on gateway:
