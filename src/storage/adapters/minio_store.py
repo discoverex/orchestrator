@@ -80,6 +80,7 @@ class MinioObjectStore:
         secure: bool = False,
         auto_create_bucket: bool = True,
         public_base_url: str = "",
+        internal_presign_base_url: str = "",
         client: MinioClientProtocol | None = None,
     ) -> None:
         self.client = client or Minio(
@@ -87,6 +88,7 @@ class MinioObjectStore:
         )
         self.auto_create_bucket = auto_create_bucket
         self.public_base_url = public_base_url.strip()
+        self.internal_presign_base_url = internal_presign_base_url.strip()
 
     def _ensure_bucket(self, bucket: str) -> None:
         if self.auto_create_bucket and not self.client.bucket_exists(bucket):
@@ -177,7 +179,7 @@ class MinioObjectStore:
         url = self.client.get_presigned_url(
             "GET", bucket, object_key, expires=timedelta(seconds=ttl_seconds)
         )
-        return self._public_url(url)
+        return self._rewrite_presigned_url(url, self.public_base_url)
 
     def generate_presigned_put(self, object_uri: str, ttl_seconds: int) -> str:
         bucket, object_key = parse_s3_uri(object_uri)
@@ -185,12 +187,14 @@ class MinioObjectStore:
         url = self.client.get_presigned_url(
             "PUT", bucket, object_key, expires=timedelta(seconds=ttl_seconds)
         )
-        return self._public_url(url)
+        return self._rewrite_presigned_url(
+            url, self.internal_presign_base_url or self.public_base_url
+        )
 
-    def _public_url(self, url: str) -> str:
-        if not self.public_base_url:
+    def _rewrite_presigned_url(self, url: str, base_url: str) -> str:
+        if not base_url:
             return url
-        base_value = self.public_base_url
+        base_value = base_url
         if "://" not in base_value:
             base_value = f"https://{base_value}"
         public = urlsplit(base_value)

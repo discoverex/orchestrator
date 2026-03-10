@@ -127,9 +127,10 @@ class MLflowProxy:
 @contextlib.contextmanager
 def maybe_start_mlflow_proxy(env: dict[str, str]) -> Iterator[dict[str, str]]:
     router_url = env.get("WORKER_ROUTER_URL", "").strip().rstrip("/")
+    tracking_uri = env.get("MLFLOW_TRACKING_URI", "").strip()
     cf_id = env.get("CF_ACCESS_CLIENT_ID", "").strip()
     cf_secret = env.get("CF_ACCESS_CLIENT_SECRET", "").strip()
-    if router_url and cf_id and cf_secret:
+    if router_url and tracking_uri and cf_id and cf_secret:
         proxy = MLflowProxy(
             upstream_url=f"{router_url}/mlflow",
             cf_access_client_id=cf_id,
@@ -147,7 +148,6 @@ def maybe_start_mlflow_proxy(env: dict[str, str]) -> Iterator[dict[str, str]]:
             proxy.close()
         return
 
-    tracking_uri = env.get("MLFLOW_TRACKING_URI", "").strip()
     if (
         not tracking_uri
         or not _is_remote_http_url(tracking_uri)

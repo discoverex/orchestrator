@@ -16,6 +16,7 @@ def build_storage_app_from_env() -> StorageApplicationService:
         auto_create_bucket=os.getenv("MINIO_AUTO_CREATE_BUCKET", "true").lower()
         == "true",
         public_base_url=os.getenv("MINIO_PUBLIC_BASE_URL", ""),
+        internal_presign_base_url=os.getenv("MINIO_INTERNAL_PRESIGN_BASE_URL", ""),
     )
     return StorageApplicationService(
         object_store=store,
