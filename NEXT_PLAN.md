@@ -3,7 +3,7 @@
 ## 0) 현재 결론 (2026-03-10 기준)
 
 - `core` E2E는 통과한다.
-  - 스케줄러(Prefect) -> 워커 -> worker-router -> storage-gateway -> MinIO 흐름 정상
+  - 스케줄러(Prefect) -> 워커 -> storage-api/worker-router -> MinIO 흐름 정상
   - 아티팩트(stdout/stderr/result/manifest) 검증 정상
 - `full` E2E는 현재 실패한다.
   - 실패 지점: `mlflow.verify_tags`
@@ -27,15 +27,14 @@
 
 1. 이미지 기반 런타임 구성
 - `infra/images/base.Dockerfile` (공통 의존성 베이스)
-- `infra/images/storage-gateway.Dockerfile`
 - `infra/images/worker.Dockerfile`
 - `infra/images/register.Dockerfile`
 - `infra/images/worker-router.Dockerfile`
 - `.dockerignore`
 
 2. 컴포즈 전환
-- `docker-compose.local.yml`: storage-gateway/worker/register 이미지 기반 실행
-- `infra/stacks/storage-node/docker-compose.yml`: storage-gateway + worker-router + MLflow 이미지 기반 실행
+- `docker-compose.local.yml`: worker-router/worker/register 이미지 기반 실행
+- `infra/stacks/storage-node/docker-compose.yml`: worker-router + MLflow 이미지 기반 실행
 
 3. MLflow 기동 안정화 보강
 - `infra/images/mlflow.Dockerfile` 추가 (`psycopg2-binary` 포함)
@@ -43,7 +42,7 @@
 - `mlflow` healthcheck를 `curl` -> `python urllib`로 변경
 
 4. 워커 접근 경로/실행 보강
-- 워커 env 기본값을 `WORKER_ROUTER_URL` / `WORKER_ROUTER_TOKEN` 기준으로 변경
+- 워커 env 기본값을 `WORKER_ROUTER_URL` + `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` 기준으로 변경
 - storage presign 요청은 `worker-router` 우선, direct gateway는 fallback으로 유지
 - MLflow 프록시는 `worker-router` 경유 인증을 지원
 - repo run 모드에서 `resolved_commit`만이 아니라 요청된 `ref`를 체크아웃 대상으로 보존
@@ -65,7 +64,7 @@
 - 권장: CNAME -> `<tunnel-id>.cfargotunnel.com` (proxied)
 
 3. CF Access 앱/토큰 재검증 (미완료)
-- `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`가 해당 앱 정책에 매칭되는지 확인
+- `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`가 외부 공개 엔드포인트 정책에 매칭되는지 확인
 
 4. full E2E 재실행 (미완료)
 - Access 정책 수정 후 `mlflow.verify_tags`와 외부 접근 단계까지 통과 여부 재확인
@@ -88,7 +87,6 @@ MLFLOW_PUBLIC_URL=https://mlflow.discoverex.qzz.io
 CF_ACCESS_CLIENT_ID=<cloudflare-access-client-id>
 CF_ACCESS_CLIENT_SECRET=<cloudflare-access-client-secret>
 WORKER_ROUTER_URL=https://discoverex.qzz.io
-WORKER_ROUTER_TOKEN=<worker-router-token>
 ```
 
 권장 확인:

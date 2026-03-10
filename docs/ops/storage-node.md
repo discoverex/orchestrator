@@ -3,8 +3,7 @@
 This machine is storage-only in production:
 
 - MinIO (object SSOT)
-- storage-gateway (presigned URL API)
-- worker-router (worker-facing auth + routing for storage/MLflow)
+- worker-router (storage auth gateway + presign issuer + MLflow routing)
 - MLflow Tracking server
 - MLflow metadata Postgres
 
@@ -20,7 +19,6 @@ set -a; source infra/stacks/storage-node/.env; set +a
 mkdir -p "${MINIO_DATA_DIR}" "${MLFLOW_DB_DATA_DIR}" "${BACKUP_ROOT}"
 
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml build base-runtime
-docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml build storage-gateway
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml build worker-router
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml up -d
 ```
@@ -32,20 +30,18 @@ Runtime policy:
 
 ## 2) Access model
 
-- Public exposure: Cloudflare Tunnel -> `discoverex.qzz.io` (worker-router), `storage.discoverex.qzz.io` (`/v1/object/proxy*` + MinIO console split), `mlflow.discoverex.qzz.io` (MLflow)
+- Public exposure: `storage.discoverex.qzz.io` (human CF/email access), `storage-api.discoverex.qzz.io` (machine CF service-token access), `mlflow.discoverex.qzz.io` (MLflow)
 - Direct exposure forbidden: MinIO API and console must stay localhost-bound
-- Runtime isolation: storage-gateway runs from a built image (no project source bind-mount, no host `.venv` reuse)
-- Presign URL mode: `PRESIGN_MODE=gateway` (gateway proxy URL issuance for external clients)
+- Runtime isolation: worker-router runs from a built image and owns storage control-plane composition
 - MLflow worker endpoint: `MLFLOW_TRACKING_URI=https://mlflow.discoverex.qzz.io`
 - MLflow auth model: Cloudflare Access(Service Token) only
-- Artifact policy: worker presign requests go through `worker-router`, issued object upload/download URLs go through `storage-gateway`
+- Artifact policy: worker presign/head requests go through storage routes on worker-router, issued upload/download URLs go directly to the object endpoint
 - MLflow responsibility: metadata only (params/metrics/tags/status). Do not use `mlflow.log_artifact()`.
-- MinIO operator access should use MinIO Console route (`storage.discoverex...`) or localhost-bound console port.
-- Worker contract: workers should carry only `WORKER_ROUTER_URL` and `WORKER_ROUTER_TOKEN`; direct storage/MLflow credentials stay on this node.
-- Request auth on gateway:
+- MinIO operator access should use localhost-bound console port or a separately protected operator ingress.
+- Worker contract: workers should carry only `STORAGE_API_URL`/`WORKER_ROUTER_URL` and Cloudflare Access credentials; direct storage/MLflow credentials stay on this node.
+- Request auth on storage API:
 
-1. Bearer token (`Authorization`)
-2. Cloudflare Access headers (`CF-Access-Client-Id`, `CF-Access-Client-Secret`) when `GATEWAY_REQUIRE_CF_ACCESS=true`
+1. Cloudflare Access headers (`CF-Access-Client-Id`, `CF-Access-Client-Secret`) when `GATEWAY_REQUIRE_CF_ACCESS=true`
 
 Cloudflare side requirements for MLflow:
 
@@ -61,7 +57,6 @@ Note: `infra/stacks/storage-node/.cloudflared/config.yml` is template-style (`__
 
 ```bash
 curl -fsS http://127.0.0.1:8200/healthz
-curl -fsS http://127.0.0.1:${STORAGE_GATEWAY_PORT}/healthz
 curl -fsS http://127.0.0.1:${MINIO_API_PORT}/minio/health/live
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml exec -T mlflow \
   python -c "import os, urllib.request; p=os.environ.get('MLFLOW_PORT','5000'); urllib.request.urlopen(f'http://localhost:{p}/', timeout=3)"
@@ -71,7 +66,8 @@ Worker-router path quick check:
 
 ```bash
 set -a; source infra/stacks/storage-node/.env; set +a
-curl -fsS -H "Authorization: Bearer ${WORKER_ROUTER_TOKEN}" \
+curl -fsS -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
+  -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
   http://127.0.0.1:8200/mlflow/api/2.0/mlflow/experiments/search
 ```
 
@@ -96,14 +92,14 @@ curl -fsS \
 export MLFLOW_TRACKING_URI=https://mlflow.discoverex.qzz.io
 # run mlflow.start_run(), then:
 # - log param/metric/tag only
-# - upload files via storage-gateway
+# - upload files via storage-api-issued presigned URLs
 # - save returned object_uri values as MLflow tags (artifact_manifest_uri, artifact_stdout_uri, ...)
 ```
 
 If it fails at `mlflow.verify_tags` with `mlflow runs/create failed: HTTP 403`,
 Cloudflare Access policy is still blocking MLflow write APIs for the service token.
 
-If worker-side artifact preparation fails with `non-json response from storage gateway`,
+If worker-side artifact preparation fails with `non-json response from storage API`,
 inspect `worker-router` logs first; that now usually indicates an auth or upstream routing mismatch rather than a worker bug.
 
 ## 5) Backup (daily, retain 30 days)
