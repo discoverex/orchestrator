@@ -48,11 +48,27 @@ def recreate_venv(config: ColabRuntimeConfig, env: dict[str, str]) -> Path:
     if config.venv_dir.exists():
         log_step("bootstrap", f"remove existing venv {config.venv_dir}")
         shutil.rmtree(config.venv_dir)
-    run_command(
-        [config.python_bin, "-m", "venv", str(config.venv_dir)],
-        env=env,
-        step="bootstrap",
-    )
+    try:
+        run_command(
+            [config.python_bin, "-m", "venv", str(config.venv_dir)],
+            env=env,
+            step="bootstrap",
+        )
+    except RuntimeError:
+        log_step(
+            "bootstrap",
+            "python -m venv failed; falling back to virtualenv bootstrap",
+        )
+        run_command(
+            [config.python_bin, "-m", "pip", "install", "-U", "virtualenv"],
+            env=env,
+            step="bootstrap",
+        )
+        run_command(
+            [config.python_bin, "-m", "virtualenv", str(config.venv_dir)],
+            env=env,
+            step="bootstrap",
+        )
     if not config.venv_python.exists():
         raise RuntimeError(
             f"virtualenv creation failed: {config.venv_python} not found"
