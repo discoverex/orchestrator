@@ -39,7 +39,7 @@ docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.tes
 Register deployment and run:
 
 ```bash
-docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect work-pool create colab-gpu --type process || true
+docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect work-pool create gpu-pool --type process || true
 docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml run --rm register
 docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment run 'engine-run/engine-run' \
   -p job_spec_json='{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo hello-prefect"],"config":null,"inputs":{},"env":{},"outputs_prefix":null}'
@@ -71,19 +71,38 @@ prefect deployment run 'engine-run/engine-run' \
 Primary operation should be script-first:
 
 ```bash
-PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py start \
+PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py bootstrap \
+  --repo-dir /content/drive/MyDrive/discoverex/orchestrator \
+  --cache-root /content/drive/MyDrive/discoverex/cache \
+  --venv-dir /content/venv
+
+/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py start \
+  --skip-install \
   --checkpoint-dir /content/drive/MyDrive/orchestrator/checkpoints
 ```
+
+The runtime layout is:
+
+- repo: Google Drive
+- pip/XDG cache: Google Drive
+- virtualenv: `/content/venv`
+
+The runner auto-loads repo-root `.env` when present and creates the checkpoint
+directory after Drive is mounted. Do not create the virtualenv on Google Drive.
 
 Other commands:
 
 ```bash
-PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py status
-PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py logs --tail 80
-PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py stop
+/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py status
+/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py logs --tail 80
+/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py stop
 ```
 
 Optional notebook: `infra/stacks/worker/colab/worker_colab.ipynb`
+It keeps only minimal bootstrap logic inline: the notebook can begin from a
+session where only the notebook file is present, configure env, clone or
+refresh the repo into Drive, and then invoke the checked-out
+`infra/stacks/worker/colab/colab_worker_runner.py` with Colab-visible logs.
 
 Artifact and experiment policy:
 

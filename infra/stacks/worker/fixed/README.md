@@ -16,6 +16,19 @@ cp infra/stacks/worker/fixed/.env.example infra/stacks/worker/fixed/.env
 docker compose --env-file infra/stacks/worker/fixed/.env -f infra/stacks/worker/fixed/docker-compose.yml up -d --build
 ```
 
+Required worker env:
+
+- `PREFECT_API_URL=https://<your-domain>/api`
+- `PREFECT_WORK_POOL=gpu-pool`
+- `PREFECT_WORK_QUEUE=gpu-fixed`
+
+If Prefect is behind Cloudflare Access, also set either:
+
+- `PREFECT_CF_ACCESS_CLIENT_ID` / `PREFECT_CF_ACCESS_CLIENT_SECRET`
+- or `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`
+
+The entrypoint will merge those into `PREFECT_CLIENT_CUSTOM_HEADERS` automatically.
+
 ## 3) Operate
 
 ```bash
