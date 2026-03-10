@@ -22,7 +22,7 @@ services:
       CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-}
       CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-}
       PREFECT_BROWSER_USER_AGENT: ${PREFECT_BROWSER_USER_AGENT:-}
-      WORKER_ROUTER_URL: ${WORKER_ROUTER_URL:-}
+      STORAGE_API_URL: ${STORAGE_API_URL:-}
       ORCHESTRATOR_CHECKPOINT_DIR: /var/lib/orchestrator/checkpoints
     volumes:
       - ${WORKER_CHECKPOINT_DIR:-/srv/orchestrator/checkpoints}:/var/lib/orchestrator/checkpoints

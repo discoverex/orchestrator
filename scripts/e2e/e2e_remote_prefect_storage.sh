@@ -21,8 +21,7 @@ PREFECT_WORK_POOL="${PREFECT_WORK_POOL:-gpu-pool}"
 PREFECT_WORK_QUEUE="${PREFECT_WORK_QUEUE:-gpu-fixed}"
 CF_ACCESS_CLIENT_ID="${CF_ACCESS_CLIENT_ID:-}"
 CF_ACCESS_CLIENT_SECRET="${CF_ACCESS_CLIENT_SECRET:-}"
-STORAGE_API_URL="${STORAGE_API_URL:-https://storage-api.discoverex.qzz.io/artifact}"
-WORKER_ROUTER_URL="${WORKER_ROUTER_URL:-https://discoverex.qzz.io}"
+STORAGE_API_URL="${STORAGE_API_URL:-https://storage-api.discoverex.qzz.io}"
 ARTIFACT_BUCKET="${ARTIFACT_BUCKET:-orchestrator-artifacts}"
 MINIO_API_PORT="${MINIO_API_PORT:-9000}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-600}"
@@ -66,7 +65,7 @@ Options:
   --work-queue NAME             Prefect work queue name (default: gpu-fixed)
   --prefect-access-client-id ID
   --prefect-access-client-secret SECRET
-  --storage-api-url URL         Storage API URL (default: https://storage-api.discoverex.qzz.io/artifact)
+  --storage-api-url URL         Storage API URL (default: https://storage-api.discoverex.qzz.io)
   --artifact-bucket NAME        Artifact bucket name (default: orchestrator-artifacts)
   --timeout-sec N               Timeout for flow completion (default: 600)
   --job-spec-json JSON          JobSpec payload (default: engine generate repo job built from engine wrapper)
@@ -284,7 +283,7 @@ bootstrap_temp_worker() {
     -e PREFECT_API_URL="${PREFECT_API_URL}" \
     -e PREFECT_CLIENT_CUSTOM_HEADERS="${PREFECT_CUSTOM_HEADERS_JSON}" \
     -e PREFECT_WORK_POOL="${PREFECT_WORK_POOL}" \
-    -e WORKER_ROUTER_URL="${WORKER_ROUTER_URL}" \
+    -e STORAGE_API_URL="${STORAGE_API_URL}" \
     -e CF_ACCESS_CLIENT_ID="${CF_ACCESS_CLIENT_ID}" \
     -e CF_ACCESS_CLIENT_SECRET="${CF_ACCESS_CLIENT_SECRET}" \
     orchestrator-worker:local
@@ -304,7 +303,7 @@ if [[ -n "${CF_ACCESS_CLIENT_ID}" && -n "${CF_ACCESS_CLIENT_SECRET}" ]]; then
 fi
 
 must_step "preflight.tools" bash -lc "command -v docker >/dev/null && command -v curl >/dev/null && command -v python3 >/dev/null"
-must_step "preflight.storage_api_health" curl -fsS "${WORKER_ROUTER_URL%/}/healthz"
+must_step "preflight.storage_api_health" curl -fsS "${STORAGE_API_URL%/}/healthz"
 must_step "preflight.minio_health" curl -fsS "http://127.0.0.1:${MINIO_API_PORT}/minio/health/live"
 must_step "engine.build_job_spec" build_engine_job_spec
 must_step "build.base_register_worker_images" docker compose -f "${LOCAL_TEST_COMPOSE}" build base-runtime register worker

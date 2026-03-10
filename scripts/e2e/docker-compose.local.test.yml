@@ -75,7 +75,7 @@ services:
     environment:
       PREFECT_API_URL: http://prefect:4200/api
       PREFECT_WORK_POOL: gpu-pool
-      WORKER_ROUTER_URL: http://worker-router:8200
+      STORAGE_API_URL: http://worker-router:8200
       CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-local-e2e-client}
       CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-local-e2e-secret}
     volumes:

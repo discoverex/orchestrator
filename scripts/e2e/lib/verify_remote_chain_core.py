@@ -80,6 +80,13 @@ def gateway_headers(token: str) -> dict[str, str]:
     return {"Content-Type": "application/json"}
 
 
+def artifact_api_base(storage_api_url: str) -> str:
+    base = storage_api_url.rstrip("/")
+    if base.endswith("/artifact"):
+        return base
+    return f"{base}/artifact"
+
+
 def run_ops_script(
     script_rel_path: str, env_overrides: dict[str, str], argv: list[str]
 ) -> dict[str, Any]:
@@ -183,7 +190,7 @@ def command_storage_objects(
     if cf_id and cf_secret:
         headers["CF-Access-Client-Id"] = cf_id
         headers["CF-Access-Client-Secret"] = cf_secret
-    base = args.storage_api_url.rstrip("/")
+    base = artifact_api_base(args.storage_api_url)
 
     for object_uri in uris.values():
         out = http_json_fn(
@@ -270,7 +277,7 @@ def command_flush_verify(
 ) -> dict[str, Any]:
     env = {
         "PREFECT_API_URL": args.prefect_api_url,
-        "FLUSH_TARGET_URL": args.storage_api_url,
+        "FLUSH_TARGET_URL": artifact_api_base(args.storage_api_url),
         "FLUSH_CURSOR_PATH": args.cursor_path,
         "FLUSH_PAGE_SIZE": str(args.page_size),
         "FLUSH_MAX_RUNS": str(args.max_runs),

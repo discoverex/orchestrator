@@ -79,6 +79,13 @@ def _http_text(
     return body.decode("utf-8")
 
 
+def _artifact_api_base(storage_api_url: str) -> str:
+    base = storage_api_url.rstrip("/")
+    if base.endswith("/artifact"):
+        return base
+    return f"{base}/artifact"
+
+
 def _extract_json_object(raw: str) -> dict[str, object]:
     for line in reversed(raw.splitlines()):
         candidate = line.strip()
@@ -131,7 +138,7 @@ def cmd_poll_prefect_completion(args: argparse.Namespace) -> int:
 
 def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
     flow_run_id = args.flow_run_id
-    gateway = args.storage_api_url.rstrip("/")
+    gateway = _artifact_api_base(args.storage_api_url)
     bucket = args.artifact_bucket
     log_dir = Path(args.log_dir)
     attempt = 1

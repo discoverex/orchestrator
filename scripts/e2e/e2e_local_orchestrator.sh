@@ -63,7 +63,7 @@ mkdir -p "${LOG_DIR}"
 
 PREFECT_API_URL="${PREFECT_API_URL:-http://127.0.0.1:24200/api}"
 PREFECT_WORK_POOL="${PREFECT_WORK_POOL:-gpu-pool}"
-STORAGE_API_URL="${STORAGE_API_URL:-http://127.0.0.1:8200/storage/artifact}"
+STORAGE_API_URL="${STORAGE_API_URL:-http://127.0.0.1:8200}"
 ARTIFACT_BUCKET="${ARTIFACT_BUCKET:-orchestrator-artifacts}"
 ENGINE_REPO_REF="${ENGINE_REPO_REF:-$(git -C "${ENGINE_DIR}" rev-parse HEAD)}"
 ENGINE_LOCAL_REPO_PATH_HOST="${ENGINE_LOCAL_REPO_PATH_HOST:-${ENGINE_DIR}}"
@@ -185,7 +185,7 @@ verify_prefect_flush() {
     orchestrator-base:local \
     /bin/sh -lc "\
       PREFECT_API_URL=http://prefect:4200/api \
-      FLUSH_TARGET_URL=http://worker-router:8200/storage/artifact \
+      FLUSH_TARGET_URL=http://worker-router:8200/artifact \
       FLUSH_CURSOR_PATH=/workspace/${LOG_DIR}/prefect-flush-cursor.json \
       PYTHONPATH=src /opt/venv/bin/python scripts/ops/prefect_flush_completed.py --once --page-size 100 --max-runs 500 \
       > /workspace/${out_json}"
