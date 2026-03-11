@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 
 load_remote_env() {
-  local root_dir="$1"
-  if [[ -f "${root_dir}/.env" ]]; then
-    set -a
-    # shellcheck disable=SC1091
-    source "${root_dir}/.env"
-    set +a
-  fi
+  load_repo_env
+
+  REMOTE_USERNAME="${REMOTE_USERNAME:-}"
+  REMOTE_HOST="${REMOTE_HOST:-}"
+  GITHUB_DEPLOY_KEY_PATH="${GITHUB_DEPLOY_KEY_PATH:-}"
+  REMOTE_PROJECT_PATH="${REMOTE_PROJECT_PATH:-}"
+  REMOTE_PREFECT_PATH="${REMOTE_PREFECT_PATH:-/opt/services/orchestrator-prefect}"
+  REMOTE_PREFECT_ENV="${REMOTE_PREFECT_ENV:-.env}"
+  REMOTE_PREFECT_COMPOSE="${REMOTE_PREFECT_COMPOSE:-docker-compose.yml}"
+
+  GITHUB_DEPLOY_KEY_PATH="$(normalize_deploy_key_path "${GITHUB_DEPLOY_KEY_PATH}")"
+  REMOTE_PROJECT_PATH="$(ensure_remote_project_path "${REMOTE_PROJECT_PATH}" "${REMOTE_USERNAME}")"
 }
 
 normalize_deploy_key_path() {
@@ -67,6 +72,21 @@ join_quoted() {
     out+=" $(printf "%q" "${arg}")"
   done
   printf "%s" "${out}"
+}
+
+remote_prefect_compose() {
+  if [[ "$#" -eq 0 ]]; then
+    echo "missing prefect compose args" >&2
+    return 1
+  fi
+
+  local compose_cmd
+  compose_cmd="if [[ -n \"${REMOTE_PREFECT_ENV}\" && -f \"${REMOTE_PREFECT_ENV}\" ]]; then docker compose --env-file ${REMOTE_PREFECT_ENV} -f ${REMOTE_PREFECT_COMPOSE}"
+  compose_cmd+="$(join_quoted "$@")"
+  compose_cmd+="; else docker compose -f ${REMOTE_PREFECT_COMPOSE}"
+  compose_cmd+="$(join_quoted "$@")"
+  compose_cmd+="; fi"
+  remote_prefect_exec "${compose_cmd}"
 }
 
 remote_prefect_worker_ls() {

@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  cli <domain> <action> [options]
+
+Domains:
+  base       Base runtime image helpers
+  e2e        Local and remote validation flows
+  local      Local compose stack lifecycle
+  observability  Prefect diagnostics and smoke checks
+  ops        Remote operational helpers
+  prefect    Prefect stack lifecycle and maintenance
+  register   Deployment registration helpers
+  runtime    Runtime directory initialization
+  storage    Storage stack lifecycle
+  worker     Worker lifecycle and submission helpers
+
+Examples:
+  cli base build
+  cli storage up
+  cli local up
+  cli observability workers --work-pool gpu-pool
+  cli prefect up
+  cli prefect ps --remote
+  cli prefect workers --remote
+  cli runtime init all
+  cli e2e local --mode core
+  cli e2e remote --prefect-api-url https://prefect.example.com/api
+EOF
+}
+
+domain="${1:-help}"
+shift || true
+
+case "${domain}" in
+  help|-h|--help)
+    usage
+    ;;
+  base)
+    exec "${ROOT_DIR}/scripts/base/cli.sh" "$@"
+    ;;
+  storage)
+    exec "${ROOT_DIR}/scripts/storage/cli.sh" "$@"
+    ;;
+  local)
+    exec "${ROOT_DIR}/scripts/local/cli.sh" "$@"
+    ;;
+  observability)
+    exec "${ROOT_DIR}/scripts/observability/cli.sh" "$@"
+    ;;
+  prefect)
+    exec "${ROOT_DIR}/scripts/prefect/cli.sh" "$@"
+    ;;
+  register)
+    exec "${ROOT_DIR}/scripts/register/cli.sh" "$@"
+    ;;
+  worker)
+    exec "${ROOT_DIR}/scripts/worker/cli.sh" "$@"
+    ;;
+  runtime)
+    exec "${ROOT_DIR}/scripts/runtime/cli.sh" "$@"
+    ;;
+  e2e)
+    exec "${ROOT_DIR}/scripts/e2e/cli.sh" "$@"
+    ;;
+  ops)
+    exec "${ROOT_DIR}/scripts/ops/cli.sh" "$@"
+    ;;
+  *)
+    echo "unknown domain: ${domain}" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
