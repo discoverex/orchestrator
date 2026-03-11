@@ -159,6 +159,6 @@ uv run python scripts/observability/prefect_check_auth.py
 Storage + MLflow:
 
 ```bash
-./bin/cli observability fixed-dummy-smoke --deployment-name engine-run --timeout-sec 240
+./bin/cli observability fixed-dummy-smoke --deployment-name discoverex-engine-run --timeout-sec 240
 uv run python scripts/observability/prefect_verify_standard_dummy_run.py --flow-run-id <FLOW_RUN_ID>
 ```
