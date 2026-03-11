@@ -59,7 +59,9 @@ def main() -> int:
         "final_flow_run": summarize_flow_run(final),
     }
     print_json(result)
-    state_type = str(cast(dict[str, object], result["final_flow_run"]).get("state_type") or "").upper()
+    state_type = str(
+        cast(dict[str, object], result["final_flow_run"]).get("state_type") or ""
+    ).upper()
     return 0 if state_type == "COMPLETED" else 1
 
 
