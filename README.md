@@ -2,8 +2,8 @@
 
 Prefect-based orchestration workspace with four responsibilities:
 
-- `flows`: Prefect workflow definitions (`engine_run_flow`)
-- `runner`: git checkout (resolved commit) + entrypoint execution
+- `flows`: compatibility and maintenance Prefect workflows
+- `runner`: execution adapter for source checkout + entrypoint execution
 - `storage`: hexagonal storage module for presign/head control-plane logic
 - `worker_router`: worker-facing auth gateway for storage control APIs and MLflow
 
@@ -39,7 +39,7 @@ Core interaction path:
 
 1. register deployment to Prefect
 2. submit flow run to work pool/queue
-3. worker executes `engine_run_flow`
+3. worker executes the registered engine deployment or the compatibility wrapper
 4. worker requests presigned URLs via `storage-api` and uploads objects through `storage-api` signed object paths
 5. worker records run metadata via `storage-api/mlflow`
 6. flush exports completed run snapshots to storage
@@ -51,7 +51,7 @@ Standard validation path:
 2. verify artifact objects and MLflow linkage
 
 ```bash
-./bin/cli observability fixed-dummy-smoke --deployment-name engine-run --timeout-sec 240
+./bin/cli observability fixed-dummy-smoke --deployment-name discoverex-engine-run --timeout-sec 240
 uv run python scripts/observability/prefect_verify_standard_dummy_run.py --flow-run-id <FLOW_RUN_ID>
 ```
 
@@ -70,7 +70,7 @@ Register deployment and run:
 ```bash
 docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect work-pool create gpu-pool --type process || true
 docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml run --rm register
-docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment run 'engine-run/engine-run' \
+docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment run 'run-job/discoverex-engine-run' \
   -p job_spec_json='{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo hello-prefect"],"config":null,"inputs":{},"env":{},"outputs_prefix":null}'
 ```
 
@@ -89,7 +89,7 @@ docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.tes
 Example:
 
 ```bash
-prefect deployment run 'engine-run/engine-run' \
+prefect deployment run 'run-job/discoverex-engine-run' \
   -p job_spec_json='{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo hello-prefect"],"config":null,"inputs":{},"env":{},"outputs_prefix":null}' \
   -p resume_key='job-001' \
   -p checkpoint_dir='/content/drive/MyDrive/orchestrator/checkpoints'

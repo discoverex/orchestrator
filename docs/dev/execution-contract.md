@@ -64,6 +64,10 @@ Optional additional gateway protection:
 
 `Prefect flow result` is the source of truth for run metadata.
 
+Implementation-facing runtime contract:
+
+- [Engine Implementation Contract](/home/esillileu/discoverex/orchestrator/docs/dev/engine-implementation-contract.md)
+
 ## E2E Acceptance (Register -> Worker -> Storage)
 
 The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the orchestration chain in two modes:
@@ -73,7 +77,7 @@ The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the or
 
 Core pass criteria:
 
-1. `engine-run/engine-run` deployment exists after register.
+1. `run-job/discoverex-engine-run` deployment exists after register.
 2. Submitted flow run reaches `COMPLETED`.
 3. All required objects exist:
    - `stdout.log`

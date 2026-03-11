@@ -83,7 +83,7 @@ curl -fsS -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
 ```bash
 set -a; source infra/stacks/storage-node/.env; set +a
 
-# 0) DNS resolution must work before E2E full mode
+# 0) DNS resolution must work before MLflow/external verification
 getent ahosts storage-api.discoverex.qzz.io
 getent ahosts storage.discoverex.qzz.io
 
