@@ -27,12 +27,14 @@ MINIO_API_PORT="${MINIO_API_PORT:-9000}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-600}"
 PRUNE_MODE="${PRUNE_MODE:-dry-run}"
 PRUNE_TTL_HOURS="${PRUNE_TTL_HOURS:-72}"
+RUN_MODE="${RUN_MODE:-engine}"
 KEEP_ON_FAIL="false"
 REGISTER_ONLY="false"
 BOOTSTRAP_WORKER="false"
 WORKER_CONTAINER_NAME="orchestrator-e2e-temp-worker"
 FLOW_RUN_ID=""
 JOB_SPEC_JSON=""
+JOB_SPEC_FILE=""
 ENGINE_REPO_URL="${ENGINE_REPO_URL:-$(git -C "${ENGINE_DIR}" remote get-url origin)}"
 ENGINE_REPO_REF="${ENGINE_REPO_REF:-$(git -C "${ENGINE_DIR}" branch --show-current)}"
 ENGINE_BACKGROUND_ASSET_REF="${ENGINE_BACKGROUND_ASSET_REF:-bg://dummy}"
@@ -68,7 +70,9 @@ Options:
   --storage-api-url URL         Storage API URL (default: https://storage-api.discoverex.qzz.io)
   --artifact-bucket NAME        Artifact bucket name (default: orchestrator-artifacts)
   --timeout-sec N               Timeout for flow completion (default: 600)
+  --mode dummy|engine           Validation mode (default: engine)
   --job-spec-json JSON          JobSpec payload (default: engine generate repo job built from engine wrapper)
+  --job-spec-file PATH          JobSpec file path (default: unset)
   --prune-mode dry-run|apply    Prune validation mode (default: dry-run)
   --prune-ttl-hours N           TTL hours passed to prune (default: 72)
   --register-only               Stop after deployment register/verify
@@ -116,8 +120,16 @@ while [[ $# -gt 0 ]]; do
       TIMEOUT_SEC="${2:-}"
       shift 2
       ;;
+    --mode)
+      RUN_MODE="${2:-}"
+      shift 2
+      ;;
     --job-spec-json)
       JOB_SPEC_JSON="${2:-}"
+      shift 2
+      ;;
+    --job-spec-file)
+      JOB_SPEC_FILE="${2:-}"
       shift 2
       ;;
     --prune-mode)
@@ -178,6 +190,11 @@ fi
 
 if ! [[ "${PRUNE_TTL_HOURS}" =~ ^[0-9]+$ ]]; then
   echo "--prune-ttl-hours must be an integer" >&2
+  exit 2
+fi
+
+if [[ "${RUN_MODE}" != "dummy" && "${RUN_MODE}" != "engine" ]]; then
+  echo "--mode must be dummy or engine" >&2
   exit 2
 fi
 
@@ -244,6 +261,14 @@ must_step() {
 build_engine_job_spec() {
   if [[ -n "${JOB_SPEC_JSON}" ]]; then
     printf '%s' "${JOB_SPEC_JSON}" >"${LOG_DIR}/job-spec.json"
+    return 0
+  fi
+  if [[ -n "${JOB_SPEC_FILE}" ]]; then
+    if [[ ! -f "${JOB_SPEC_FILE}" ]]; then
+      echo "job spec file not found: ${JOB_SPEC_FILE}" >&2
+      return 1
+    fi
+    cp "${JOB_SPEC_FILE}" "${LOG_DIR}/job-spec.json"
     return 0
   fi
   if [[ -z "${ENGINE_MLFLOW_TRACKING_URI}" ]]; then
@@ -334,13 +359,30 @@ fi
 record_step "prefect.extract_flow_run_id" "pass" "${FLOW_RUN_ID}"
 
 must_step "prefect.wait_flow_completion" python3 "${VERIFY_SCRIPT}" prefect-wait-completed --prefect-api-url "${PREFECT_API_URL}" --flow-run-id "${FLOW_RUN_ID}" --timeout-sec "${TIMEOUT_SEC}" --prefect-cf-access-client-id "${CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET}"
-must_step "storage.verify_objects" python3 "${PY_HELPER}" verify-storage-objects --flow-run-id "${FLOW_RUN_ID}" --storage-api-url "${STORAGE_API_URL}" --cf-access-client-id "${CF_ACCESS_CLIENT_ID}" --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET}" --artifact-bucket "${ARTIFACT_BUCKET}" --log-dir "${LOG_DIR}"
-if MLFLOW_RUN_ID="$(python3 "${PY_HELPER}" verify-engine-mlflow-run --mlflow-tracking-uri "${ENGINE_MLFLOW_TRACKING_URI}" --log-dir "${LOG_DIR}" --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" 2>>"${RUN_LOG}")"; then
-  record_step "mlflow.verify_engine_run" "pass" "${MLFLOW_RUN_ID}"
+storage_verify_args=(
+  python3 "${PY_HELPER}" verify-storage-objects
+  --flow-run-id "${FLOW_RUN_ID}"
+  --storage-api-url "${STORAGE_API_URL}"
+  --cf-access-client-id "${CF_ACCESS_CLIENT_ID}"
+  --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET}"
+  --artifact-bucket "${ARTIFACT_BUCKET}"
+  --log-dir "${LOG_DIR}"
+)
+if [[ "${RUN_MODE}" == "dummy" ]]; then
+  storage_verify_args+=(--skip-engine-artifacts)
+fi
+must_step "storage.verify_objects" "${storage_verify_args[@]}"
+
+if [[ "${RUN_MODE}" == "engine" ]]; then
+  if MLFLOW_RUN_ID="$(python3 "${PY_HELPER}" verify-engine-mlflow-run --mlflow-tracking-uri "${ENGINE_MLFLOW_TRACKING_URI}" --log-dir "${LOG_DIR}" --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" 2>>"${RUN_LOG}")"; then
+    record_step "mlflow.verify_engine_run" "pass" "${MLFLOW_RUN_ID}"
+  else
+    record_step "mlflow.verify_engine_run" "fail" "matching run not found"
+    collect_diagnostics
+    exit 1
+  fi
 else
-  record_step "mlflow.verify_engine_run" "fail" "matching run not found"
-  collect_diagnostics
-  exit 1
+  record_step "mlflow.verify_engine_run" "pass" "skipped for dummy mode"
 fi
 must_step "prefect.verify_flush" python3 "${VERIFY_SCRIPT}" flush-verify --prefect-api-url "${PREFECT_API_URL}" --storage-api-url "${STORAGE_API_URL}" --flow-run-id "${FLOW_RUN_ID}" --cursor-path "${LOG_DIR}/prefect-flush-cursor.json" --prefect-cf-access-client-id "${CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET}"
 

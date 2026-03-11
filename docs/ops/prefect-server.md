@@ -70,14 +70,21 @@ Expected external API endpoint:
 Run from the storage-node machine:
 
 ```bash
-./bin/cli e2e remote \
+./bin/cli e2e remote dummy \
+  --prefect-api-url https://<domain>/api
+```
+
+Full engine validation:
+
+```bash
+./bin/cli e2e remote engine \
   --prefect-api-url https://<domain>/api
 ```
 
 PoC-only destructive prune verification:
 
 ```bash
-./bin/cli e2e remote \
+./bin/cli e2e remote engine \
   --prefect-api-url https://<domain>/api \
   --prune-mode apply \
   --prune-ttl-hours 0
@@ -86,7 +93,9 @@ PoC-only destructive prune verification:
 Operational notes:
 
 - `register` is a one-shot container (`run --rm`) that exits after deployment registration.
-- The validation script assumes production worker is already polling the target pool/queue.
+- `remote dummy` is the control-plane check and avoids external engine helper dependencies.
+- `remote engine` is the full production path and assumes the external engine helper + repo inputs are available.
+- The validation scripts assume production worker is already polling the target pool/queue.
 - `--bootstrap-worker` exists only as temporary bootstrap support and should be removed when production worker validation is fully adopted.
 - Recommended production split:
   - fixed worker: `gpu-pool` + `gpu-fixed`

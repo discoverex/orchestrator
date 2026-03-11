@@ -49,7 +49,12 @@ def _http_json(
     timeout: int = 15,
 ) -> dict[str, object]:
     data = None
-    req_headers = dict(headers or {})
+    req_headers = {
+        "Accept": "application/json",
+        "User-Agent": "orchestrator-e2e/1.0",
+    }
+    if headers:
+        req_headers.update(headers)
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         req_headers.setdefault("Content-Type", "application/json")

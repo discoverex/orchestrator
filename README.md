@@ -184,7 +184,8 @@ Runbook: `docs/ops/prefect-server.md`
 ```bash
 ./bin/cli runtime init all
 ./bin/cli e2e local mlflow --keep-on-fail
-./bin/cli e2e remote --prefect-api-url https://prefect.example.com/api --prune-mode apply
+./bin/cli e2e remote dummy --prefect-api-url https://prefect.example.com/api
+./bin/cli e2e remote engine --prefect-api-url https://prefect.example.com/api --prune-mode apply
 ./bin/cli storage up
 ./bin/cli storage down
 ./bin/cli local up
@@ -247,12 +248,16 @@ MLflow run/tag linkage without external endpoints.
 Remote Prefect + local storage E2E (production-worker oriented):
 
 ```bash
-# register + run + storage verify + flush + prune dry-run
-./bin/cli e2e remote \
+# control-plane dummy path: register + dummy run + storage verify + flush + prune dry-run
+./bin/cli e2e remote dummy \
   --prefect-api-url https://prefect.example.com/api
 
-# PoC mode (allow prune apply)
-./bin/cli e2e remote \
+# full engine path: register + real engine job + storage verify + flush + prune dry-run
+./bin/cli e2e remote engine \
+  --prefect-api-url https://prefect.example.com/api
+
+# PoC mode for full engine path (allow prune apply)
+./bin/cli e2e remote engine \
   --prefect-api-url https://prefect.example.com/api \
   --prune-mode apply \
   --prune-ttl-hours 0
@@ -260,6 +265,9 @@ Remote Prefect + local storage E2E (production-worker oriented):
 
 Notes:
 
-- Default flow assumes an existing operational worker in the target work pool.
+- `remote dummy` uses the checked-in inline dummy job spec and does not require the external engine helper script.
+- `remote engine` keeps the previous behavior and builds a repo-based engine job spec through the external engine helper.
+- `./bin/cli e2e remote ...` without an explicit mode is kept as an alias for `remote engine`.
+- Both flows assume an existing operational worker in the target work pool unless `--bootstrap-worker` is used.
 - `--bootstrap-worker` is available only for temporary bootstrapping and should be removed during production cutover.
 - Workers should use `STORAGE_API_URL` for storage and `MLFLOW_TRACKING_URI=https://storage-api.../mlflow` for MLflow.
