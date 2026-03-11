@@ -3,6 +3,15 @@ set -euo pipefail
 
 : "${PREFECT_API_URL:?PREFECT_API_URL is required}"
 
+if [[ "${PREFECT_CLIENT_CUSTOM_HEADERS:-}" == "" ]]; then
+  unset PREFECT_CLIENT_CUSTOM_HEADERS || true
+fi
+
+eval "$(
+  /opt/venv/bin/python -c \
+  'from common.prefect_client_env import shell_exports; print(shell_exports())'
+)"
+
 DEPLOYMENT_NAME="${REGISTER_DEPLOYMENT_NAME:-engine-run}"
 WORK_POOL="${PREFECT_WORK_POOL:-gpu-pool}"
 WORK_QUEUE="${PREFECT_WORK_QUEUE:-default}"

@@ -5,15 +5,12 @@ import os
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
+from typing import Any
 
 import pytest
 
 COLAB_DIR = (
-    Path(__file__).resolve().parents[2]
-    / "infra"
-    / "stacks"
-    / "worker"
-    / "colab"
+    Path(__file__).resolve().parents[2] / "infra" / "stacks" / "worker" / "colab"
 )
 
 
@@ -24,7 +21,7 @@ def _load_module(name: str) -> ModuleType:
     return importlib.import_module(name)
 
 
-def _build_config(runtime_mod: ModuleType, tmp_path: Path) -> object:
+def _build_config(runtime_mod: ModuleType, tmp_path: Path) -> Any:
     return runtime_mod.ColabRuntimeConfig(
         repo_dir=tmp_path / "repo",
         cache_root=tmp_path / "cache",
@@ -39,8 +36,6 @@ def test_prefect_env_sets_default_queue(monkeypatch: pytest.MonkeyPatch) -> None
     runtime = _load_module("colab_runtime")
     monkeypatch.delenv("PREFECT_WORK_QUEUE", raising=False)
     monkeypatch.delenv("PREFECT_CLIENT_CUSTOM_HEADERS", raising=False)
-    monkeypatch.delenv("PREFECT_CF_ACCESS_CLIENT_ID", raising=False)
-    monkeypatch.delenv("PREFECT_CF_ACCESS_CLIENT_SECRET", raising=False)
     monkeypatch.delenv("CF_ACCESS_CLIENT_ID", raising=False)
     monkeypatch.delenv("CF_ACCESS_CLIENT_SECRET", raising=False)
 
@@ -50,21 +45,21 @@ def test_prefect_env_sets_default_queue(monkeypatch: pytest.MonkeyPatch) -> None
     assert "PREFECT_CLIENT_CUSTOM_HEADERS" not in env
 
 
-def test_populate_colab_env_maps_generic_cf_headers(
+def test_populate_colab_env_maps_cf_access_headers(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     runtime = _load_module("colab_runtime")
     config = _build_config(runtime, tmp_path)
     monkeypatch.delenv("PREFECT_CLIENT_CUSTOM_HEADERS", raising=False)
-    monkeypatch.delenv("PREFECT_CF_ACCESS_CLIENT_ID", raising=False)
-    monkeypatch.delenv("PREFECT_CF_ACCESS_CLIENT_SECRET", raising=False)
-    monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "generic-id")
-    monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "generic-secret")
+    monkeypatch.delenv("CF_ACCESS_CLIENT_ID", raising=False)
+    monkeypatch.delenv("CF_ACCESS_CLIENT_SECRET", raising=False)
+    monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "prefect-id")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "prefect-secret")
 
     snapshot = runtime.populate_colab_env(config)
 
     assert snapshot["prefect_work_queue"] == "gpu-colab"
-    assert runtime.clean_env_value(os.environ["CF_ACCESS_CLIENT_ID"]) == "generic-id"
+    assert runtime.clean_env_value(os.environ["CF_ACCESS_CLIENT_ID"]) == "prefect-id"
     assert "CF-Access-Client-Id" in os.environ["PREFECT_CLIENT_CUSTOM_HEADERS"]
 
 
@@ -130,7 +125,7 @@ def test_bootstrap_runtime_installs_runtime_requirements(
         cwd: Path | None = None,
         check: bool = True,
         step: str,
-    ) -> object:
+    ) -> SimpleNamespace:
         del env, cwd, check, step
         commands.append(cmd)
         return SimpleNamespace(output="ok")
@@ -156,7 +151,9 @@ def test_bootstrap_runtime_installs_runtime_requirements(
     assert "ready python=python3" in output
 
 
-def test_project_runtime_requirements_reads_project_dependencies(tmp_path: Path) -> None:
+def test_project_runtime_requirements_reads_project_dependencies(
+    tmp_path: Path,
+) -> None:
     bootstrap = _load_module("colab_bootstrap")
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
@@ -285,7 +282,9 @@ def test_stop_worker_reports_timeout_when_process_survives(
     pid_file.write_text("654", encoding="utf-8")
     calls: list[tuple[str, int, int]] = []
 
-    monkeypatch.setattr(worker, "wait_for_exit", lambda pid, timeout_seconds=10.0: False)
+    monkeypatch.setattr(
+        worker, "wait_for_exit", lambda pid, timeout_seconds=10.0: False
+    )
 
     def fake_killpg(pid: int, sig: int) -> None:
         calls.append(("killpg", pid, sig))

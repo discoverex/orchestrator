@@ -6,7 +6,7 @@ The orchestration state machine is delegated to Prefect.
 
 - Scheduling/dispatch/retry/state transitions: Prefect
 - Execution payload (git checkout + entrypoint): `runner`
-- Artifact URL issuance and object-key policy: `storage_gateway`
+- Artifact URL issuance and object-key policy: `storage`
 
 ## Retry Semantics
 

@@ -1,14 +1,23 @@
 from __future__ import annotations
 
 import json
-import os
+import logging
 from pathlib import Path
+from typing import cast
 
-from prefect import task
+from prefect import get_run_logger, task
+from prefect.exceptions import MissingContextError
 
-from flows.engine_run.http import http_json, upload_file
+from flows.engine_run.http import http_json, storage_base_url, upload_file
 from flows.engine_run.models import ArtifactLink
 from runner.git_runner import resolve_commit, run_entrypoint
+
+
+def _get_task_logger() -> logging.Logger:
+    try:
+        return cast(logging.Logger, get_run_logger())
+    except MissingContextError:
+        return logging.getLogger("flows.engine_run.tasks")
 
 
 @task
@@ -18,7 +27,8 @@ def resolve_commit_task(repo_url: str, ref: str) -> str:
 
 @task
 def prepare_manifest_task(flow_run_id: str, attempt: int) -> list[ArtifactLink]:
-    gateway = os.getenv("STORAGE_GATEWAY_URL", "http://127.0.0.1:18100")
+    logger = _get_task_logger()
+    gateway = storage_base_url()
     payload = {
         "flow_run_id": flow_run_id,
         "attempt": attempt,
@@ -51,12 +61,20 @@ def prepare_manifest_task(flow_run_id: str, attempt: int) -> list[ArtifactLink]:
     }
     rows = http_json("POST", f"{gateway}/v1/presign/batch", payload)
     assert isinstance(rows, list)
-    return [
+    links = [
         ArtifactLink(
             kind=str(r["kind"]), object_uri=str(r["object_uri"]), url=str(r["url"])
         )
         for r in rows
     ]
+    logger.info(
+        "issued artifact links: %s",
+        [
+            {"kind": link.kind, "object_uri": link.object_uri, "url": link.url}
+            for link in links
+        ],
+    )
+    return links
 
 
 @task
@@ -72,6 +90,7 @@ def run_entrypoint_task(
 def run_entrypoint_job_task(
     *,
     repo_url: str | None,
+    ref: str | None,
     resolved_commit: str | None,
     entrypoint: list[str],
     env: dict[str, str],
@@ -86,6 +105,7 @@ def run_entrypoint_job_task(
 ) -> tuple[dict[str, str], int]:
     artifacts = run_entrypoint(
         repo_url=repo_url,
+        ref=ref,
         resolved_commit=resolved_commit,
         entrypoint=entrypoint,
         env=env,
@@ -115,6 +135,7 @@ def upload_outputs_task(
     attempt: int,
     already_uploaded: dict[str, str] | None = None,
 ) -> dict[str, str]:
+    logger = _get_task_logger()
     output: dict[str, str] = dict(already_uploaded or {})
     for link in links:
         if link.kind in output:
@@ -133,11 +154,24 @@ def upload_outputs_task(
             manifest_path.write_text(
                 json.dumps(manifest, ensure_ascii=True, indent=2), encoding="utf-8"
             )
+            logger.info(
+                "uploading manifest artifact: kind=%s object_uri=%s url=%s",
+                link.kind,
+                link.object_uri,
+                link.url,
+            )
             upload_file(link.url, manifest_path.read_bytes())
             output["manifest"] = link.object_uri
             continue
 
         src = Path(local_paths[link.kind])
+        logger.info(
+            "uploading artifact: kind=%s object_uri=%s url=%s local_path=%s",
+            link.kind,
+            link.object_uri,
+            link.url,
+            src,
+        )
         upload_file(link.url, src.read_bytes())
         output[link.kind] = link.object_uri
     return output

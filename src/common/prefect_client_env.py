@@ -18,7 +18,6 @@ class WorkerStartupSummary(StrictModel):
     prefect_api_url: str
     prefect_work_pool: str
     prefect_work_queue: str
-    storage_gateway_url: str
     checkpoint_dir: str
     custom_header_keys: list[str]
     cf_access_configured: bool
@@ -38,10 +37,8 @@ def build_prefect_client_headers(
             headers = {str(key): str(value) for key, value in parsed.items()}
             headers.pop("User-Agent", None)
 
-    cf_id = env.get("PREFECT_CF_ACCESS_CLIENT_ID") or env.get("CF_ACCESS_CLIENT_ID")
-    cf_secret = env.get("PREFECT_CF_ACCESS_CLIENT_SECRET") or env.get(
-        "CF_ACCESS_CLIENT_SECRET"
-    )
+    cf_id = env.get("CF_ACCESS_CLIENT_ID")
+    cf_secret = env.get("CF_ACCESS_CLIENT_SECRET")
     if cf_id and cf_secret:
         headers.setdefault("CF-Access-Client-Id", cf_id)
         headers.setdefault("CF-Access-Client-Secret", cf_secret)
@@ -90,8 +87,7 @@ def shell_exports(
         raw_headers = base_env.get("PREFECT_CLIENT_CUSTOM_HEADERS")
         if raw_headers != header_value:
             lines.append(
-                "export PREFECT_CLIENT_CUSTOM_HEADERS="
-                f"{shlex.quote(header_value)}"
+                f"export PREFECT_CLIENT_CUSTOM_HEADERS={shlex.quote(header_value)}"
             )
     elif base_env.get("PREFECT_CLIENT_CUSTOM_HEADERS"):
         lines.append("unset PREFECT_CLIENT_CUSTOM_HEADERS")
@@ -116,17 +112,10 @@ def startup_summary(
         prefect_api_url=updated.get("PREFECT_API_URL", ""),
         prefect_work_pool=updated.get("PREFECT_WORK_POOL", ""),
         prefect_work_queue=updated.get("PREFECT_WORK_QUEUE", ""),
-        storage_gateway_url=updated.get("STORAGE_GATEWAY_URL", ""),
         checkpoint_dir=updated.get("ORCHESTRATOR_CHECKPOINT_DIR", ""),
         custom_header_keys=header_keys,
-        cf_access_configured=bool(
-            updated.get("PREFECT_CF_ACCESS_CLIENT_ID")
-            or updated.get("CF_ACCESS_CLIENT_ID")
-        )
-        and bool(
-            updated.get("PREFECT_CF_ACCESS_CLIENT_SECRET")
-            or updated.get("CF_ACCESS_CLIENT_SECRET")
-        ),
+        cf_access_configured=bool(updated.get("CF_ACCESS_CLIENT_ID"))
+        and bool(updated.get("CF_ACCESS_CLIENT_SECRET")),
     )
 
 
@@ -148,9 +137,9 @@ def main() -> int:
     if args.command == "summary":
         print(
             json.dumps(
-                startup_summary(
-                    default_queue=args.default_queue or None
-                ).model_dump(mode="json"),
+                startup_summary(default_queue=args.default_queue or None).model_dump(
+                    mode="json"
+                ),
                 ensure_ascii=True,
                 sort_keys=True,
             )

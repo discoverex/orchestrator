@@ -4,6 +4,7 @@ from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
 from typing import BinaryIO, Protocol
+from urllib.parse import urlsplit, urlunsplit
 
 from minio import Minio
 from minio.error import S3Error
@@ -78,12 +79,16 @@ class MinioObjectStore:
         secret_key: str,
         secure: bool = False,
         auto_create_bucket: bool = True,
+        public_base_url: str = "",
+        internal_presign_base_url: str = "",
         client: MinioClientProtocol | None = None,
     ) -> None:
         self.client = client or Minio(
             endpoint, access_key=access_key, secret_key=secret_key, secure=secure
         )
         self.auto_create_bucket = auto_create_bucket
+        self.public_base_url = public_base_url.strip()
+        self.internal_presign_base_url = internal_presign_base_url.strip()
 
     def _ensure_bucket(self, bucket: str) -> None:
         if self.auto_create_bucket and not self.client.bucket_exists(bucket):
@@ -171,13 +176,38 @@ class MinioObjectStore:
 
     def generate_presigned_get(self, object_uri: str, ttl_seconds: int) -> str:
         bucket, object_key = parse_s3_uri(object_uri)
-        return self.client.get_presigned_url(
+        url = self.client.get_presigned_url(
             "GET", bucket, object_key, expires=timedelta(seconds=ttl_seconds)
         )
+        return self._rewrite_presigned_url(url, self.public_base_url)
 
     def generate_presigned_put(self, object_uri: str, ttl_seconds: int) -> str:
         bucket, object_key = parse_s3_uri(object_uri)
         self._ensure_bucket(bucket)
-        return self.client.get_presigned_url(
+        url = self.client.get_presigned_url(
             "PUT", bucket, object_key, expires=timedelta(seconds=ttl_seconds)
+        )
+        return self._rewrite_presigned_url(
+            url, self.internal_presign_base_url or self.public_base_url
+        )
+
+    def _rewrite_presigned_url(self, url: str, base_url: str) -> str:
+        if not base_url:
+            return url
+        base_value = base_url
+        if "://" not in base_value:
+            base_value = f"https://{base_value}"
+        public = urlsplit(base_value)
+        signed = urlsplit(url)
+        path = signed.path
+        if public.path and public.path != "/":
+            path = f"{public.path.rstrip('/')}{signed.path}"
+        return urlunsplit(
+            (
+                public.scheme or signed.scheme,
+                public.netloc or signed.netloc,
+                path,
+                signed.query,
+                signed.fragment,
+            )
         )

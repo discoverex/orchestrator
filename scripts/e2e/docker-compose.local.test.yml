@@ -36,33 +36,32 @@ services:
       timeout: 3s
       retries: 30
 
-  storage-gateway:
+  worker-router:
     build:
       context: ../..
-      dockerfile: infra/images/storage-gateway.Dockerfile
-    image: orchestrator-storage-gateway:local
-    container_name: orchestrator-e2e-local-storage-gateway
+      dockerfile: infra/images/worker-router.Dockerfile
+    image: orchestrator-worker-router:local
+    container_name: orchestrator-e2e-local-worker-router
     environment:
+      GATEWAY_REQUIRE_CF_ACCESS: false
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_SECURE: false
       MINIO_AUTO_CREATE_BUCKET: true
+      MINIO_PUBLIC_BASE_URL: http://127.0.0.1:29000
+      MINIO_INTERNAL_PRESIGN_BASE_URL: http://minio:9000
       ARTIFACT_BUCKET: orchestrator-artifacts
       PRESIGN_TTL_DEFAULT: 900
       PRESIGN_TTL_MAX: 3600
-      PRESIGN_MODE: gateway
-      STORAGE_PUBLIC_BASE_URL: ""
-      STORAGE_URL_SIGNING_SECRET: dev-url-signing-secret
-      STORAGE_GATEWAY_TOKEN: dev-storage-token
-      GATEWAY_REQUIRE_CF_ACCESS: false
-    ports:
-      - "28100:8100"
+      MLFLOW_BACKEND_URL: http://mlflow:5000
     depends_on:
       minio:
         condition: service_healthy
+    ports:
+      - "8200:8200"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8100/healthz"]
+      test: ["CMD", "curl", "-f", "http://localhost:8200/healthz"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -76,14 +75,15 @@ services:
     environment:
       PREFECT_API_URL: http://prefect:4200/api
       PREFECT_WORK_POOL: gpu-pool
-      STORAGE_GATEWAY_URL: http://storage-gateway:8100
-      STORAGE_GATEWAY_TOKEN: dev-storage-token
+      STORAGE_API_URL: http://worker-router:8200
+      CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-local-e2e-client}
+      CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-local-e2e-secret}
     volumes:
       - ${ENGINE_LOCAL_REPO_PATH_HOST:-../../engine}:/opt/engine-src:ro
     depends_on:
       prefect:
         condition: service_healthy
-      storage-gateway:
+      worker-router:
         condition: service_healthy
 
   register:

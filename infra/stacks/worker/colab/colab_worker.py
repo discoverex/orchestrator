@@ -63,9 +63,10 @@ def append_worker_log_banner(
 
 def ensure_drive_checkpoint_dir(path: Path) -> None:
     resolved = path.resolve()
-    if str(resolved).startswith("/content/drive") and not Path(
-        "/content/drive/MyDrive"
-    ).exists():
+    if (
+        str(resolved).startswith("/content/drive")
+        and not Path("/content/drive/MyDrive").exists()
+    ):
         raise RuntimeError(
             "Google Drive is not mounted; run drive.mount('/content/drive') first"
         )
@@ -78,7 +79,8 @@ def ensure_drive_checkpoint_dir(path: Path) -> None:
 def ensure_runtime_ready(skip_install: bool) -> None:
     if skip_install:
         log_step(
-            "worker", "warning: --skip-install is deprecated; bootstrap handles installation"
+            "worker",
+            "warning: --skip-install is deprecated; bootstrap handles installation",
         )
     try:
         version = importlib.metadata.version("prefect")
@@ -118,7 +120,9 @@ def worker_status(pid_file: Path) -> WorkerStatusResult:
     if not pid:
         return WorkerStatusResult(False, None, "worker status: stopped (no pid file)")
     if not is_running(pid):
-        return WorkerStatusResult(False, pid, f"worker status: stopped (stale pid={pid})")
+        return WorkerStatusResult(
+            False, pid, f"worker status: stopped (stale pid={pid})"
+        )
     return WorkerStatusResult(True, pid, f"worker status: running (pid={pid})")
 
 

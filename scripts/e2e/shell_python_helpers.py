@@ -75,7 +75,15 @@ def _http_text(
         req_headers.update(headers)
     req = request.Request(url, method="GET", headers=req_headers)
     with request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8")
+        body = cast(bytes, resp.read())
+    return body.decode("utf-8")
+
+
+def _artifact_api_base(storage_api_url: str) -> str:
+    base = storage_api_url.rstrip("/")
+    if base.endswith("/artifact"):
+        return base
+    return f"{base}/artifact"
 
 
 def _extract_json_object(raw: str) -> dict[str, object]:
@@ -96,13 +104,22 @@ def cmd_poll_prefect_completion(args: argparse.Namespace) -> int:
     api_url = args.prefect_api_url.rstrip("/")
     terminal_success = {"COMPLETED"}
     terminal_fail = {"FAILED", "CRASHED", "CANCELLED"}
+    transient_statuses = {403, 404, 429, 500, 502, 503, 504}
 
     deadline = time.time() + args.timeout_sec
     while time.time() < deadline:
-        payload = cast(
-            dict[str, Any],
-            _http_json("GET", f"{api_url}/flow_runs/{args.flow_run_id}", timeout=10),
-        )
+        try:
+            payload = cast(
+                dict[str, Any],
+                _http_json(
+                    "GET", f"{api_url}/flow_runs/{args.flow_run_id}", timeout=10
+                ),
+            )
+        except error.HTTPError as exc:
+            if exc.code in transient_statuses:
+                time.sleep(2)
+                continue
+            raise
         state_type_raw = payload.get("state_type")
         if not state_type_raw:
             state = payload.get("state")
@@ -123,8 +140,7 @@ def cmd_poll_prefect_completion(args: argparse.Namespace) -> int:
 
 def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
     flow_run_id = args.flow_run_id
-    gateway = args.storage_gateway_url.rstrip("/")
-    token = args.storage_gateway_token
+    gateway = _artifact_api_base(args.storage_api_url)
     bucket = args.artifact_bucket
     log_dir = Path(args.log_dir)
     attempt = 1
@@ -135,7 +151,10 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         "result": f"s3://{bucket}/jobs/{flow_run_id}/attempt-{attempt}/result.json",
         "manifest": f"s3://{bucket}/jobs/{flow_run_id}/attempt-{attempt}/artifacts.json",
     }
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json"}
+    if args.cf_access_client_id and args.cf_access_client_secret:
+        headers["CF-Access-Client-Id"] = args.cf_access_client_id
+        headers["CF-Access-Client-Secret"] = args.cf_access_client_secret
 
     for object_uri in uris.values():
         payload = _http_json(
@@ -162,15 +181,26 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
     )
 
     manifest_url = str(manifest_link.get("url", ""))
-    download_headers = {"Authorization": f"Bearer {token}"}
-    manifest = json.loads(_http_text(manifest_url, headers=download_headers, timeout=15))
+    download_headers: dict[str, str] = {}
+    if args.presigned_host_header:
+        download_headers["Host"] = args.presigned_host_header
+    if args.cf_access_client_id and args.cf_access_client_secret:
+        download_headers["CF-Access-Client-Id"] = args.cf_access_client_id
+        download_headers["CF-Access-Client-Secret"] = args.cf_access_client_secret
+    manifest = cast(
+        dict[str, object],
+        json.loads(_http_text(manifest_url, headers=download_headers, timeout=15)),
+    )
 
     if manifest.get("flow_run_id") != flow_run_id:
         raise SystemExit("manifest flow_run_id mismatch")
-    if int(manifest.get("attempt", -1)) != attempt:
+    manifest_attempt = manifest.get("attempt", -1)
+    if int(str(manifest_attempt)) != attempt:
         raise SystemExit("manifest attempt mismatch")
 
     rows = manifest.get("artifacts", [])
+    if not isinstance(rows, list):
+        raise SystemExit("manifest artifacts mismatch")
     kinds = {
         row.get("kind"): row.get("object_uri") for row in rows if isinstance(row, dict)
     }
@@ -208,7 +238,7 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         dict[str, object],
         json.loads(_http_text(result_url, headers=download_headers, timeout=15)),
     )
-    exit_code = int(result_payload.get("exit_code", -1))
+    exit_code = int(str(result_payload.get("exit_code", -1)))
     if exit_code != 0:
         raise SystemExit(f"engine entrypoint exited with code {exit_code}")
 
@@ -217,6 +247,8 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
     )
     scene_id = str(engine_output.get("scene_id", "")).strip()
     version_id = str(engine_output.get("version_id", "")).strip()
+    if args.skip_engine_artifacts:
+        return 0
     if not scene_id or not version_id:
         raise SystemExit("engine stdout missing scene_id/version_id")
 
@@ -484,10 +516,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("verify-storage-objects")
     p.add_argument("--flow-run-id", required=True)
-    p.add_argument("--storage-gateway-url", required=True)
-    p.add_argument("--storage-gateway-token", required=True)
+    p.add_argument("--storage-api-url", required=True)
+    p.add_argument("--cf-access-client-id", default="")
+    p.add_argument("--cf-access-client-secret", default="")
     p.add_argument("--artifact-bucket", required=True)
     p.add_argument("--log-dir", required=True)
+    p.add_argument("--presigned-host-header", default="")
+    p.add_argument("--skip-engine-artifacts", action="store_true")
     p.set_defaults(func=cmd_verify_storage_objects)
 
     p = sub.add_parser("create-and-verify-mlflow-tags")

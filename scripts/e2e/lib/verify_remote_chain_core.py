@@ -77,10 +77,14 @@ def http_json(
 
 
 def gateway_headers(token: str) -> dict[str, str]:
-    return {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
+    return {"Content-Type": "application/json"}
+
+
+def artifact_api_base(storage_api_url: str) -> str:
+    base = storage_api_url.rstrip("/")
+    if base.endswith("/artifact"):
+        return base
+    return f"{base}/artifact"
 
 
 def run_ops_script(
@@ -116,9 +120,15 @@ def command_wait_completed(
     args: Any, http_json_fn: Callable[..., Any]
 ) -> dict[str, Any]:
     headers: dict[str, str] = {}
-    if args.prefect_cf_access_client_id and args.prefect_cf_access_client_secret:
-        headers["CF-Access-Client-Id"] = args.prefect_cf_access_client_id
-        headers["CF-Access-Client-Secret"] = args.prefect_cf_access_client_secret
+    cf_id = getattr(args, "prefect_cf_access_client_id", "") or getattr(
+        args, "cf_access_client_id", ""
+    )
+    cf_secret = getattr(args, "prefect_cf_access_client_secret", "") or getattr(
+        args, "cf_access_client_secret", ""
+    )
+    if cf_id and cf_secret:
+        headers["CF-Access-Client-Id"] = cf_id
+        headers["CF-Access-Client-Secret"] = cf_secret
     deadline = time.time() + args.timeout_sec
     last_state = "UNKNOWN"
 
@@ -170,8 +180,17 @@ def command_storage_objects(
         "result": f"s3://{args.artifact_bucket}/jobs/{args.flow_run_id}/attempt-{attempt}/result.json",
         "manifest": f"s3://{args.artifact_bucket}/jobs/{args.flow_run_id}/attempt-{attempt}/artifacts.json",
     }
-    headers = gateway_headers(args.storage_gateway_token)
-    base = args.storage_gateway_url.rstrip("/")
+    headers = gateway_headers("")
+    cf_id = getattr(args, "prefect_cf_access_client_id", "") or getattr(
+        args, "cf_access_client_id", ""
+    )
+    cf_secret = getattr(args, "prefect_cf_access_client_secret", "") or getattr(
+        args, "cf_access_client_secret", ""
+    )
+    if cf_id and cf_secret:
+        headers["CF-Access-Client-Id"] = cf_id
+        headers["CF-Access-Client-Secret"] = cf_secret
+    base = artifact_api_base(args.storage_api_url)
 
     for object_uri in uris.values():
         out = http_json_fn(
@@ -201,7 +220,7 @@ def command_storage_objects(
             "storage-objects", "PRESIGN_FAILED", "invalid presign/get response"
         )
 
-    manifest_raw = http_json_fn("GET", str(presign["url"]), timeout=60)
+    manifest_raw = http_json_fn("GET", str(presign["url"]), headers=headers, timeout=60)
     if not isinstance(manifest_raw, dict):
         raise VerifyError(
             "storage-objects", "MANIFEST_BAD_TYPE", "manifest is not an object"
@@ -258,15 +277,14 @@ def command_flush_verify(
 ) -> dict[str, Any]:
     env = {
         "PREFECT_API_URL": args.prefect_api_url,
-        "FLUSH_TARGET_URL": args.storage_gateway_url,
-        "FLUSH_GATEWAY_TOKEN": args.storage_gateway_token,
+        "FLUSH_TARGET_URL": artifact_api_base(args.storage_api_url),
         "FLUSH_CURSOR_PATH": args.cursor_path,
         "FLUSH_PAGE_SIZE": str(args.page_size),
         "FLUSH_MAX_RUNS": str(args.max_runs),
     }
     if args.prefect_cf_access_client_id and args.prefect_cf_access_client_secret:
-        env["PREFECT_CF_ACCESS_CLIENT_ID"] = args.prefect_cf_access_client_id
-        env["PREFECT_CF_ACCESS_CLIENT_SECRET"] = args.prefect_cf_access_client_secret
+        env["CF_ACCESS_CLIENT_ID"] = args.prefect_cf_access_client_id
+        env["CF_ACCESS_CLIENT_SECRET"] = args.prefect_cf_access_client_secret
     payload = run_ops_script_fn(
         "prefect_flush_completed.py",
         env,
@@ -308,8 +326,8 @@ def command_prune_verify(
     env = {"PREFECT_API_URL": args.prefect_api_url}
     headers: dict[str, str] = {}
     if args.prefect_cf_access_client_id and args.prefect_cf_access_client_secret:
-        env["PREFECT_CF_ACCESS_CLIENT_ID"] = args.prefect_cf_access_client_id
-        env["PREFECT_CF_ACCESS_CLIENT_SECRET"] = args.prefect_cf_access_client_secret
+        env["CF_ACCESS_CLIENT_ID"] = args.prefect_cf_access_client_id
+        env["CF_ACCESS_CLIENT_SECRET"] = args.prefect_cf_access_client_secret
         headers["CF-Access-Client-Id"] = args.prefect_cf_access_client_id
         headers["CF-Access-Client-Secret"] = args.prefect_cf_access_client_secret
     argv = [

@@ -1,15 +1,16 @@
-# Next Plan: 컨테이너 격리 E2E 안정화 + Cloudflare DNS 최종 수렴
+# Next Plan: worker-router 경로 반영 + MLflow Access 최종 수렴
 
-## 0) 현재 결론 (2026-03-05 기준)
+## 0) 현재 결론 (2026-03-10 기준)
 
 - `core` E2E는 통과한다.
-  - 스케줄러(Prefect) -> 워커 -> storage-gateway -> MinIO 흐름 정상
+  - 스케줄러(Prefect) -> 워커 -> storage-api/worker-router -> MinIO 흐름 정상
   - 아티팩트(stdout/stderr/result/manifest) 검증 정상
 - `full` E2E는 현재 실패한다.
   - 실패 지점: `mlflow.verify_tags`
   - 현재 원인: MLflow write API(`runs/create`)가 `HTTP 403`으로 차단됨
   - DNS 해석 실패 이슈는 해소됨(`full.verify_prereqs` 통과 확인)
 - `cloudflared` 터널 프로세스 자체는 정상 등록됨(Registered tunnel connection 확인).
+- 이번 브랜치에서 워커 직접 스토리지 접근 대신 `worker-router` 경유 경로가 기본값으로 정리됐다.
 
 ## 1) 내가 하려고 했던 것 (진행 의도)
 
@@ -26,23 +27,31 @@
 
 1. 이미지 기반 런타임 구성
 - `infra/images/base.Dockerfile` (공통 의존성 베이스)
-- `infra/images/storage-gateway.Dockerfile`
 - `infra/images/worker.Dockerfile`
 - `infra/images/register.Dockerfile`
+- `infra/images/worker-router.Dockerfile`
 - `.dockerignore`
 
 2. 컴포즈 전환
-- `docker-compose.local.yml`: storage-gateway/worker/register 이미지 기반 실행
-- `infra/stacks/storage-node/docker-compose.yml`: storage-gateway 이미지 기반 실행
+- `docker-compose.local.yml`: worker-router/worker/register 이미지 기반 실행
+- `infra/stacks/storage-node/docker-compose.yml`: worker-router + MLflow 이미지 기반 실행
 
 3. MLflow 기동 안정화 보강
 - `infra/images/mlflow.Dockerfile` 추가 (`psycopg2-binary` 포함)
 - `infra/stacks/storage-node/docker-compose.yml`의 `mlflow`를 위 이미지로 변경
 - `mlflow` healthcheck를 `curl` -> `python urllib`로 변경
 
-4. E2E 오케스트레이터 개선
-- `scripts/e2e/e2e_local_orchestrator.sh`를 컨테이너 기반 실행으로 정렬
-- `core/mlflow/full` 모드와 결과 요약(`artifacts/e2e/.../summary.json`) 유지
+4. 워커 접근 경로/실행 보강
+- 워커 env 기본값을 `STORAGE_API_URL`, `MLFLOW_TRACKING_URI`, `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` 기준으로 변경
+- storage presign 요청은 `STORAGE_API_URL` 기준으로 통일
+- MLflow 프록시는 `MLFLOW_TRACKING_URI` 직접 경유 인증을 지원
+- repo run 모드에서 `resolved_commit`만이 아니라 요청된 `ref`를 체크아웃 대상으로 보존
+- GitHub SSH repo URL(`git@github.com:...`)은 resolve/fetch 시 HTTPS로 정규화
+
+5. 테스트 보강
+- `tests/unit/test_worker_router.py`
+- `tests/unit/test_engine_run_http.py`
+- `tests/unit/test_runner.py`
 
 ## 3) 지금부터 해야 할 일 (우선순위)
 
@@ -55,13 +64,14 @@
 - 권장: CNAME -> `<tunnel-id>.cfargotunnel.com` (proxied)
 
 3. CF Access 앱/토큰 재검증 (미완료)
-- `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`가 해당 앱 정책에 매칭되는지 확인
+- `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`가 외부 공개 엔드포인트 정책에 매칭되는지 확인
 
 4. full E2E 재실행 (미완료)
 - Access 정책 수정 후 `mlflow.verify_tags`와 외부 접근 단계까지 통과 여부 재확인
 
 5. 문서/운영 체크리스트 확정 (진행중)
 - `.env` 필수키와 실행 순서를 README/ops 문서에 최종 고정
+- 서비스별 공개 엔드포인트(`storage-api`, `mlflow`) 배포 경로와 회전 절차 정리
 - `scripts/e2e/e2e_local_orchestrator.sh`에 `full` 모드 사전검증(`full.verify_prereqs`) 추가
 - `scripts/e2e/e2e_local_orchestrator.sh`에 `mlflow.verify_tracking_access` 추가
 
@@ -76,6 +86,7 @@ MLFLOW_TRACKING_URI=https://mlflow.discoverex.qzz.io
 MLFLOW_PUBLIC_URL=https://mlflow.discoverex.qzz.io
 CF_ACCESS_CLIENT_ID=<cloudflare-access-client-id>
 CF_ACCESS_CLIENT_SECRET=<cloudflare-access-client-secret>
+STORAGE_API_URL=https://storage-api.discoverex.qzz.io
 ```
 
 권장 확인:

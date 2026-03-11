@@ -31,7 +31,9 @@ def _base_env(deploy_dir: Path, bin_dir: Path) -> dict[str, str]:
     return env
 
 
-def _write_runtime_env(deploy_dir: Path, *, include_flush_token: bool = True) -> None:
+def _write_runtime_env(
+    deploy_dir: Path, *, include_flush_target_url: bool = True
+) -> None:
     lines = [
         "PREFECT_SERVER_IMAGE=ghcr.io/org/orchestrator/prefect-server:sha-test",
         "PREFECT_HOSTNAMES=prefect.example.com,prefect-api.example.com",
@@ -39,8 +41,8 @@ def _write_runtime_env(deploy_dir: Path, *, include_flush_token: bool = True) ->
         "PREFECT_DB_PASSWORD=pw",
         "FLUSH_TARGET_URL=https://storage.example.com",
     ]
-    if include_flush_token:
-        lines.append("FLUSH_GATEWAY_TOKEN=token")
+    if not include_flush_target_url:
+        lines.pop()
     (deploy_dir / ".env.runtime").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -48,7 +50,7 @@ def test_deploy_script_fails_when_required_env_missing(tmp_path: Path) -> None:
     deploy_dir = tmp_path / "deploy"
     deploy_dir.mkdir()
     (deploy_dir / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
-    _write_runtime_env(deploy_dir, include_flush_token=False)
+    _write_runtime_env(deploy_dir, include_flush_target_url=False)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     _write_fake_docker(bin_dir, tmp_path / "docker.log")
@@ -63,7 +65,7 @@ def test_deploy_script_fails_when_required_env_missing(tmp_path: Path) -> None:
         check=False,
     )
     assert proc.returncode != 0
-    assert "missing required env: FLUSH_GATEWAY_TOKEN" in proc.stderr
+    assert "missing required env: FLUSH_TARGET_URL" in proc.stderr
     assert not (deploy_dir / ".env.runtime").exists()
 
 
@@ -71,7 +73,7 @@ def test_deploy_script_applies_defaults_and_runs_compose(tmp_path: Path) -> None
     deploy_dir = tmp_path / "deploy"
     deploy_dir.mkdir()
     (deploy_dir / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
-    _write_runtime_env(deploy_dir, include_flush_token=True)
+    _write_runtime_env(deploy_dir, include_flush_target_url=True)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     log_path = tmp_path / "docker.log"

@@ -31,7 +31,6 @@ set +a
 : "${PREFECT_DB_USER:?PREFECT_DB_USER is required}"
 : "${PREFECT_DB_PASSWORD:?PREFECT_DB_PASSWORD is required}"
 : "${FLUSH_TARGET_URL:?FLUSH_TARGET_URL is required}"
-: "${FLUSH_GATEWAY_TOKEN:?FLUSH_GATEWAY_TOKEN is required}"
 
 pushd "${ROOT_DIR}" >/dev/null
 

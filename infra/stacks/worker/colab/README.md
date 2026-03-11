@@ -14,11 +14,10 @@ Set these before start:
 - `PREFECT_API_URL`
 - `PREFECT_WORK_POOL` (recommended: `gpu-pool`)
 - `PREFECT_WORK_QUEUE` (recommended: `gpu-colab`)
-- `STORAGE_GATEWAY_URL`
-- `STORAGE_GATEWAY_TOKEN`
-- If Prefect is behind Cloudflare Access, also set either:
-  - `PREFECT_CF_ACCESS_CLIENT_ID` / `PREFECT_CF_ACCESS_CLIENT_SECRET`
-  - or `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET`
+- `STORAGE_API_URL`
+- If Prefect is behind Cloudflare Access, also set:
+  - `CF_ACCESS_CLIENT_ID`
+  - `CF_ACCESS_CLIENT_SECRET`
 
 ## 2) Bootstrap (recommended first step)
 

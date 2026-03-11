@@ -69,8 +69,9 @@ def _build_parser() -> argparse.ArgumentParser:
     wait_p.add_argument("--prefect-cf-access-client-secret")
 
     storage_p = sub.add_parser("storage-objects")
-    storage_p.add_argument("--storage-gateway-url", required=True)
-    storage_p.add_argument("--storage-gateway-token", required=True)
+    storage_p.add_argument("--storage-api-url", required=True)
+    storage_p.add_argument("--prefect-cf-access-client-id")
+    storage_p.add_argument("--prefect-cf-access-client-secret")
     storage_p.add_argument("--artifact-bucket", required=True)
     storage_p.add_argument("--flow-run-id", required=True)
     storage_p.add_argument("--attempt", type=int, default=1)
@@ -78,8 +79,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     flush_p = sub.add_parser("flush-verify")
     flush_p.add_argument("--prefect-api-url", required=True)
-    flush_p.add_argument("--storage-gateway-url", required=True)
-    flush_p.add_argument("--storage-gateway-token", required=True)
+    flush_p.add_argument("--storage-api-url", required=True)
     flush_p.add_argument("--flow-run-id", required=True)
     flush_p.add_argument("--cursor-path", required=True)
     flush_p.add_argument("--page-size", type=int, default=100)

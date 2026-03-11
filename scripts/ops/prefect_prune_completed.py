@@ -19,8 +19,8 @@ def _api_url() -> str:
 
 def _prefect_headers() -> dict[str, str]:
     headers: dict[str, str] = {}
-    cf_id = os.getenv("PREFECT_CF_ACCESS_CLIENT_ID", "")
-    cf_secret = os.getenv("PREFECT_CF_ACCESS_CLIENT_SECRET", "")
+    cf_id = os.getenv("CF_ACCESS_CLIENT_ID", "")
+    cf_secret = os.getenv("CF_ACCESS_CLIENT_SECRET", "")
     if cf_id and cf_secret:
         headers["CF-Access-Client-Id"] = cf_id
         headers["CF-Access-Client-Secret"] = cf_secret

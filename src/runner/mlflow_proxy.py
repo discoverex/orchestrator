@@ -25,6 +25,7 @@ class MLflowProxy:
     upstream_url: str
     cf_access_client_id: str
     cf_access_client_secret: str
+    extra_headers: dict[str, str] | None = None
     bind_host: str = "127.0.0.1"
 
     def __post_init__(self) -> None:
@@ -37,7 +38,9 @@ class MLflowProxy:
 
     @property
     def local_url(self) -> str:
-        host, port = self._server.server_address
+        address = self._server.server_address
+        host = str(address[0])
+        port = int(address[1])
         return f"http://{host}:{port}"
 
     def start(self) -> None:
@@ -52,6 +55,7 @@ class MLflowProxy:
         upstream_url = self.upstream_url.rstrip("/")
         cf_id = self.cf_access_client_id
         cf_secret = self.cf_access_client_secret
+        extra_headers = dict(self.extra_headers or {})
 
         class ProxyHandler(http.server.BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"
@@ -85,8 +89,10 @@ class MLflowProxy:
                     for key, value in self.headers.items()
                     if key.lower() not in {"host", "content-length"}
                 }
-                headers["CF-Access-Client-Id"] = cf_id
-                headers["CF-Access-Client-Secret"] = cf_secret
+                if cf_id and cf_secret:
+                    headers["CF-Access-Client-Id"] = cf_id
+                    headers["CF-Access-Client-Secret"] = cf_secret
+                headers.update(extra_headers)
                 req = request.Request(
                     target,
                     method=self.command,
@@ -123,6 +129,7 @@ def maybe_start_mlflow_proxy(env: dict[str, str]) -> Iterator[dict[str, str]]:
     tracking_uri = env.get("MLFLOW_TRACKING_URI", "").strip()
     cf_id = env.get("CF_ACCESS_CLIENT_ID", "").strip()
     cf_secret = env.get("CF_ACCESS_CLIENT_SECRET", "").strip()
+
     if (
         not tracking_uri
         or not _is_remote_http_url(tracking_uri)

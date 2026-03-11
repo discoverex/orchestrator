@@ -14,8 +14,7 @@ cp infra/stacks/prefect-server/.env.example infra/stacks/prefect-server/.env
 `prefect-db` is part of this stack. Set `PREFECT_DB_*` values in `.env`.
 Completed runs are exported as full JSON snapshots using:
 
-- `FLUSH_TARGET_URL` (storage-gateway base URL)
-- `FLUSH_GATEWAY_TOKEN`
+- `FLUSH_TARGET_URL` (public gateway `/storage` base URL)
 
 ## 2) Start/stop
 

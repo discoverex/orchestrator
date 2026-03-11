@@ -19,10 +19,9 @@ load_env_file_if_exists "${ROOT_DIR}/infra/stacks/storage-node/.env"
 PREFECT_API_URL="${PREFECT_API_URL:-}"
 PREFECT_WORK_POOL="${PREFECT_WORK_POOL:-gpu-pool}"
 PREFECT_WORK_QUEUE="${PREFECT_WORK_QUEUE:-gpu-fixed}"
-PREFECT_CF_ACCESS_CLIENT_ID="${PREFECT_CF_ACCESS_CLIENT_ID:-${CF_ACCESS_CLIENT_ID:-}}"
-PREFECT_CF_ACCESS_CLIENT_SECRET="${PREFECT_CF_ACCESS_CLIENT_SECRET:-${CF_ACCESS_CLIENT_SECRET:-}}"
-STORAGE_GATEWAY_URL="${STORAGE_GATEWAY_URL:-http://127.0.0.1:8100}"
-STORAGE_GATEWAY_TOKEN="${STORAGE_GATEWAY_TOKEN:-}"
+CF_ACCESS_CLIENT_ID="${CF_ACCESS_CLIENT_ID:-}"
+CF_ACCESS_CLIENT_SECRET="${CF_ACCESS_CLIENT_SECRET:-}"
+STORAGE_API_URL="${STORAGE_API_URL:-https://storage-api.discoverex.qzz.io}"
 ARTIFACT_BUCKET="${ARTIFACT_BUCKET:-orchestrator-artifacts}"
 MINIO_API_PORT="${MINIO_API_PORT:-9000}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-600}"
@@ -64,10 +63,9 @@ Options:
   --prefect-api-url URL         Remote Prefect API URL (default: $PREFECT_API_URL from env)
   --work-pool NAME              Prefect work pool name (default: gpu-pool)
   --work-queue NAME             Prefect work queue name (default: gpu-fixed)
-  --prefect-cf-access-client-id ID
-  --prefect-cf-access-client-secret SECRET
-  --storage-gateway-url URL     Local storage-gateway URL (default: http://127.0.0.1:8100)
-  --storage-gateway-token TOK   storage-gateway bearer token
+  --prefect-access-client-id ID
+  --prefect-access-client-secret SECRET
+  --storage-api-url URL         Storage API URL (default: https://storage-api.discoverex.qzz.io)
   --artifact-bucket NAME        Artifact bucket name (default: orchestrator-artifacts)
   --timeout-sec N               Timeout for flow completion (default: 600)
   --job-spec-json JSON          JobSpec payload (default: engine generate repo job built from engine wrapper)
@@ -98,20 +96,16 @@ while [[ $# -gt 0 ]]; do
       PREFECT_WORK_QUEUE="${2:-}"
       shift 2
       ;;
-    --storage-gateway-url)
-      STORAGE_GATEWAY_URL="${2:-}"
+    --storage-api-url)
+      STORAGE_API_URL="${2:-}"
       shift 2
       ;;
-    --prefect-cf-access-client-id)
-      PREFECT_CF_ACCESS_CLIENT_ID="${2:-}"
+    --prefect-access-client-id)
+      CF_ACCESS_CLIENT_ID="${2:-}"
       shift 2
       ;;
-    --prefect-cf-access-client-secret)
-      PREFECT_CF_ACCESS_CLIENT_SECRET="${2:-}"
-      shift 2
-      ;;
-    --storage-gateway-token)
-      STORAGE_GATEWAY_TOKEN="${2:-}"
+    --prefect-access-client-secret)
+      CF_ACCESS_CLIENT_SECRET="${2:-}"
       shift 2
       ;;
     --artifact-bucket)
@@ -164,11 +158,6 @@ done
 
 if [[ -z "${PREFECT_API_URL}" ]]; then
   echo "missing Prefect API URL; pass --prefect-api-url or set PREFECT_API_URL" >&2
-  exit 2
-fi
-
-if [[ -z "${STORAGE_GATEWAY_TOKEN}" ]]; then
-  echo "missing storage gateway token; pass --storage-gateway-token or set STORAGE_GATEWAY_TOKEN" >&2
   exit 2
 fi
 
@@ -294,8 +283,9 @@ bootstrap_temp_worker() {
     -e PREFECT_API_URL="${PREFECT_API_URL}" \
     -e PREFECT_CLIENT_CUSTOM_HEADERS="${PREFECT_CUSTOM_HEADERS_JSON}" \
     -e PREFECT_WORK_POOL="${PREFECT_WORK_POOL}" \
-    -e STORAGE_GATEWAY_URL="${STORAGE_GATEWAY_URL}" \
-    -e STORAGE_GATEWAY_TOKEN="${STORAGE_GATEWAY_TOKEN}" \
+    -e STORAGE_API_URL="${STORAGE_API_URL}" \
+    -e CF_ACCESS_CLIENT_ID="${CF_ACCESS_CLIENT_ID}" \
+    -e CF_ACCESS_CLIENT_SECRET="${CF_ACCESS_CLIENT_SECRET}" \
     orchestrator-worker:local
   must_step "worker.verify_temp_running" bash -lc "sleep 3 && [[ \"\$(docker inspect --format '{{.State.Running}}' '${WORKER_CONTAINER_NAME}' 2>/dev/null || true)\" == 'true' ]]"
 }
@@ -303,17 +293,17 @@ bootstrap_temp_worker() {
 log "Remote e2e start: prefect=${PREFECT_API_URL} pool=${PREFECT_WORK_POOL} queue=${PREFECT_WORK_QUEUE}"
 
 PREFECT_CUSTOM_HEADERS_JSON=""
-if [[ -n "${PREFECT_CF_ACCESS_CLIENT_ID}" && -n "${PREFECT_CF_ACCESS_CLIENT_SECRET}" ]]; then
+if [[ -n "${CF_ACCESS_CLIENT_ID}" && -n "${CF_ACCESS_CLIENT_SECRET}" ]]; then
   PREFECT_CUSTOM_HEADERS_JSON="$(
     python3 "${PY_HELPER}" build-cf-headers-json \
-      --client-id "${PREFECT_CF_ACCESS_CLIENT_ID}" \
-      --client-secret "${PREFECT_CF_ACCESS_CLIENT_SECRET}"
+      --client-id "${CF_ACCESS_CLIENT_ID}" \
+      --client-secret "${CF_ACCESS_CLIENT_SECRET}"
   )"
-  export PREFECT_CF_ACCESS_CLIENT_ID PREFECT_CF_ACCESS_CLIENT_SECRET
+  export CF_ACCESS_CLIENT_ID CF_ACCESS_CLIENT_SECRET
 fi
 
 must_step "preflight.tools" bash -lc "command -v docker >/dev/null && command -v curl >/dev/null && command -v python3 >/dev/null"
-must_step "preflight.storage_gateway_health" curl -fsS "${STORAGE_GATEWAY_URL%/}/healthz"
+must_step "preflight.storage_api_health" curl -fsS "${STORAGE_API_URL%/}/healthz"
 must_step "preflight.minio_health" curl -fsS "http://127.0.0.1:${MINIO_API_PORT}/minio/health/live"
 must_step "engine.build_job_spec" build_engine_job_spec
 must_step "build.base_register_worker_images" docker compose -f "${LOCAL_TEST_COMPOSE}" build base-runtime register worker
@@ -343,8 +333,8 @@ if [[ -z "${FLOW_RUN_ID}" ]]; then
 fi
 record_step "prefect.extract_flow_run_id" "pass" "${FLOW_RUN_ID}"
 
-must_step "prefect.wait_flow_completion" python3 "${VERIFY_SCRIPT}" prefect-wait-completed --prefect-api-url "${PREFECT_API_URL}" --flow-run-id "${FLOW_RUN_ID}" --timeout-sec "${TIMEOUT_SEC}" --prefect-cf-access-client-id "${PREFECT_CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${PREFECT_CF_ACCESS_CLIENT_SECRET}"
-must_step "storage.verify_objects" python3 "${PY_HELPER}" verify-storage-objects --flow-run-id "${FLOW_RUN_ID}" --storage-gateway-url "${STORAGE_GATEWAY_URL}" --storage-gateway-token "${STORAGE_GATEWAY_TOKEN}" --artifact-bucket "${ARTIFACT_BUCKET}" --log-dir "${LOG_DIR}"
+must_step "prefect.wait_flow_completion" python3 "${VERIFY_SCRIPT}" prefect-wait-completed --prefect-api-url "${PREFECT_API_URL}" --flow-run-id "${FLOW_RUN_ID}" --timeout-sec "${TIMEOUT_SEC}" --prefect-cf-access-client-id "${CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET}"
+must_step "storage.verify_objects" python3 "${PY_HELPER}" verify-storage-objects --flow-run-id "${FLOW_RUN_ID}" --storage-api-url "${STORAGE_API_URL}" --cf-access-client-id "${CF_ACCESS_CLIENT_ID}" --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET}" --artifact-bucket "${ARTIFACT_BUCKET}" --log-dir "${LOG_DIR}"
 if MLFLOW_RUN_ID="$(python3 "${PY_HELPER}" verify-engine-mlflow-run --mlflow-tracking-uri "${ENGINE_MLFLOW_TRACKING_URI}" --log-dir "${LOG_DIR}" --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" 2>>"${RUN_LOG}")"; then
   record_step "mlflow.verify_engine_run" "pass" "${MLFLOW_RUN_ID}"
 else
@@ -352,12 +342,12 @@ else
   collect_diagnostics
   exit 1
 fi
-must_step "prefect.verify_flush" python3 "${VERIFY_SCRIPT}" flush-verify --prefect-api-url "${PREFECT_API_URL}" --storage-gateway-url "${STORAGE_GATEWAY_URL}" --storage-gateway-token "${STORAGE_GATEWAY_TOKEN}" --flow-run-id "${FLOW_RUN_ID}" --cursor-path "${LOG_DIR}/prefect-flush-cursor.json" --prefect-cf-access-client-id "${PREFECT_CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${PREFECT_CF_ACCESS_CLIENT_SECRET}"
+must_step "prefect.verify_flush" python3 "${VERIFY_SCRIPT}" flush-verify --prefect-api-url "${PREFECT_API_URL}" --storage-api-url "${STORAGE_API_URL}" --flow-run-id "${FLOW_RUN_ID}" --cursor-path "${LOG_DIR}/prefect-flush-cursor.json" --prefect-cf-access-client-id "${CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET}"
 
 if [[ "${PRUNE_MODE}" == "apply" ]]; then
-  must_step "prefect.verify_prune" python3 "${VERIFY_SCRIPT}" prune-verify --prefect-api-url "${PREFECT_API_URL}" --flow-run-id "${FLOW_RUN_ID}" --apply --ttl-hours "${PRUNE_TTL_HOURS}" --prefect-cf-access-client-id "${PREFECT_CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${PREFECT_CF_ACCESS_CLIENT_SECRET}"
+  must_step "prefect.verify_prune" python3 "${VERIFY_SCRIPT}" prune-verify --prefect-api-url "${PREFECT_API_URL}" --flow-run-id "${FLOW_RUN_ID}" --apply --ttl-hours "${PRUNE_TTL_HOURS}" --prefect-cf-access-client-id "${CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET}"
 else
-  must_step "prefect.verify_prune" python3 "${VERIFY_SCRIPT}" prune-verify --prefect-api-url "${PREFECT_API_URL}" --flow-run-id "${FLOW_RUN_ID}" --ttl-hours "${PRUNE_TTL_HOURS}" --prefect-cf-access-client-id "${PREFECT_CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${PREFECT_CF_ACCESS_CLIENT_SECRET}"
+  must_step "prefect.verify_prune" python3 "${VERIFY_SCRIPT}" prune-verify --prefect-api-url "${PREFECT_API_URL}" --flow-run-id "${FLOW_RUN_ID}" --ttl-hours "${PRUNE_TTL_HOURS}" --prefect-cf-access-client-id "${CF_ACCESS_CLIENT_ID}" --prefect-cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET}"
 fi
 
 log "Remote e2e succeeded: flow_run_id=${FLOW_RUN_ID}"

@@ -32,8 +32,8 @@ def _headers() -> dict[str, str]:
         "Accept": "application/json",
         "User-Agent": "orchestrator-router/1.0",
     }
-    cf_id = _env("PREFECT_CF_ACCESS_CLIENT_ID")
-    cf_secret = _env("PREFECT_CF_ACCESS_CLIENT_SECRET")
+    cf_id = _env("CF_ACCESS_CLIENT_ID")
+    cf_secret = _env("CF_ACCESS_CLIENT_SECRET")
     if cf_id and cf_secret:
         headers["CF-Access-Client-Id"] = cf_id
         headers["CF-Access-Client-Secret"] = cf_secret

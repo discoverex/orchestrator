@@ -1,10 +1,11 @@
 # orchestrator
 
-Prefect-based orchestration workspace with three responsibilities:
+Prefect-based orchestration workspace with four responsibilities:
 
 - `flows`: Prefect workflow definitions (`engine_run_flow`)
 - `runner`: git checkout (resolved commit) + entrypoint execution
-- `storage_gateway`: presigned URL gateway for MinIO (workers never hold MinIO credentials)
+- `storage`: hexagonal storage module for presign/head control-plane logic
+- `worker_router`: worker-facing auth gateway for storage control APIs and MLflow
 
 ## Conceptual topology
 
@@ -15,16 +16,18 @@ Prefect-based orchestration workspace with three responsibilities:
   - fixed docker worker (`gpu-fixed`)
   - optional colab workers (`gpu-colab`)
 - Storage node:
-  - MinIO + storage-gateway + MLflow
-  - artifact/object persistence and metadata tracking
+  - MinIO + worker-router + MLflow
+  - artifact/object persistence and worker-facing auth/presign routing
 
 Core interaction path:
 
 1. register deployment to Prefect
 2. submit flow run to work pool/queue
-3. worker executes `engine_run_flow` + uploads outputs via storage-gateway
-4. flush exports completed run snapshots to storage
-5. prune handles retention (optional apply mode)
+3. worker executes `engine_run_flow`
+4. worker requests presigned URLs via `storage-api` and uploads objects through `storage-api` signed object paths
+5. worker records run metadata via `storage-api/mlflow`
+6. flush exports completed run snapshots to storage
+7. prune handles retention (optional apply mode)
 
 ## Local quickstart (dev)
 
@@ -33,7 +36,7 @@ cp .env.example .env
 set -a; source .env; set +a
 mkdir -p "${MINIO_DATA_DIR}"
 docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml build base-runtime
-docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml up -d --build minio prefect storage-gateway worker
+docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml up -d --build minio prefect worker-router worker
 ```
 
 Register deployment and run:
@@ -107,9 +110,16 @@ refresh the repo into Drive, and then invoke the checked-out
 Artifact and experiment policy:
 
 - Record experiment metadata in MLflow (params/metrics/tags/status).
-- Upload files only through `storage-gateway` (`/v1/presign/*`, `/v1/object/proxy`).
+- Prefer `STORAGE_API_URL/artifact/...` for storage presigns.
+- Upload and download artifact bytes through object-store presigned URLs, not through router proxying.
 - Keep MinIO credentials out of workers.
 - Persist uploaded `object_uri` references into MLflow tags (for example `artifact_manifest_uri`).
+- In repo run mode, the runner now checks out the requested `ref` instead of detaching strictly by resolved SHA.
+
+Auth split:
+
+- External access credentials: `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET`
+- Internal backend secrets stay on the storage node gateway/backend services only
 
 ## Storage-only production profile
 
@@ -124,6 +134,7 @@ docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage
 ```
 
 Operational runbook: `docs/ops/storage-node.md`
+This profile now exposes `storage.discoverex.qzz.io` for human UI access and `storage-api.discoverex.qzz.io` for machine APIs/object paths, while keeping object and MLflow credentials on the storage node only.
 
 ## Prefect server production profile (VM)
 
@@ -223,3 +234,4 @@ Notes:
 
 - Default flow assumes an existing operational worker in the target work pool.
 - `--bootstrap-worker` is available only for temporary bootstrapping and should be removed during production cutover.
+- Workers should use `STORAGE_API_URL` for storage and `MLFLOW_TRACKING_URI=https://storage-api.../mlflow` for MLflow.

@@ -41,7 +41,8 @@
 
 All endpoints require bearer auth:
 
-- `Authorization: Bearer <STORAGE_GATEWAY_TOKEN>`
+- `CF-Access-Client-Id: <CF_ACCESS_CLIENT_ID>`
+- `CF-Access-Client-Secret: <CF_ACCESS_CLIENT_SECRET>`
 
 Optional additional gateway protection:
 

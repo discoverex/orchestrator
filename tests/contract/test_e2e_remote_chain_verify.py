@@ -32,8 +32,7 @@ def test_e2e_remote_chain__storage_objects__returns_ok(
     bucket = "orchestrator-artifacts"
 
     args = argparse.Namespace(
-        storage_gateway_url="http://127.0.0.1:8100",
-        storage_gateway_token="token",
+        storage_api_url="http://127.0.0.1:8100",
         artifact_bucket=bucket,
         flow_run_id=flow_run_id,
         attempt=1,

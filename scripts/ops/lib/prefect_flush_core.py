@@ -107,8 +107,8 @@ def prefect_api_url() -> str:
 
 def prefect_headers() -> dict[str, str]:
     headers: dict[str, str] = {}
-    cf_id = env("PREFECT_CF_ACCESS_CLIENT_ID", "")
-    cf_secret = env("PREFECT_CF_ACCESS_CLIENT_SECRET", "")
+    cf_id = env("CF_ACCESS_CLIENT_ID", "")
+    cf_secret = env("CF_ACCESS_CLIENT_SECRET", "")
     if cf_id and cf_secret:
         headers["CF-Access-Client-Id"] = cf_id
         headers["CF-Access-Client-Secret"] = cf_secret
@@ -131,9 +131,9 @@ def prefect_get(path: str) -> Any:
 
 
 def gateway_headers() -> dict[str, str]:
-    headers = {"Authorization": f"Bearer {env('FLUSH_GATEWAY_TOKEN', required=True)}"}
-    cf_id = env("FLUSH_CF_ACCESS_CLIENT_ID", "")
-    cf_secret = env("FLUSH_CF_ACCESS_CLIENT_SECRET", "")
+    headers: dict[str, str] = {}
+    cf_id = env("CF_ACCESS_CLIENT_ID", "")
+    cf_secret = env("CF_ACCESS_CLIENT_SECRET", "")
     if cf_id and cf_secret:
         headers["CF-Access-Client-Id"] = cf_id
         headers["CF-Access-Client-Secret"] = cf_secret
