@@ -8,7 +8,7 @@ source "./scripts/e2e/lib/common.sh"
 PY_HELPER="./scripts/e2e/shell_python_helpers.py"
 LOCAL_COMPOSE_FILE="scripts/e2e/docker-compose.local.test.yml"
 LOCAL_PROJECT_NAME="orchestrator-e2e-local"
-ENGINE_DIR="${ENGINE_DIR:-$(cd "${ROOT_DIR}/../engine" && pwd)}"
+ENGINE_DIR="${ENGINE_DIR:-${ROOT_DIR}/tests/fixtures/dummy_engine_repo}"
 ENGINE_JOB_SCRIPT="${ENGINE_DIR}/infra/register/register_orchestrator_job.py"
 ENGINE_REPO_URL_CONTAINER="${ENGINE_REPO_URL_CONTAINER:-/opt/engine-src}"
 ENGINE_BACKGROUND_ASSET_REF="${ENGINE_BACKGROUND_ASSET_REF:-bg://dummy}"
@@ -314,7 +314,7 @@ payload = {
     "entrypoint": [
         "/bin/sh",
         "-lc",
-        "printf '%s\n' '{\"status\":\"ok\",\"scene_id\":\"local-e2e-scene\",\"version_id\":\"attempt-1\"}'",
+        "mkdir -p \"$ORCH_ENGINE_ARTIFACT_DIR/scene\" && printf '%s\n' '{\"scene_id\":\"local-e2e-scene\",\"version_id\":\"attempt-1\"}' > \"$ORCH_ENGINE_ARTIFACT_DIR/scene/scene.json\" && printf '%s\n' '{\"status\":\"ok\"}' > \"$ORCH_ENGINE_ARTIFACT_DIR/scene/verification.json\" && printf '%s\n' '{\"schema_version\":1,\"artifacts\":[{\"logical_name\":\"scene_json\",\"relative_path\":\"scene/scene.json\",\"content_type\":\"application/json\",\"mlflow_tag\":\"artifact_scene_uri\"},{\"logical_name\":\"verification_json\",\"relative_path\":\"scene/verification.json\",\"content_type\":\"application/json\",\"mlflow_tag\":\"artifact_verification_uri\"}]}' > \"$ORCH_ENGINE_ARTIFACT_MANIFEST_PATH\" && printf '%s\n' '{\"status\":\"ok\",\"scene_id\":\"local-e2e-scene\",\"version_id\":\"attempt-1\"}'",
     ],
     "config": None,
     "job_name": "local-e2e-dummy",

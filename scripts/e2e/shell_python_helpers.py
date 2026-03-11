@@ -386,8 +386,9 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         raise SystemExit("engine stdout missing scene_id/version_id")
 
     engine_uris = {
-        "scene_json": f"s3://{bucket}/scenes/{scene_id}/{version_id}/scene.json",
-        "verification_json": f"s3://{bucket}/scenes/{scene_id}/{version_id}/verification.json",
+        "scene_json": f"s3://{bucket}/jobs/{flow_run_id}/attempt-{attempt}/engine/scene/scene.json",
+        "verification_json": f"s3://{bucket}/jobs/{flow_run_id}/attempt-{attempt}/engine/scene/verification.json",
+        "engine_manifest": f"s3://{bucket}/jobs/{flow_run_id}/attempt-{attempt}/engine-artifacts.json",
     }
     for object_uri in engine_uris.values():
         payload = _http_json(
@@ -399,6 +400,45 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         )
         if not payload.get("exists"):
             raise SystemExit(f"missing engine object: {object_uri}")
+
+    engine_manifest_link = _http_json(
+        "POST",
+        f"{gateway}/v1/presign/get",
+        payload={
+            "flow_run_id": flow_run_id,
+            "attempt": attempt,
+            "kind": "custom",
+            "filename": "engine-artifacts.json",
+        },
+        headers=headers,
+        timeout=10,
+    )
+    engine_manifest_url = _rewrite_presigned_url(
+        str(engine_manifest_link.get("url", "")),
+        args.presigned_internal_base_url,
+    )
+    engine_manifest = cast(
+        dict[str, object],
+        json.loads(
+            _http_text(engine_manifest_url, headers=download_headers, timeout=15)
+        ),
+    )
+    if engine_manifest.get("flow_run_id") != flow_run_id:
+        raise SystemExit("engine manifest flow_run_id mismatch")
+    if int(str(engine_manifest.get("attempt", -1))) != attempt:
+        raise SystemExit("engine manifest attempt mismatch")
+    manifest_rows = engine_manifest.get("artifacts", [])
+    if not isinstance(manifest_rows, list):
+        raise SystemExit("engine manifest artifacts mismatch")
+    by_logical_name = {
+        str(row.get("logical_name")): str(row.get("object_uri"))
+        for row in manifest_rows
+        if isinstance(row, dict)
+    }
+    if by_logical_name.get("scene_json") != engine_uris["scene_json"]:
+        raise SystemExit("engine manifest scene_json uri mismatch")
+    if by_logical_name.get("verification_json") != engine_uris["verification_json"]:
+        raise SystemExit("engine manifest verification_json uri mismatch")
 
     (log_dir / "engine_uris.json").write_text(
         json.dumps(engine_uris, ensure_ascii=True, indent=2), encoding="utf-8"
@@ -482,6 +522,30 @@ def cmd_verify_engine_mlflow_run(args: argparse.Namespace) -> int:
     run_id = str(run_info.get("run_id", "")).strip()
     if not run_id:
         raise SystemExit("mlflow run_id missing")
+    run_data = run.get("data", {})
+    if not isinstance(run_data, dict):
+        raise SystemExit("mlflow run data missing")
+    tags = run_data.get("tags", [])
+    if not isinstance(tags, list):
+        raise SystemExit("mlflow run tags missing")
+    values = {
+        str(tag.get("key")): str(tag.get("value"))
+        for tag in tags
+        if isinstance(tag, dict) and "key" in tag and "value" in tag
+    }
+    engine_uris_path = log_dir / "engine_uris.json"
+    if engine_uris_path.exists():
+        engine_uris = cast(
+            dict[str, str], json.loads(engine_uris_path.read_text(encoding="utf-8"))
+        )
+        expected_tags = {
+            "artifact_engine_manifest_uri": engine_uris["engine_manifest"],
+            "artifact_scene_uri": engine_uris["scene_json"],
+            "artifact_verification_uri": engine_uris["verification_json"],
+        }
+        for key, value in expected_tags.items():
+            if values.get(key) != value:
+                raise SystemExit(f"mlflow worker tag mismatch: {key}")
 
     (log_dir / "mlflow_run.json").write_text(
         json.dumps(run, ensure_ascii=True, indent=2), encoding="utf-8"
