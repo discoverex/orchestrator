@@ -9,10 +9,16 @@ This machine is storage-only in production:
 
 Prefect server must run on another node.
 
+Related design docs:
+
+- [Service Flow](/home/esillileu/discoverex/orchestrator/docs/dev/service-flow.md)
+- [Service Auth Model](/home/esillileu/discoverex/orchestrator/docs/dev/service-auth-model.md)
+- [Service Contracts](/home/esillileu/discoverex/orchestrator/docs/dev/service-contracts.md)
+
 ## 1) Deploy (production profile)
 
 ```bash
-./bin/project runtime init storage
+./bin/cli runtime init storage
 cp infra/stacks/storage-node/.env.example infra/stacks/storage-node/.env
 # fill strong secrets, MLflow DB, and Cloudflare values
 set -a; source infra/stacks/storage-node/.env; set +a
@@ -60,7 +66,7 @@ curl -fsS http://127.0.0.1:8200/healthz
 curl -fsS http://127.0.0.1:${MINIO_API_PORT}/minio/health/live
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml exec -T mlflow \
-  python -c "import os, urllib.request; p=os.environ.get('MLFLOW_PORT','5000'); urllib.request.urlopen(f'http://localhost:{p}/', timeout=3)"
+  python -c "import os, urllib.request; p=os.environ.get('MLFLOW_PORT','5000'); prefix=os.environ.get('MLFLOW_STATIC_PREFIX','').rstrip('/'); urllib.request.urlopen(f'http://localhost:{p}{prefix or \"/\"}/', timeout=3)"
 ```
 
 Worker-router path quick check:
@@ -77,7 +83,7 @@ curl -fsS -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
 ```bash
 set -a; source infra/stacks/storage-node/.env; set +a
 
-# 0) DNS resolution must work before E2E full mode
+# 0) DNS resolution must work before MLflow/external verification
 getent ahosts storage-api.discoverex.qzz.io
 getent ahosts storage.discoverex.qzz.io
 

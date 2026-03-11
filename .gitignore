@@ -9,10 +9,14 @@ wheels/
 # Virtual environments
 .venv
 
-# Local secrets and backups
+# Local secrets
 .env
 .env.storage.prod
+**/.cloudflared/*.json
+
+# Local logs
+.coverage
+
+# Local data
 backups/
 artifacts/
-
-**/.cloudflared/*.json

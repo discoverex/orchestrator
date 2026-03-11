@@ -8,7 +8,7 @@ It also runs maintenance to flush completed runs to storage-node and prune old V
 ```bash
 cp infra/stacks/prefect-server/.env.example infra/stacks/prefect-server/.env
 # edit infra/stacks/prefect-server/.env
-./bin/project prefect build
+./bin/cli prefect build
 ```
 
 `prefect-db` is part of this stack. Set `PREFECT_DB_*` values in `.env`.
@@ -19,24 +19,24 @@ Completed runs are exported as full JSON snapshots using:
 ## 2) Start/stop
 
 ```bash
-./bin/project prefect up
-./bin/project prefect ps
-./bin/project prefect logs
-./bin/project prefect down
-./bin/project prefect flush
-./bin/project prefect prune
+./bin/cli prefect up
+./bin/cli prefect ps
+./bin/cli prefect logs
+./bin/cli prefect down
+./bin/cli prefect flush
+./bin/cli prefect prune
 ```
 
 ## 3) VM bootstrap (remote)
 
 ```bash
-./bin/remote prefect-install
-./bin/remote prefect-up
-./bin/remote prefect-ps
-./bin/remote prefect-logs
+./bin/cli prefect install --remote
+./bin/cli prefect up --remote
+./bin/cli prefect ps --remote
+./bin/cli prefect logs --remote
 ```
 
-`bin/remote` reads `REMOTE_USERNAME`, `REMOTE_HOST`, and `GITHUB_DEPLOY_KEY_PATH`
+`bin/cli` reads `REMOTE_USERNAME`, `REMOTE_HOST`, and `GITHUB_DEPLOY_KEY_PATH`
 from root `.env` by default.
 
 ## 4) Worker settings

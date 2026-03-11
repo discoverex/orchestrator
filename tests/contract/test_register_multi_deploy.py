@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any, cast
@@ -79,3 +80,55 @@ def test_single_mode_registers_compat_deployment(
     assert fake.calls[0]["name"] == "engine-run"
     assert fake.calls[0]["work_queue_name"] == "default"
     assert fake.calls[0]["version"] == "v1"
+
+
+def test_parse_args_uses_expected_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["register.py"])
+
+    args = register.parse_args()
+
+    assert args.single_name is None
+    assert args.single_queue == "default"
+    assert args.pool == "gpu-pool"
+    assert args.fixed_name == "engine-run"
+    assert args.fixed_queue == "gpu-fixed"
+    assert args.colab_name == "engine-run-colab"
+    assert args.colab_queue == "gpu-colab"
+    assert args.version is None
+
+
+def test_parse_args_accepts_explicit_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "register.py",
+            "--single-name",
+            "one",
+            "--single-queue",
+            "queue-a",
+            "--pool",
+            "pool-a",
+            "--fixed-name",
+            "fixed-a",
+            "--fixed-queue",
+            "fixed-q",
+            "--colab-name",
+            "colab-a",
+            "--colab-queue",
+            "colab-q",
+            "--version",
+            "v2",
+        ],
+    )
+
+    args = register.parse_args()
+
+    assert args.single_name == "one"
+    assert args.single_queue == "queue-a"
+    assert args.pool == "pool-a"
+    assert args.fixed_name == "fixed-a"
+    assert args.fixed_queue == "fixed-q"
+    assert args.colab_name == "colab-a"
+    assert args.colab_queue == "colab-q"
+    assert args.version == "v2"
