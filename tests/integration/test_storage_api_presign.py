@@ -5,16 +5,6 @@ import pytest
 from tests.integration.storage_api.helpers import cf_client, client
 
 
-def test_rejects_missing_auth(monkeypatch: pytest.MonkeyPatch) -> None:
-    c = cf_client(monkeypatch)
-    res = c.post(
-        "/artifact/v1/presign/put",
-        headers={"host": "storage-api.discoverex.qzz.io"},
-        json={"flow_run_id": "f1", "attempt": 1, "kind": "stdout"},
-    )
-    assert res.status_code == 403
-
-
 def test_presign_put_builds_attempt_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
     c = client(monkeypatch)
     res = c.post(
@@ -39,7 +29,7 @@ def test_ttl_over_limit_returns_400(monkeypatch: pytest.MonkeyPatch) -> None:
     assert res.status_code == 400
 
 
-def test_cf_access_required(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_machine_host_requires_cf_access(monkeypatch: pytest.MonkeyPatch) -> None:
     c = cf_client(monkeypatch)
     res = c.post(
         "/artifact/v1/presign/put",
@@ -58,3 +48,23 @@ def test_cf_access_required(monkeypatch: pytest.MonkeyPatch) -> None:
         json={"flow_run_id": "f1", "attempt": 1, "kind": "stdout"},
     )
     assert ok.status_code == 200
+
+
+def test_batch_presign_uses_default_filenames(monkeypatch: pytest.MonkeyPatch) -> None:
+    c = client(monkeypatch)
+    res = c.post(
+        "/artifact/v1/presign/batch",
+        json={
+            "flow_run_id": "f1",
+            "attempt": 1,
+            "entries": [
+                {"flow_run_id": "ignored", "attempt": 99, "kind": "stdout"},
+                {"flow_run_id": "ignored", "attempt": 99, "kind": "manifest"},
+            ],
+        },
+    )
+
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload[0]["object_uri"].endswith("/stdout.log")
+    assert payload[1]["object_uri"].endswith("/artifacts.json")
