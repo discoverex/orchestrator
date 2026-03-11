@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 from urllib import error, parse, request
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 
 def _read_steps(steps_file: Path) -> list[dict[str, str]]:
@@ -86,6 +86,26 @@ def _artifact_api_base(storage_api_url: str) -> str:
     return f"{base}/artifact"
 
 
+def _download_headers(presigned_host_header: str) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    if presigned_host_header:
+        headers["Host"] = presigned_host_header
+    return headers
+
+
+def _rewrite_presigned_url(url: str, internal_base_url: str) -> str:
+    if not internal_base_url:
+        return url
+    src = urlsplit(url)
+    dst = urlsplit(internal_base_url)
+    if not src.scheme or not src.netloc or not dst.scheme or not dst.netloc:
+        return url
+    host = (src.hostname or "").lower()
+    if host not in {"127.0.0.1", "localhost"}:
+        return url
+    return urlunsplit((dst.scheme, dst.netloc, src.path, src.query, src.fragment))
+
+
 def _extract_json_object(raw: str) -> dict[str, object]:
     for line in reversed(raw.splitlines()):
         candidate = line.strip()
@@ -98,6 +118,98 @@ def _extract_json_object(raw: str) -> dict[str, object]:
         if isinstance(parsed, dict):
             return cast(dict[str, object], parsed)
     raise SystemExit("unable to extract JSON object from stdout")
+
+
+def _find_mlflow_experiment_id(
+    tracking_uri: str,
+    experiment_name: str,
+    headers: dict[str, str],
+) -> str:
+    try:
+        experiment = _http_json(
+            "GET",
+            (
+                f"{tracking_uri}/api/2.0/mlflow/experiments/get-by-name"
+                f"?experiment_name={parse.quote(experiment_name, safe='')}"
+            ),
+            headers=headers,
+            timeout=20,
+        )
+    except error.HTTPError as exc:
+        if exc.code != 404:
+            raise
+    else:
+        row = experiment.get("experiment", {})
+        if isinstance(row, dict):
+            experiment_id = str(row.get("experiment_id", "")).strip()
+            if experiment_id:
+                return experiment_id
+
+    try:
+        experiments = _http_json(
+            "POST",
+            f"{tracking_uri}/api/2.0/mlflow/experiments/search",
+            payload={"filter": f"name = '{experiment_name}'", "max_results": 20},
+            headers=headers,
+            timeout=20,
+        )
+    except error.HTTPError as exc:
+        if exc.code != 404:
+            raise
+    else:
+        experiment_rows = experiments.get("experiments", [])
+        if not isinstance(experiment_rows, list):
+            raise SystemExit("mlflow experiments/search returned invalid experiments list")
+        for row in experiment_rows:
+            if isinstance(row, dict) and str(row.get("name", "")) == experiment_name:
+                experiment_id = str(row.get("experiment_id", "")).strip()
+                if experiment_id:
+                    return experiment_id
+
+    # Older/local MLflow builds may not expose search endpoints consistently.
+    # Probe a bounded range of experiment ids to recover the named experiment.
+    for candidate_id in range(0, 21):
+        try:
+            experiment = _http_json(
+                "GET",
+                (
+                    f"{tracking_uri}/api/2.0/mlflow/experiments/get"
+                    f"?experiment_id={candidate_id}"
+                ),
+                headers=headers,
+                timeout=20,
+            )
+        except error.HTTPError as exc:
+            if exc.code == 404:
+                continue
+            raise
+        row = experiment.get("experiment", {})
+        if isinstance(row, dict) and str(row.get("name", "")) == experiment_name:
+            experiment_id = str(row.get("experiment_id", "")).strip()
+            if experiment_id:
+                return experiment_id
+
+    return ""
+
+
+def _mlflow_run_matches_scene_version(
+    run: dict[str, object],
+    *,
+    scene_id: str,
+    version_id: str,
+) -> bool:
+    data = run.get("data", {})
+    if not isinstance(data, dict):
+        return False
+    params_raw = data.get("params", [])
+    if not isinstance(params_raw, list):
+        return False
+    values = {
+        str(row.get("key", "")): str(row.get("value", ""))
+        for row in params_raw
+        if isinstance(row, dict)
+    }
+    return values.get("scene_id") == scene_id and values.get("version_id") == version_id
 
 
 def cmd_poll_prefect_completion(args: argparse.Namespace) -> int:
@@ -167,6 +279,12 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         if not payload.get("exists"):
             raise SystemExit(f"missing object: {object_uri}")
 
+    (log_dir / "flow_uris.json").write_text(
+        json.dumps(uris, ensure_ascii=True, indent=2), encoding="utf-8"
+    )
+    if args.skip_engine_artifacts:
+        return 0
+
     manifest_link = _http_json(
         "POST",
         f"{gateway}/v1/presign/get",
@@ -180,10 +298,11 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         timeout=10,
     )
 
-    manifest_url = str(manifest_link.get("url", ""))
-    download_headers: dict[str, str] = {}
-    if args.presigned_host_header:
-        download_headers["Host"] = args.presigned_host_header
+    manifest_url = _rewrite_presigned_url(
+        str(manifest_link.get("url", "")),
+        args.presigned_internal_base_url,
+    )
+    download_headers = _download_headers(args.presigned_host_header)
     if args.cf_access_client_id and args.cf_access_client_secret:
         download_headers["CF-Access-Client-Id"] = args.cf_access_client_id
         download_headers["CF-Access-Client-Secret"] = args.cf_access_client_secret
@@ -220,7 +339,10 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         headers=headers,
         timeout=10,
     )
-    stdout_url = str(stdout_link.get("url", ""))
+    stdout_url = _rewrite_presigned_url(
+        str(stdout_link.get("url", "")),
+        args.presigned_internal_base_url,
+    )
     result_link = _http_json(
         "POST",
         f"{gateway}/v1/presign/get",
@@ -233,7 +355,10 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         headers=headers,
         timeout=10,
     )
-    result_url = str(result_link.get("url", ""))
+    result_url = _rewrite_presigned_url(
+        str(result_link.get("url", "")),
+        args.presigned_internal_base_url,
+    )
     result_payload = cast(
         dict[str, object],
         json.loads(_http_text(result_url, headers=download_headers, timeout=15)),
@@ -247,8 +372,9 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
     )
     scene_id = str(engine_output.get("scene_id", "")).strip()
     version_id = str(engine_output.get("version_id", "")).strip()
-    if args.skip_engine_artifacts:
-        return 0
+    (log_dir / "engine_output.json").write_text(
+        json.dumps(engine_output, ensure_ascii=True, indent=2), encoding="utf-8"
+    )
     if not scene_id or not version_id:
         raise SystemExit("engine stdout missing scene_id/version_id")
 
@@ -267,12 +393,6 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
         if not payload.get("exists"):
             raise SystemExit(f"missing engine object: {object_uri}")
 
-    (log_dir / "flow_uris.json").write_text(
-        json.dumps(uris, ensure_ascii=True, indent=2), encoding="utf-8"
-    )
-    (log_dir / "engine_output.json").write_text(
-        json.dumps(engine_output, ensure_ascii=True, indent=2), encoding="utf-8"
-    )
     (log_dir / "engine_uris.json").write_text(
         json.dumps(engine_uris, ensure_ascii=True, indent=2), encoding="utf-8"
     )
@@ -296,37 +416,54 @@ def cmd_verify_engine_mlflow_run(args: argparse.Namespace) -> int:
         headers["CF-Access-Client-Id"] = args.cf_access_client_id
         headers["CF-Access-Client-Secret"] = args.cf_access_client_secret
 
-    experiments = _http_json(
-        "POST",
-        f"{tracking_uri}/api/2.0/mlflow/experiments/search",
-        payload={"filter": "name = 'discoverex-core'", "max_results": 20},
-        headers=headers,
-        timeout=20,
+    experiment_id = _find_mlflow_experiment_id(
+        tracking_uri,
+        "discoverex-core",
+        headers,
     )
-    experiment_rows = experiments.get("experiments", [])
-    if not isinstance(experiment_rows, list):
-        raise SystemExit("mlflow experiments/search returned invalid experiments list")
-    experiment_id = ""
-    for row in experiment_rows:
-        if isinstance(row, dict) and str(row.get("name", "")) == "discoverex-core":
-            experiment_id = str(row.get("experiment_id", ""))
-            break
-    if not experiment_id:
-        raise SystemExit("discoverex-core experiment not found in MLflow")
+    candidate_ids: list[str] = []
+    if experiment_id:
+        candidate_ids.append(experiment_id)
+    candidate_ids.extend(
+        str(candidate_id)
+        for candidate_id in range(0, 21)
+        if str(candidate_id) != experiment_id
+    )
 
-    runs = _http_json(
-        "POST",
-        f"{tracking_uri}/api/2.0/mlflow/runs/search",
-        payload={
-            "experiment_ids": [experiment_id],
-            "filter": f"params.scene_id = '{scene_id}' and params.version_id = '{version_id}'",
-            "max_results": 5,
-        },
-        headers=headers,
-        timeout=20,
-    )
-    run_rows = runs.get("runs", [])
-    if not isinstance(run_rows, list) or not run_rows:
+    run_rows: list[object] = []
+    for candidate_id in candidate_ids:
+        try:
+            runs = _http_json(
+                "POST",
+                f"{tracking_uri}/api/2.0/mlflow/runs/search",
+                payload={
+                    "experiment_ids": [candidate_id],
+                    "max_results": 20,
+                },
+                headers=headers,
+                timeout=20,
+            )
+        except error.HTTPError as exc:
+            if exc.code == 404:
+                continue
+            raise
+        rows = runs.get("runs", [])
+        if not isinstance(rows, list):
+            raise SystemExit("mlflow runs/search returned invalid runs list")
+        matched = [
+            row
+            for row in rows
+            if isinstance(row, dict)
+            and _mlflow_run_matches_scene_version(
+                row,
+                scene_id=scene_id,
+                version_id=version_id,
+            )
+        ]
+        if matched:
+            run_rows = matched
+            break
+    if not run_rows:
         raise SystemExit("no matching MLflow run found for engine scene output")
 
     run = run_rows[0]
@@ -522,6 +659,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--artifact-bucket", required=True)
     p.add_argument("--log-dir", required=True)
     p.add_argument("--presigned-host-header", default="")
+    p.add_argument("--presigned-internal-base-url", default="")
     p.add_argument("--skip-engine-artifacts", action="store_true")
     p.set_defaults(func=cmd_verify_storage_objects)
 
