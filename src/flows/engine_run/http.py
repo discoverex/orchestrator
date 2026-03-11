@@ -41,9 +41,7 @@ def http_json(
         parsed = json.loads(text)
     except json.JSONDecodeError as exc:
         preview = text[:200].replace("\n", "\\n")
-        raise RuntimeError(
-            f"non-json response from storage API: {preview}"
-        ) from exc
+        raise RuntimeError(f"non-json response from storage API: {preview}") from exc
     if isinstance(parsed, dict):
         return cast(dict[str, object], parsed)
     if isinstance(parsed, list):

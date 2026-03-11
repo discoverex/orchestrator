@@ -145,11 +145,7 @@ def load_env_file_if_exists(path: Path) -> None:
         value = value.strip()
         if not key or key in os.environ:
             continue
-        if (
-            len(value) >= 2
-            and value[0] == value[-1]
-            and value[0] in {"'", '"'}
-        ):
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
             value = value[1:-1]
         os.environ[key] = value
 
@@ -204,7 +200,9 @@ def summarize_flow_run(row: dict[str, Any]) -> dict[str, Any]:
         "work_queue_name": row.get("work_queue_name"),
         "state_type": row.get("state_type") or (state or {}).get("type"),
         "state_name": row.get("state_name") or (state or {}).get("name"),
-        "state_message": (state or {}).get("message") if isinstance(state, dict) else None,
+        "state_message": (state or {}).get("message")
+        if isinstance(state, dict)
+        else None,
         "created": row.get("created"),
         "expected_start_time": row.get("expected_start_time"),
         "start_time": row.get("start_time"),

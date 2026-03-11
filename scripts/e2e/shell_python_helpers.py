@@ -111,7 +111,9 @@ def cmd_poll_prefect_completion(args: argparse.Namespace) -> int:
         try:
             payload = cast(
                 dict[str, Any],
-                _http_json("GET", f"{api_url}/flow_runs/{args.flow_run_id}", timeout=10),
+                _http_json(
+                    "GET", f"{api_url}/flow_runs/{args.flow_run_id}", timeout=10
+                ),
             )
         except error.HTTPError as exc:
             if exc.code in transient_statuses:

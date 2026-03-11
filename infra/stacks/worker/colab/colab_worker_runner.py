@@ -4,16 +4,22 @@ import argparse
 import importlib
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+if TYPE_CHECKING:
+    from colab_runtime import ColabRuntimeConfig as ColabRuntimeConfigType
+else:
+    ColabRuntimeConfigType = Any
+
 bootstrap_runtime = importlib.import_module("colab_bootstrap").bootstrap_runtime
 runtime = importlib.import_module("colab_runtime")
 worker = importlib.import_module("colab_worker")
 
-ColabRuntimeConfig = runtime.ColabRuntimeConfig
+ColabRuntimeConfig = cast(type[ColabRuntimeConfigType], runtime.ColabRuntimeConfig)
 DEFAULT_BOOTSTRAP_PYTHON = runtime.DEFAULT_BOOTSTRAP_PYTHON
 DEFAULT_CACHE_ROOT = runtime.DEFAULT_CACHE_ROOT
 DEFAULT_CHECKPOINT_DIR = runtime.DEFAULT_CHECKPOINT_DIR
@@ -49,7 +55,7 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _config_from_args(args: argparse.Namespace) -> ColabRuntimeConfig:
+def _config_from_args(args: argparse.Namespace) -> ColabRuntimeConfigType:
     return ColabRuntimeConfig(
         repo_dir=resolve_path(Path(args.repo_dir)),
         cache_root=resolve_path(Path(args.cache_root)),

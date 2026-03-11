@@ -71,7 +71,9 @@ def _storage_head(storage_api_url: str, object_uri: str) -> dict[str, Any]:
     return payload
 
 
-def _verify_storage(storage_api_url: str, flow_run_id: str, attempt: int) -> dict[str, Any]:
+def _verify_storage(
+    storage_api_url: str, flow_run_id: str, attempt: int
+) -> dict[str, Any]:
     keys = {
         "stdout": f"s3://orchestrator-artifacts/jobs/{flow_run_id}/attempt-{attempt}/stdout.log",
         "stderr": f"s3://orchestrator-artifacts/jobs/{flow_run_id}/attempt-{attempt}/stderr.log",
@@ -107,7 +109,9 @@ def _verify_mlflow(tracking_uri: str, flow_run_id: str) -> dict[str, Any]:
         raise ObserveError("unexpected mlflow runs/search response shape")
     rows = payload.get("runs", [])
     if not isinstance(rows, list) or not rows:
-        raise ObserveError(f"no matching MLflow run found for flow_run_id={flow_run_id}")
+        raise ObserveError(
+            f"no matching MLflow run found for flow_run_id={flow_run_id}"
+        )
     row = rows[0]
     if not isinstance(row, dict):
         raise ObserveError("unexpected mlflow run row shape")
@@ -146,7 +150,9 @@ def main() -> int:
     args = parser.parse_args()
 
     bootstrap_env(args.env_file)
-    storage_api_url = args.storage_api_url.strip() or os.getenv("STORAGE_API_URL", "").strip()
+    storage_api_url = (
+        args.storage_api_url.strip() or os.getenv("STORAGE_API_URL", "").strip()
+    )
     if not storage_api_url:
         raise ObserveError("missing STORAGE_API_URL")
     tracking_uri = args.mlflow_tracking_uri.strip()

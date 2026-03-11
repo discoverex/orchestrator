@@ -11,6 +11,8 @@ if str(ROOT_DIR) not in sys.path:
 
 from scripts.observability.lib.prefect_observe import (  # noqa: E402
     ROOT_DIR as OBSERVE_ROOT,
+)
+from scripts.observability.lib.prefect_observe import (  # noqa: E402
     build_client,
     load_job_spec,
     print_json,

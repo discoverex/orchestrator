@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import cast
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -11,6 +12,8 @@ if str(ROOT_DIR) not in sys.path:
 
 from scripts.observability.lib.prefect_observe import (  # noqa: E402
     ROOT_DIR as OBSERVE_ROOT,
+)
+from scripts.observability.lib.prefect_observe import (  # noqa: E402
     build_client,
     load_job_spec,
     poll_flow_run,
@@ -56,7 +59,7 @@ def main() -> int:
         "final_flow_run": summarize_flow_run(final),
     }
     print_json(result)
-    state_type = str(result["final_flow_run"]["state_type"] or "").upper()
+    state_type = str(cast(dict[str, object], result["final_flow_run"]).get("state_type") or "").upper()
     return 0 if state_type == "COMPLETED" else 1
 
 

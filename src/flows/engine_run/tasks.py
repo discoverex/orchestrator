@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
+from typing import cast
 
 from prefect import get_run_logger, task
+from prefect.exceptions import MissingContextError
 
 from flows.engine_run.http import http_json, storage_base_url, upload_file
 from flows.engine_run.models import ArtifactLink
 from runner.git_runner import resolve_commit, run_entrypoint
+
+
+def _get_task_logger() -> logging.Logger:
+    try:
+        return cast(logging.Logger, get_run_logger())
+    except MissingContextError:
+        return logging.getLogger("flows.engine_run.tasks")
 
 
 @task
@@ -17,7 +27,7 @@ def resolve_commit_task(repo_url: str, ref: str) -> str:
 
 @task
 def prepare_manifest_task(flow_run_id: str, attempt: int) -> list[ArtifactLink]:
-    logger = get_run_logger()
+    logger = _get_task_logger()
     gateway = storage_base_url()
     payload = {
         "flow_run_id": flow_run_id,
@@ -125,7 +135,7 @@ def upload_outputs_task(
     attempt: int,
     already_uploaded: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    logger = get_run_logger()
+    logger = _get_task_logger()
     output: dict[str, str] = dict(already_uploaded or {})
     for link in links:
         if link.kind in output:
