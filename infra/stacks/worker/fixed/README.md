@@ -16,6 +16,14 @@ cp infra/stacks/worker/fixed/.env.example infra/stacks/worker/fixed/.env
 docker compose --env-file infra/stacks/worker/fixed/.env -f infra/stacks/worker/fixed/docker-compose.yml up -d --build
 ```
 
+CPU-only smoke worker on this machine:
+
+```bash
+cp infra/stacks/worker/fixed/.env.cpu-test.example infra/stacks/worker/fixed/.env.cpu-test
+# edit infra/stacks/worker/fixed/.env.cpu-test
+docker compose --env-file infra/stacks/worker/fixed/.env.cpu-test -f infra/stacks/worker/fixed/docker-compose.cpu-test.yml up -d --build
+```
+
 Required worker env:
 
 - `PREFECT_API_URL=https://<your-domain>/api`
@@ -39,6 +47,14 @@ docker compose --env-file infra/stacks/worker/fixed/.env -f infra/stacks/worker/
 docker compose --env-file infra/stacks/worker/fixed/.env -f infra/stacks/worker/fixed/docker-compose.yml down
 ```
 
+CPU test worker:
+
+```bash
+docker compose --env-file infra/stacks/worker/fixed/.env.cpu-test -f infra/stacks/worker/fixed/docker-compose.cpu-test.yml ps
+docker compose --env-file infra/stacks/worker/fixed/.env.cpu-test -f infra/stacks/worker/fixed/docker-compose.cpu-test.yml logs --tail=120
+docker compose --env-file infra/stacks/worker/fixed/.env.cpu-test -f infra/stacks/worker/fixed/docker-compose.cpu-test.yml down
+```
+
 Expected startup summary:
 
 - Prefect custom headers should include Cloudflare keys only when Prefect itself is Access-protected
@@ -49,3 +65,4 @@ Expected startup summary:
 - This unit is intended to be always-on and low-touch.
 - Runtime data is expected outside repo at `../runtime/worker` by default.
 - GitHub SSH repo URLs are normalized internally to HTTPS for resolution/cache fetches.
+- CPU smoke stack defaults to `cpu-test-pool` / `cpu-fixed-test` and keeps checkpoint data under `/tmp/orchestrator-worker-cpu-test-checkpoints` by default.
