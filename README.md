@@ -24,8 +24,8 @@ Core interaction path:
 1. register deployment to Prefect
 2. submit flow run to work pool/queue
 3. worker executes `engine_run_flow`
-4. worker requests presigned URLs via `storage-api` or `worker-router` compatibility path and uploads objects directly to object storage
-5. worker records run metadata via MLflow (direct or router-backed proxy)
+4. worker requests presigned URLs via `storage-api` and uploads objects through `storage-api` signed object paths
+5. worker records run metadata via `storage-api/mlflow`
 6. flush exports completed run snapshots to storage
 7. prune handles retention (optional apply mode)
 
@@ -134,7 +134,7 @@ docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage
 ```
 
 Operational runbook: `docs/ops/storage-node.md`
-This profile now exposes `storage.discoverex.qzz.io` for human access, `storage-api.discoverex.qzz.io` for machine presign access, and keeps object credentials on the storage node only.
+This profile now exposes `storage.discoverex.qzz.io` for human UI access and `storage-api.discoverex.qzz.io` for machine APIs/object paths, while keeping object and MLflow credentials on the storage node only.
 
 ## Prefect server production profile (VM)
 
@@ -234,4 +234,4 @@ Notes:
 
 - Default flow assumes an existing operational worker in the target work pool.
 - `--bootstrap-worker` is available only for temporary bootstrapping and should be removed during production cutover.
-- Worker router mode is the preferred production path for storage and MLflow access from workers.
+- Workers should use `STORAGE_API_URL` for storage and `MLFLOW_TRACKING_URI=https://storage-api.../mlflow` for MLflow.

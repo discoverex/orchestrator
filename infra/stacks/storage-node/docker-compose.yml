@@ -14,6 +14,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      MINIO_BROWSER_REDIRECT_URL: ${MINIO_BROWSER_REDIRECT_URL:-https://storage.discoverex.qzz.io/minio}
     volumes:
       - ${MINIO_DATA_DIR:-/srv/orchestrator/minio}:/data
     ports:
@@ -82,6 +83,9 @@ services:
     image: orchestrator-mlflow:local
     container_name: orchestrator-mlflow
     restart: unless-stopped
+    environment:
+      MLFLOW_PORT: ${MLFLOW_PORT:-5000}
+      MLFLOW_STATIC_PREFIX: ${MLFLOW_STATIC_PREFIX:-/mlflow}
     command:
       - mlflow
       - server
@@ -91,6 +95,8 @@ services:
       - 0.0.0.0
       - --port
       - "${MLFLOW_PORT:-5000}"
+      - --static-prefix
+      - "${MLFLOW_STATIC_PREFIX:-/mlflow}"
     depends_on:
       mlflow-db:
         condition: service_healthy
@@ -100,11 +106,44 @@ services:
           "CMD",
           "python",
           "-c",
-          "import os, urllib.request; p=os.environ.get('MLFLOW_PORT','5000'); urllib.request.urlopen(f'http://localhost:{p}/', timeout=3)",
+          "import os, urllib.request; p=os.environ.get('MLFLOW_PORT','5000'); prefix=os.environ.get('MLFLOW_STATIC_PREFIX','').rstrip('/'); urllib.request.urlopen(f'http://localhost:{p}{prefix or \"/\"}/', timeout=3)",
         ]
       interval: 10s
       timeout: 5s
       retries: 10
+
+  db-admin:
+    image: dpage/pgadmin4:9.10
+    container_name: orchestrator-db-admin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@discoverex.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-replace_me_pgadmin_password}
+      SCRIPT_NAME: ${PGADMIN_SCRIPT_NAME:-/db}
+    depends_on:
+      mlflow-db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.10
+    container_name: orchestrator-storage-caddy
+    restart: unless-stopped
+    depends_on:
+      worker-router:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+      db-admin:
+        condition: service_started
+    environment:
+      STORAGE_API_HOST: ${STORAGE_API_HOST}
+      STORAGE_HUMAN_HOST: ${STORAGE_HUMAN_HOST}
+    command:
+      - sh
+      - -lc
+      - caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
 
   cloudflared:
     image: cloudflare/cloudflared:2026.2.0
@@ -118,7 +157,5 @@ services:
     volumes:
       - ./.cloudflared:/etc/cloudflared:ro
     depends_on:
-      worker-router:
-        condition: service_healthy
-      mlflow:
-        condition: service_healthy
+      caddy:
+        condition: service_started

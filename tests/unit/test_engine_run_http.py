@@ -114,3 +114,34 @@ def test_http_json_returns_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     assert rows == [{"kind": "stdout", "url": "https://example"}]
+
+
+def test_upload_file_sends_cf_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
+    seen: dict[str, str] = {}
+
+    class _FakeResponse:
+        def __enter__(self) -> "_FakeResponse":
+            return self
+
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc: BaseException | None,
+            tb: TracebackType | None,
+        ) -> None:
+            return None
+
+    def _fake_urlopen(req: object) -> _FakeResponse:
+        raw_headers = getattr(req, "headers", {})
+        headers = {str(key).lower(): str(value) for key, value in raw_headers.items()}
+        seen["cf_id"] = headers.get("cf-access-client-id", "")
+        seen["cf_secret"] = headers.get("cf-access-client-secret", "")
+        return _FakeResponse()
+
+    monkeypatch.setattr("flows.engine_run.http.request.urlopen", _fake_urlopen)
+
+    http.upload_file("https://storage-api.example.com/objects/bucket/key", b"payload")
+
+    assert seen == {"cf_id": "cf-id", "cf_secret": "cf-secret"}

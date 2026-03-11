@@ -53,14 +53,20 @@ def http_json(
 
 
 def upload_file(put_url: str, payload: bytes) -> None:
+    headers = {
+        "Content-Type": "application/octet-stream",
+        "User-Agent": WORKER_HTTP_USER_AGENT,
+    }
+    cf_id = os.getenv("CF_ACCESS_CLIENT_ID", "").strip()
+    cf_secret = os.getenv("CF_ACCESS_CLIENT_SECRET", "").strip()
+    if cf_id and cf_secret:
+        headers["CF-Access-Client-Id"] = cf_id
+        headers["CF-Access-Client-Secret"] = cf_secret
     req = request.Request(
         put_url,
         method="PUT",
         data=payload,
-        headers={
-            "Content-Type": "application/octet-stream",
-            "User-Agent": WORKER_HTTP_USER_AGENT,
-        },
+        headers=headers,
     )
     with request.urlopen(req):  # nosec B310 - presigned URL
         return

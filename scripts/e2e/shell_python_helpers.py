@@ -182,6 +182,9 @@ def cmd_verify_storage_objects(args: argparse.Namespace) -> int:
     download_headers: dict[str, str] = {}
     if args.presigned_host_header:
         download_headers["Host"] = args.presigned_host_header
+    if args.cf_access_client_id and args.cf_access_client_secret:
+        download_headers["CF-Access-Client-Id"] = args.cf_access_client_id
+        download_headers["CF-Access-Client-Secret"] = args.cf_access_client_secret
     manifest = cast(
         dict[str, object],
         json.loads(_http_text(manifest_url, headers=download_headers, timeout=15)),

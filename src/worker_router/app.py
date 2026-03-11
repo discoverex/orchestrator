@@ -29,7 +29,7 @@ def _mlflow_upstream() -> UpstreamConfig:
         headers["Authorization"] = auth
     return UpstreamConfig(
         name="mlflow",
-        base_url=os.getenv("MLFLOW_BACKEND_URL", "http://mlflow:5000"),
+        base_url=os.getenv("MLFLOW_BACKEND_URL", "http://mlflow:5000").rstrip("/"),
         headers=headers,
     )
 

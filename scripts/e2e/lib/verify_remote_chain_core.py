@@ -220,7 +220,7 @@ def command_storage_objects(
             "storage-objects", "PRESIGN_FAILED", "invalid presign/get response"
         )
 
-    manifest_raw = http_json_fn("GET", str(presign["url"]), timeout=60)
+    manifest_raw = http_json_fn("GET", str(presign["url"]), headers=headers, timeout=60)
     if not isinstance(manifest_raw, dict):
         raise VerifyError(
             "storage-objects", "MANIFEST_BAD_TYPE", "manifest is not an object"

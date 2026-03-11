@@ -30,34 +30,35 @@ Runtime policy:
 
 ## 2) Access model
 
-- Public exposure: `storage.discoverex.qzz.io` (human CF/email access), `storage-api.discoverex.qzz.io` (machine CF service-token access), `mlflow.discoverex.qzz.io` (MLflow)
+- Public exposure: `storage.discoverex.qzz.io` (human CF/email access), `storage-api.discoverex.qzz.io` (machine CF service-token access)
 - Direct exposure forbidden: MinIO API and console must stay localhost-bound
-- Runtime isolation: worker-router runs from a built image and owns storage control-plane composition
-- MLflow worker endpoint: `MLFLOW_TRACKING_URI=https://mlflow.discoverex.qzz.io`
-- MLflow auth model: Cloudflare Access(Service Token) only
-- Artifact policy: worker presign/head requests go through storage routes on worker-router, issued upload/download URLs go directly to the object endpoint
+- Runtime isolation: worker-router owns storage control-plane composition; Caddy handles human/machine host routing
+- MLflow worker endpoint: `MLFLOW_TRACKING_URI=https://storage-api.discoverex.qzz.io/mlflow`
+- MLflow UI endpoint: `https://storage.discoverex.qzz.io/mlflow`
+- Artifact policy: worker presign/head requests go through storage routes on worker-router, issued upload/download URLs use `storage-api` signed object paths
 - MLflow responsibility: metadata only (params/metrics/tags/status). Do not use `mlflow.log_artifact()`.
-- MinIO operator access should use localhost-bound console port or a separately protected operator ingress.
+- Human/operator UIs: MLflow at `/mlflow`, MinIO console at `/minio`, pgAdmin at `/db`
 - Worker contract: workers should carry only `STORAGE_API_URL`, `MLFLOW_TRACKING_URI`, and Cloudflare Access credentials; direct storage/MLflow credentials stay on this node.
 - Request auth on storage API:
 
 1. Cloudflare Access headers (`CF-Access-Client-Id`, `CF-Access-Client-Secret`) when `GATEWAY_REQUIRE_CF_ACCESS=true`
 
-Cloudflare side requirements for MLflow:
+Cloudflare side requirements for storage domain pair:
 
-1. Create DNS/route for `mlflow.discoverex.qzz.io` in the same tunnel
-2. Add/verify tunnel ingress for `mlflow.discoverex.qzz.io -> http://mlflow:${MLFLOW_PORT}`
-3. Create Cloudflare Access application for `mlflow.discoverex.qzz.io`
-4. Issue Service Token and distribute only to trusted workers/clients
+1. Create DNS/route for `storage.discoverex.qzz.io`
+2. Create DNS/route for `storage-api.discoverex.qzz.io`
+3. Add/verify tunnel ingress for both hosts -> `http://caddy:80`
+4. Create Cloudflare Access application/policy for both hosts
+5. Issue Service Token and distribute only to trusted workers/clients for `storage-api`
 
-Note: `infra/stacks/storage-node/.cloudflared/config.yml` is template-style (`__MLFLOW_PORT__`).
-`docker-compose` starts cloudflared with runtime substitution from `MLFLOW_PORT`.
+`cloudflared` now forwards both public hosts into the local Caddy ingress, which fans out by path to `worker-router`, `mlflow`, `minio`, and DB admin.
 
 ## 3) Health checks
 
 ```bash
 curl -fsS http://127.0.0.1:8200/healthz
 curl -fsS http://127.0.0.1:${MINIO_API_PORT}/minio/health/live
+docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml exec -T mlflow \
   python -c "import os, urllib.request; p=os.environ.get('MLFLOW_PORT','5000'); urllib.request.urlopen(f'http://localhost:{p}/', timeout=3)"
 ```
@@ -77,19 +78,20 @@ curl -fsS -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
 set -a; source infra/stacks/storage-node/.env; set +a
 
 # 0) DNS resolution must work before E2E full mode
-getent ahosts mlflow.discoverex.qzz.io
+getent ahosts storage-api.discoverex.qzz.io
+getent ahosts storage.discoverex.qzz.io
 
 # 1) Access check (without CF token should be blocked by Access policy)
-curl -I https://mlflow.discoverex.qzz.io
+curl -I https://storage-api.discoverex.qzz.io/mlflow
 
 # 2) Access check (with Service Token)
 curl -fsS \
   -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
   -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
-  https://mlflow.discoverex.qzz.io/api/2.0/mlflow/experiments/search
+  https://storage-api.discoverex.qzz.io/mlflow/api/2.0/mlflow/experiments/search
 
 # 3) Worker run check
-export MLFLOW_TRACKING_URI=https://mlflow.discoverex.qzz.io
+export MLFLOW_TRACKING_URI=https://storage-api.discoverex.qzz.io/mlflow
 # run mlflow.start_run(), then:
 # - log param/metric/tag only
 # - upload files via storage-api-issued presigned URLs

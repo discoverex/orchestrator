@@ -98,7 +98,7 @@ def test_presigned_urls_can_split_public_and_internal_bases() -> None:
         endpoint="127.0.0.1:9000",
         access_key="a",
         secret_key="b",
-        public_base_url="http://127.0.0.1:29000",
+        public_base_url="https://storage-api.example.com/objects",
         internal_presign_base_url="http://minio:9000",
         client=FakeMinio(),
     )
@@ -107,4 +107,4 @@ def test_presigned_urls_can_split_public_and_internal_bases() -> None:
     get_url = store.generate_presigned_get("s3://artifacts/jobs/1/stdout.log", 60)
 
     assert put_url.startswith("http://minio:9000/")
-    assert get_url.startswith("http://127.0.0.1:29000/")
+    assert get_url.startswith("https://storage-api.example.com/objects/")
