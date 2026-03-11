@@ -5,7 +5,7 @@ Always-on GPU worker stack for the fixed worker node.
 ## 1) Configure
 
 ```bash
-./bin/project runtime init worker
+./bin/cli runtime init worker
 cp infra/stacks/worker/fixed/.env.example infra/stacks/worker/fixed/.env
 # edit infra/stacks/worker/fixed/.env
 ```

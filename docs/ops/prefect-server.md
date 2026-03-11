@@ -8,6 +8,12 @@ This node runs control-plane services only:
 
 Workers stay fully separate and poll work from Prefect over HTTPS.
 
+Related design docs:
+
+- [Service Flow](/home/esillileu/discoverex/orchestrator/docs/dev/service-flow.md)
+- [Service Auth Model](/home/esillileu/discoverex/orchestrator/docs/dev/service-auth-model.md)
+- [Service Contracts](/home/esillileu/discoverex/orchestrator/docs/dev/service-contracts.md)
+
 ## 1) Data policy
 
 - VM is not long-term SSOT.
@@ -20,24 +26,24 @@ Workers stay fully separate and poll work from Prefect over HTTPS.
 cp infra/stacks/prefect-server/.env.example infra/stacks/prefect-server/.env
 # set PREFECT_SERVER_IMAGE + API URL + DB + flush values
 
-./bin/project prefect up
-./bin/project prefect ps
+./bin/cli prefect up
+./bin/cli prefect ps
 ```
 
 Remote helper flow:
 
 ```bash
-./bin/remote prefect-install
-./bin/remote prefect-up
-./bin/remote prefect-ps
-./bin/remote worker ps
+./bin/cli prefect install --remote
+./bin/cli prefect up --remote
+./bin/cli prefect ps --remote
+./bin/cli prefect workers --remote
 ```
 
 ## 3) Manual maintenance commands
 
 ```bash
-./bin/project prefect flush
-./bin/project prefect prune
+./bin/cli prefect flush
+./bin/cli prefect prune
 ```
 
 ## 4) Network model
@@ -52,7 +58,7 @@ Remote helper flow:
 
 ```bash
 curl -fsS "http://127.0.0.1:${PREFECT_BIND_PORT}/api/health"
-./bin/project prefect logs
+./bin/cli prefect logs
 ```
 
 Expected external API endpoint:
@@ -64,14 +70,14 @@ Expected external API endpoint:
 Run from the storage-node machine:
 
 ```bash
-./bin/project e2e-remote \
+./bin/cli e2e remote \
   --prefect-api-url https://<domain>/api
 ```
 
 PoC-only destructive prune verification:
 
 ```bash
-./bin/project e2e-remote \
+./bin/cli e2e remote \
   --prefect-api-url https://<domain>/api \
   --prune-mode apply \
   --prune-ttl-hours 0

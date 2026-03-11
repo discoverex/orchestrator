@@ -7,6 +7,22 @@ Prefect-based orchestration workspace with four responsibilities:
 - `storage`: hexagonal storage module for presign/head control-plane logic
 - `worker_router`: worker-facing auth gateway for storage control APIs and MLflow
 
+## Docs
+
+Design and contracts:
+
+- `docs/dev/service-flow.md`
+- `docs/dev/service-auth-model.md`
+- `docs/dev/service-contracts.md`
+- `docs/dev/execution-contract.md`
+- `docs/dev/engine-implementation-contract.md`
+- `docs/dev/state-machine.md`
+
+Operations:
+
+- `docs/ops/prefect-server.md`
+- `docs/ops/storage-node.md`
+
 ## Conceptual topology
 
 - Prefect server node:
@@ -28,6 +44,16 @@ Core interaction path:
 5. worker records run metadata via `storage-api/mlflow`
 6. flush exports completed run snapshots to storage
 7. prune handles retention (optional apply mode)
+
+Standard validation path:
+
+1. run the standard Prefect dummy smoke
+2. verify artifact objects and MLflow linkage
+
+```bash
+./bin/cli observability fixed-dummy-smoke --deployment-name engine-run --timeout-sec 240
+uv run python scripts/observability/prefect_verify_standard_dummy_run.py --flow-run-id <FLOW_RUN_ID>
+```
 
 ## Local quickstart (dev)
 
@@ -126,7 +152,7 @@ Auth split:
 Use this when this machine is dedicated storage node:
 
 ```bash
-./bin/project runtime init storage
+./bin/cli runtime init storage
 cp infra/stacks/storage-node/.env.example infra/stacks/storage-node/.env
 set -a; source infra/stacks/storage-node/.env; set +a
 docker compose --env-file infra/stacks/storage-node/.env -f infra/stacks/storage-node/docker-compose.yml build base-runtime
@@ -143,55 +169,57 @@ Use this when this machine is dedicated Prefect control plane:
 ```bash
 cp infra/stacks/prefect-server/.env.example infra/stacks/prefect-server/.env
 # fill PREFECT_SERVER_IMAGE + VM-local DB + flush values
-./bin/project prefect up
-./bin/project prefect ps
-./bin/project prefect flush
-./bin/project prefect prune
+./bin/cli prefect up
+./bin/cli prefect ps
+./bin/cli prefect flush
+./bin/cli prefect prune
 ```
 
 Runbook: `docs/ops/prefect-server.md`
 
-## Project command shortcuts
+## Internal CLI shortcuts
 
-`bin/project` is the canonical local operator command:
+`bin/cli` is the canonical internal operator command:
 
 ```bash
-./bin/project runtime init all
-./bin/project e2e mlflow --keep-on-fail
-./bin/project e2e-remote --prefect-api-url https://prefect.example.com/api --prune-mode apply
-./bin/project storage up
-./bin/project storage down
-./bin/project prefect up
-./bin/project prefect logs
-./bin/project prefect flush
-./bin/project prefect prune
-./bin/project register run
-./bin/project worker fixed up
-./bin/project worker register-gpu
-./bin/project worker submit --job-spec-json '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo hello"]}'
+./bin/cli runtime init all
+./bin/cli e2e local mlflow --keep-on-fail
+./bin/cli e2e remote --prefect-api-url https://prefect.example.com/api --prune-mode apply
+./bin/cli storage up
+./bin/cli storage down
+./bin/cli local up
+./bin/cli prefect up
+./bin/cli prefect logs
+./bin/cli prefect flush
+./bin/cli prefect prune
+./bin/cli register run
+./bin/cli worker fixed up
+./bin/cli worker register-gpu
+./bin/cli worker submit --job-spec-json '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo hello"]}'
 ```
 
 Runtime data policy:
 
-- Run commands from project root (`orchestrator`).
+- Run internal commands from project root (`orchestrator`).
 - Keep runtime data outside repo under `../runtime` (for example `../runtime/storage`, `../runtime/worker`).
 
-`bin/remote` provides remote VM control for Prefect stack:
+Remote Prefect VM control is now absorbed into `bin/cli` domain commands:
 
 ```bash
-./bin/remote connect
-./bin/remote prefect-install
-./bin/remote prefect-up
-./bin/remote prefect-ps
-./bin/remote prefect-logs
-./bin/remote worker ps
+./bin/cli ops connect
+./bin/cli prefect install --remote
+./bin/cli prefect up --remote
+./bin/cli prefect ps --remote
+./bin/cli prefect logs --remote
+./bin/cli prefect workers --remote
 ```
 
-`prefect-*` commands run under `REMOTE_PREFECT_PATH` (default:
-`/opt/services/orchestrator-prefect`) and use remote-specific
-`REMOTE_PREFECT_ENV` / `REMOTE_PREFECT_COMPOSE` defaults (`.env`,
-`docker-compose.yml`).
-`prefect-install` still uses `REMOTE_PROJECT_PATH` because it bootstraps from the repo checkout.
+Remote Prefect actions run under `REMOTE_PREFECT_PATH` (default:
+`/opt/services/orchestrator-prefect`) and use `REMOTE_PREFECT_ENV` /
+`REMOTE_PREFECT_COMPOSE` defaults (`.env`, `docker-compose.yml`).
+`cli prefect install --remote` still uses `REMOTE_PROJECT_PATH` because it bootstraps from the repo checkout.
+
+`bin/orchestrator` remains reserved for external-facing CLI responsibilities. Internal docker, ssh, and orchestration operations should stay under `bin/cli`.
 
 ## Test
 
@@ -220,11 +248,11 @@ Remote Prefect + local storage E2E (production-worker oriented):
 
 ```bash
 # register + run + storage verify + flush + prune dry-run
-./bin/project e2e-remote \
+./bin/cli e2e remote \
   --prefect-api-url https://prefect.example.com/api
 
 # PoC mode (allow prune apply)
-./bin/project e2e-remote \
+./bin/cli e2e remote \
   --prefect-api-url https://prefect.example.com/api \
   --prune-mode apply \
   --prune-ttl-hours 0
