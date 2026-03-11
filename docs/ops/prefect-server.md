@@ -13,6 +13,7 @@ Related design docs:
 - [Service Flow](/home/esillileu/discoverex/orchestrator/docs/dev/service-flow.md)
 - [Service Auth Model](/home/esillileu/discoverex/orchestrator/docs/dev/service-auth-model.md)
 - [Service Contracts](/home/esillileu/discoverex/orchestrator/docs/dev/service-contracts.md)
+- [Engine Prefect Registration](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/README.md)
 
 ## 1) Data policy
 
