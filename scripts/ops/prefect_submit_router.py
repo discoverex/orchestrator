@@ -18,6 +18,9 @@ if str(ROOT_DIR / "src") not in sys.path:
 
 from flows.job_spec import JobSpecError, parse_job_spec_json  # noqa: E402
 
+DEFAULT_FIXED_DEPLOYMENT = "discoverex-engine-run"
+DEFAULT_COLAB_DEPLOYMENT = "discoverex-engine-run-colab"
+
 
 def _env(name: str, default: str = "") -> str:
     return os.getenv(name, default)
@@ -163,11 +166,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="If true and preferred queue has RUNNING flow(s), divert to secondary when strict-priority is false.",
     )
     parser.add_argument(
-        "--fixed-deployment", default=_env("ROUTER_FIXED_DEPLOYMENT", "engine-run")
+        "--fixed-deployment",
+        default=_env("ROUTER_FIXED_DEPLOYMENT", DEFAULT_FIXED_DEPLOYMENT),
     )
     parser.add_argument(
         "--colab-deployment",
-        default=_env("ROUTER_COLAB_DEPLOYMENT", "engine-run-colab"),
+        default=_env("ROUTER_COLAB_DEPLOYMENT", DEFAULT_COLAB_DEPLOYMENT),
     )
     parser.add_argument(
         "--fixed-queue", default=_env("ROUTER_FIXED_QUEUE", "gpu-fixed")

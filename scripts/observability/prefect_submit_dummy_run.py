@@ -24,7 +24,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Submit a dummy flow run to a Prefect deployment."
     )
-    parser.add_argument("--deployment-name", default="engine-run")
+    parser.add_argument("--deployment-name", default="discoverex-engine-run")
     parser.add_argument(
         "--job-spec-file",
         default=str(OBSERVE_ROOT / "scripts" / "e2e" / "fixed_dummy_inline_job.json"),

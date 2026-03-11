@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Compatibility wrapper flow around engine execution during control-plane cutover."""
+
 import os
 from pathlib import Path
 from typing import Any, cast
