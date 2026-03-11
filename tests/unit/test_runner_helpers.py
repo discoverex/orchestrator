@@ -11,7 +11,9 @@ import runner.git_runner as git_runner
 from runner.git_runner import RunnerError
 
 
-def test_run_raises_runner_error_on_nonzero_exit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_raises_runner_error_on_nonzero_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     git_runner_any = cast(Any, git_runner)
 
     def _fake_run(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
@@ -38,7 +40,9 @@ def test_local_repo_path_handles_file_uri_and_missing_path(tmp_path: Path) -> No
     assert git_runner._local_repo_path("https://github.com/example/repo.git") is None
 
 
-def test_prepare_per_repo_venv_skips_without_uv(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_prepare_per_repo_venv_skips_without_uv(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     env = {"PATH": os.environ.get("PATH", "")}
     git_runner_any = cast(Any, git_runner)
     monkeypatch.setattr(git_runner_any.shutil, "which", lambda name: None)
@@ -99,7 +103,9 @@ def test_prepare_per_repo_venv_raises_on_sync_failure(
         cmd: list[str], cwd: Path, env: dict[str, str], capture_output: bool, text: bool
     ) -> subprocess.CompletedProcess[str]:
         del cwd, env, capture_output, text
-        return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="sync failed")
+        return subprocess.CompletedProcess(
+            args=cmd, returncode=1, stdout="", stderr="sync failed"
+        )
 
     monkeypatch.setattr(git_runner_any.subprocess, "run", _fake_run)
 

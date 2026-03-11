@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Execution adapter for materializing source and launching engine entrypoints."""
+
+from __future__ import annotations
 
 import json
 import os

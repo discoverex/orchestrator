@@ -164,7 +164,9 @@ def _find_mlflow_experiment_id(
     else:
         experiment_rows = experiments.get("experiments", [])
         if not isinstance(experiment_rows, list):
-            raise SystemExit("mlflow experiments/search returned invalid experiments list")
+            raise SystemExit(
+                "mlflow experiments/search returned invalid experiments list"
+            )
         for row in experiment_rows:
             if isinstance(row, dict) and str(row.get("name", "")) == experiment_name:
                 experiment_id = str(row.get("experiment_id", "")).strip()
@@ -435,7 +437,7 @@ def cmd_verify_engine_mlflow_run(args: argparse.Namespace) -> int:
         if str(candidate_id) != experiment_id
     )
 
-    run_rows: list[object] = []
+    run_rows: list[dict[str, object]] = []
     for candidate_id in candidate_ids:
         try:
             runs = _http_json(

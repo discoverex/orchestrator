@@ -4,9 +4,10 @@ import argparse
 import importlib.util
 import json
 import sys
+from email.message import Message
 from pathlib import Path
 from types import ModuleType
-from typing import Any, cast
+from typing import Any
 from urllib import error
 
 
@@ -72,7 +73,10 @@ def test_verify_storage_objects_writes_flow_metadata_in_core_mode(
             return {"exists": True, "size": 1}
         if url.endswith("/v1/presign/get"):
             kind = str(payload["kind"])
-            return {"url": f"https://storage.example/{kind}", "object_uri": base_uris[kind]}
+            return {
+                "url": f"https://storage.example/{kind}",
+                "object_uri": base_uris[kind],
+            }
         raise AssertionError(url)
 
     def _fake_http_text(
@@ -115,7 +119,10 @@ def test_verify_storage_objects_writes_flow_metadata_in_core_mode(
     )
 
     assert mod.cmd_verify_storage_objects(args) == 0
-    assert json.loads((tmp_path / "flow_uris.json").read_text(encoding="utf-8")) == base_uris
+    assert (
+        json.loads((tmp_path / "flow_uris.json").read_text(encoding="utf-8"))
+        == base_uris
+    )
     assert calls == ["https://storage.example/artifact/v1/object/head"] * 4
     assert not (tmp_path / "engine_output.json").exists()
     assert not (tmp_path / "engine_uris.json").exists()
@@ -144,9 +151,9 @@ def test_verify_engine_mlflow_run_falls_back_to_experiment_get_probe(
         _ = (headers, timeout)
         calls.append((method, url))
         if url.endswith("/experiments/get-by-name?experiment_name=discoverex-core"):
-            raise error.HTTPError(url, 404, "not found", hdrs=None, fp=None)
+            raise error.HTTPError(url, 404, "not found", hdrs=Message(), fp=None)
         if url.endswith("/experiments/search"):
-            raise error.HTTPError(url, 404, "not found", hdrs=None, fp=None)
+            raise error.HTTPError(url, 404, "not found", hdrs=Message(), fp=None)
         if url.endswith("/experiments/get?experiment_id=0"):
             return {"experiment": {"experiment_id": "0", "name": "Default"}}
         if url.endswith("/experiments/get?experiment_id=1"):

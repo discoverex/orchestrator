@@ -87,11 +87,15 @@ def test_upload_outputs_task_skips_already_uploaded(
     } in manifest_payload["artifacts"]
 
 
-def test_flow_attempt_uses_run_context_run_count(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_flow_attempt_uses_run_context_run_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         flow_module,
         "get_run_context",
-        lambda: type("Ctx", (), {"flow_run": type("FlowRun", (), {"run_count": 3})()})(),
+        lambda: type(
+            "Ctx", (), {"flow_run": type("FlowRun", (), {"run_count": 3})()}
+        )(),
     )
 
     assert flow_module._flow_attempt() == 3
@@ -213,7 +217,9 @@ def test_run_job_flow_inline_executes_uploads_and_cleans_up(
     assert out["job_name"] == "inline-job"
     assert out["resolved_commit"] == "inline"
     assert out["outputs_prefix"] == "jobs/flow-inline/attempt-2/"
-    assert out["manifest_uri"] == "s3://bucket/jobs/flow-inline/attempt-2/artifacts.json"
+    assert (
+        out["manifest_uri"] == "s3://bucket/jobs/flow-inline/attempt-2/artifacts.json"
+    )
     assert cleanup_calls == [workdir]
     assert saved_states[-1]["steps"]["cleanup"] is True
 
@@ -267,7 +273,9 @@ def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
         "resolve_checkpoint_path",
         lambda checkpoint_dir, resume_key: checkpoint_path,
     )
-    monkeypatch.setattr(flow_module, "load_checkpoint", lambda path: deepcopy(loaded_state))
+    monkeypatch.setattr(
+        flow_module, "load_checkpoint", lambda path: deepcopy(loaded_state)
+    )
     monkeypatch.setattr(
         flow_module,
         "save_checkpoint",
@@ -286,7 +294,9 @@ def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
             0,
         )
 
-    monkeypatch.setattr(flow_module, "run_entrypoint_job_task", _run_entrypoint_job_task)
+    monkeypatch.setattr(
+        flow_module, "run_entrypoint_job_task", _run_entrypoint_job_task
+    )
     monkeypatch.setattr(
         flow_module,
         "prepare_manifest_task",
