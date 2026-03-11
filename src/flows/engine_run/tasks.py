@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from prefect import task
+from prefect import get_run_logger, task
 
 from flows.engine_run.http import http_json, storage_base_url, upload_file
 from flows.engine_run.models import ArtifactLink
@@ -17,6 +17,7 @@ def resolve_commit_task(repo_url: str, ref: str) -> str:
 
 @task
 def prepare_manifest_task(flow_run_id: str, attempt: int) -> list[ArtifactLink]:
+    logger = get_run_logger()
     gateway = storage_base_url()
     payload = {
         "flow_run_id": flow_run_id,
@@ -50,12 +51,20 @@ def prepare_manifest_task(flow_run_id: str, attempt: int) -> list[ArtifactLink]:
     }
     rows = http_json("POST", f"{gateway}/v1/presign/batch", payload)
     assert isinstance(rows, list)
-    return [
+    links = [
         ArtifactLink(
             kind=str(r["kind"]), object_uri=str(r["object_uri"]), url=str(r["url"])
         )
         for r in rows
     ]
+    logger.info(
+        "issued artifact links: %s",
+        [
+            {"kind": link.kind, "object_uri": link.object_uri, "url": link.url}
+            for link in links
+        ],
+    )
+    return links
 
 
 @task
@@ -116,6 +125,7 @@ def upload_outputs_task(
     attempt: int,
     already_uploaded: dict[str, str] | None = None,
 ) -> dict[str, str]:
+    logger = get_run_logger()
     output: dict[str, str] = dict(already_uploaded or {})
     for link in links:
         if link.kind in output:
@@ -134,11 +144,24 @@ def upload_outputs_task(
             manifest_path.write_text(
                 json.dumps(manifest, ensure_ascii=True, indent=2), encoding="utf-8"
             )
+            logger.info(
+                "uploading manifest artifact: kind=%s object_uri=%s url=%s",
+                link.kind,
+                link.object_uri,
+                link.url,
+            )
             upload_file(link.url, manifest_path.read_bytes())
             output["manifest"] = link.object_uri
             continue
 
         src = Path(local_paths[link.kind])
+        logger.info(
+            "uploading artifact: kind=%s object_uri=%s url=%s local_path=%s",
+            link.kind,
+            link.object_uri,
+            link.url,
+            src,
+        )
         upload_file(link.url, src.read_bytes())
         output[link.kind] = link.object_uri
     return output
