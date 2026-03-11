@@ -1,10 +1,12 @@
 # Register Node (Prefect Deployment Registration)
 
-This profile registers `engine_run_flow` deployments through a one-shot container.
-Default mode creates two deployments:
+This profile registers Prefect deployments through a one-shot control-plane container.
+Default mode creates two primary deployments and two compatibility aliases:
 
-- fixed: `engine-run/engine-run` on queue `gpu-fixed`
-- colab: `engine-run/engine-run-colab` on queue `gpu-colab`
+- fixed: `run-job/discoverex-engine-run` on queue `gpu-fixed`
+- colab: `run-job/discoverex-engine-run-colab` on queue `gpu-colab`
+- compat fixed alias: `run-job/engine-run`
+- compat colab alias: `run-job/engine-run-colab`
 
 ## 1) Configure
 
@@ -32,3 +34,4 @@ prefect deployment ls
 - This container is intended for one-shot registration, not a long-running worker.
 - On low-memory hosts (~1 GB RAM), registration is usually feasible, but avoid running heavy worker workloads on the same node.
 - Set `REGISTER_DEPLOYMENT_MODE=single` if you need backward-compatible single deployment registration.
+- Set `REGISTER_FLOW_SOURCE` and `REGISTER_FLOW_ENTRYPOINT` when registering an engine-owned flow instead of the compatibility wrapper.

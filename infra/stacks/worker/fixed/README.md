@@ -66,3 +66,4 @@ Expected startup summary:
 - Runtime data is expected outside repo at `../runtime/worker` by default.
 - GitHub SSH repo URLs are normalized internally to HTTPS for resolution/cache fetches.
 - CPU smoke stack defaults to `cpu-test-pool` / `cpu-fixed-test` and keeps checkpoint data under `/tmp/orchestrator-worker-cpu-test-checkpoints` by default.
+- During engine-flow cutover, this runtime is expected to have the engine flow code available in the image or mounted runtime path used by deployment registration.
