@@ -20,7 +20,8 @@ def gateway_headers() -> dict[str, str]:
     cf_secret = os.getenv("CF_ACCESS_CLIENT_SECRET", "").strip()
     if not os.getenv("STORAGE_API_URL", "").strip() or not cf_id or not cf_secret:
         raise RuntimeError(
-            "missing required environment variables: STORAGE_API_URL, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET"
+            "missing required environment variables: "
+            "STORAGE_API_URL, CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET"
         )
     return {
         "Content-Type": "application/json",
@@ -35,7 +36,7 @@ def http_json(
 ) -> dict[str, object] | list[dict[str, object]]:
     body = json.dumps(payload).encode("utf-8")
     req = request.Request(url, method=method, data=body, headers=gateway_headers())
-    with request.urlopen(req) as resp:  # nosec B310 - controlled endpoint from env
+    with request.urlopen(req) as resp:
         text = resp.read().decode("utf-8", errors="replace")
     try:
         parsed = json.loads(text)
@@ -66,5 +67,5 @@ def upload_file(put_url: str, payload: bytes) -> None:
         data=payload,
         headers=headers,
     )
-    with request.urlopen(req):  # nosec B310 - presigned URL
+    with request.urlopen(req):
         return

@@ -1,12 +1,9 @@
-"""Compatibility wrapper flow around engine execution during control-plane cutover."""
-
 from __future__ import annotations
 
 import os
 from pathlib import Path
 from typing import Any, cast
 
-from prefect import flow
 from prefect.context import get_run_context
 from prefect.runtime import flow_run
 
@@ -15,7 +12,14 @@ from flows.checkpoint_store import (
     resolve_checkpoint_path,
     save_checkpoint,
 )
-from flows.engine_run.tasks import (
+from flows.engine_run.state.main import (
+    artifact_paths_exist,
+    build_flow_result,
+    mark_step,
+    reset_after_missing_artifacts,
+    step_done,
+)
+from flows.engine_run.task.main import (
     prepare_manifest_task,
     resolve_commit_task,
     run_entrypoint_job_task,
@@ -23,19 +27,8 @@ from flows.engine_run.tasks import (
     upload_outputs_task,
 )
 from flows.job_spec import parse_job_spec_json
-from runner.git_runner import cleanup_workdir
-
-
-def _step_done(state: dict[str, Any], step: str) -> bool:
-    return bool(state.get("steps", {}).get(step))
-
-
-def _mark_step(state: dict[str, Any], step: str) -> None:
-    state.setdefault("steps", {})[step] = True
-
-
-def _artifact_paths_exist(local_paths: dict[str, str]) -> bool:
-    return all(Path(local_paths[k]).exists() for k in ("stdout", "stderr", "result"))
+from prefect import flow
+from runner.git.runner import cleanup_workdir
 
 
 def _flow_attempt() -> int:
@@ -48,7 +41,7 @@ def _flow_attempt() -> int:
         return 1
 
 
-@flow(name="run-job", retries=3, retry_delay_seconds=30)
+@flow(name="e2e-job", retries=3, retry_delay_seconds=30)
 def run_job_flow(
     job_spec_json: str | dict[str, Any],
     resume_key: str | None = None,
@@ -79,42 +72,28 @@ def run_job_flow(
     if job.run_mode == "inline":
         resolved_commit = "inline"
         state["resolved_commit"] = resolved_commit
-        _mark_step(state, "resolve_commit")
+        mark_step(state, "resolve_commit")
         save_checkpoint(checkpoint_path, state)
-    elif _step_done(state, "resolve_commit"):
+    elif step_done(state, "resolve_commit"):
         resolved_commit = str(state["resolved_commit"])
     else:
         if not job.repo_url or not job.ref:
             raise RuntimeError("repo_url/ref required for run_mode=repo")
         resolved_commit = resolve_commit_task(job.repo_url, job.ref)
         state["resolved_commit"] = resolved_commit
-        _mark_step(state, "resolve_commit")
+        mark_step(state, "resolve_commit")
         save_checkpoint(checkpoint_path, state)
 
     local_paths = state.get("local_paths", {})
     if (
-        _step_done(state, "run_entrypoint")
+        step_done(state, "run_entrypoint")
         and isinstance(local_paths, dict)
-        and not _artifact_paths_exist(local_paths)
+        and not artifact_paths_exist(local_paths)
     ):
-        state["steps"]["run_entrypoint"] = False
-        for key in (
-            "stdout_uploaded",
-            "stderr_uploaded",
-            "result_uploaded",
-            "manifest_uploaded",
-            "engine_artifacts_uploaded",
-            "engine_manifest_uploaded",
-            "engine_mlflow_tags_written",
-            "cleanup",
-        ):
-            state["steps"][key] = False
-        state["uploaded"] = {}
-        state["engine_uploaded"] = {}
-        state["engine_manifest_uri"] = ""
+        reset_after_missing_artifacts(state)
         save_checkpoint(checkpoint_path, state)
 
-    if _step_done(state, "run_entrypoint"):
+    if step_done(state, "run_entrypoint"):
         local_paths = cast(dict[str, str], state["local_paths"])
         exit_code = int(state.get("exit_code", 1))
     else:
@@ -138,15 +117,15 @@ def run_job_flow(
         )
         state["local_paths"] = local_paths
         state["exit_code"] = exit_code
-        _mark_step(state, "run_entrypoint")
+        mark_step(state, "run_entrypoint")
         state["steps"]["cleanup"] = False
         save_checkpoint(checkpoint_path, state)
 
-    if _step_done(state, "manifest_uploaded"):
+    if step_done(state, "manifest_uploaded"):
         uploaded = dict(state.get("uploaded", {}))
     else:
         links = prepare_manifest_task(run_id, attempt)
-        _mark_step(state, "prepare_manifest")
+        mark_step(state, "prepare_manifest")
         state["links"] = [link.model_dump(mode="json") for link in links]
         save_checkpoint(checkpoint_path, state)
 
@@ -160,11 +139,11 @@ def run_job_flow(
         state["uploaded"] = uploaded
         for key in ("stdout", "stderr", "result", "manifest"):
             if key in uploaded:
-                _mark_step(state, f"{key}_uploaded")
+                mark_step(state, f"{key}_uploaded")
         save_checkpoint(checkpoint_path, state)
 
     if exit_code == 0:
-        if _step_done(state, "engine_manifest_uploaded"):
+        if step_done(state, "engine_manifest_uploaded"):
             engine_uploaded = dict(state.get("engine_uploaded", {}))
             engine_manifest_uri = str(state.get("engine_manifest_uri", ""))
         else:
@@ -184,39 +163,35 @@ def run_job_flow(
             engine_manifest_uri = str(engine_upload.get("engine_manifest_uri", ""))
             state["engine_uploaded"] = engine_uploaded
             state["engine_manifest_uri"] = engine_manifest_uri
-            _mark_step(state, "engine_artifacts_uploaded")
+            mark_step(state, "engine_artifacts_uploaded")
             if engine_manifest_uri:
-                _mark_step(state, "engine_manifest_uploaded")
+                mark_step(state, "engine_manifest_uploaded")
             if bool(engine_upload.get("mlflow_tags_written")):
-                _mark_step(state, "engine_mlflow_tags_written")
+                mark_step(state, "engine_mlflow_tags_written")
             save_checkpoint(checkpoint_path, state)
     else:
         engine_uploaded = cast(dict[str, str], dict(state.get("engine_uploaded", {})))
         engine_manifest_uri = str(state.get("engine_manifest_uri", ""))
 
     workdir = Path(local_paths["workdir"])
-    if not _step_done(state, "cleanup") and workdir.exists():
+    if not step_done(state, "cleanup") and workdir.exists():
         cleanup_workdir(workdir)
-        _mark_step(state, "cleanup")
+        mark_step(state, "cleanup")
         save_checkpoint(checkpoint_path, state)
 
-    effective_outputs_prefix = job.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/"
-    return {
-        "flow_run_id": run_id,
-        "attempt": attempt,
-        "engine": job.engine,
-        "run_mode": job.run_mode,
-        "job_name": job.job_name,
-        "resolved_commit": resolved_commit,
-        "outputs_prefix": effective_outputs_prefix,
-        "stdout_uri": uploaded.get("stdout"),
-        "stderr_uri": uploaded.get("stderr"),
-        "result_uri": uploaded.get("result"),
-        "manifest_uri": uploaded.get("manifest"),
-        "engine_manifest_uri": engine_manifest_uri or None,
-        "engine_artifact_uris": engine_uploaded,
-        "exit_code": exit_code,
-    }
+    return build_flow_result(
+        flow_run_id=run_id,
+        attempt=attempt,
+        engine=job.engine,
+        run_mode=job.run_mode,
+        job_name=job.job_name,
+        resolved_commit=resolved_commit,
+        outputs_prefix=job.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/",
+        uploaded=uploaded,
+        engine_manifest_uri=engine_manifest_uri,
+        engine_uploaded=engine_uploaded,
+        exit_code=exit_code,
+    )
 
 
 engine_run_flow = run_job_flow

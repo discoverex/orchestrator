@@ -1,4 +1,4 @@
-from .git_runner import cleanup_workdir, resolve_commit, run_entrypoint
+from .git.runner import cleanup_workdir, resolve_commit, run_entrypoint
 from .models import CodeRef, RunArtifacts
 
 __all__ = [

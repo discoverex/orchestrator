@@ -5,7 +5,7 @@ from typing import Protocol
 
 from fastapi import FastAPI, Header
 
-from common.cloudflare_access import require_service_token
+from common.cloudflare.access import require_service_token
 
 
 class StorageAuthState(Protocol):
