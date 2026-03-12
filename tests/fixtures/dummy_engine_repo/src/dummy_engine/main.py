@@ -90,9 +90,7 @@ def _maybe_create_mlflow_run(
         "/api/2.0/mlflow/runs/set-tag",
         {"run_id": run_id, "key": "dummy_engine_status", "value": "ok"},
     )
-    fetched = _mlflow_get(
-        tracking_uri, "/api/2.0/mlflow/runs/get", {"run_id": run_id}
-    )
+    fetched = _mlflow_get(tracking_uri, "/api/2.0/mlflow/runs/get", {"run_id": run_id})
     fetched_run = fetched.get("run", {})
     fetched_info = fetched_run.get("info", {}) if isinstance(fetched_run, dict) else {}
     if str(fetched_info.get("run_id", "")).strip() != run_id:

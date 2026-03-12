@@ -78,14 +78,12 @@ def test_run_entrypoint_merges_job_and_orchestrator_env(
         )
         payload = artifacts.workdir / "inputs.json"
         assert '"contract_version": "v2"' in payload.read_text(encoding="utf-8")
-        assert (
-            artifacts.workdir / "artifact-dir.txt"
-        ).read_text(encoding="utf-8").strip() == str(artifacts.engine_artifact_dir)
-        assert (
-            artifacts.workdir / "artifact-manifest.txt"
-        ).read_text(encoding="utf-8").strip() == str(
-            artifacts.engine_artifact_manifest_path
-        )
+        assert (artifacts.workdir / "artifact-dir.txt").read_text(
+            encoding="utf-8"
+        ).strip() == str(artifacts.engine_artifact_dir)
+        assert (artifacts.workdir / "artifact-manifest.txt").read_text(
+            encoding="utf-8"
+        ).strip() == str(artifacts.engine_artifact_manifest_path)
     finally:
         cleanup_workdir(artifacts.workdir)
 

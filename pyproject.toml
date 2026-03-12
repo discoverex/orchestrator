@@ -41,7 +41,7 @@ index-url = "https://pypi.org/simple"
 minversion = "8.0"
 addopts = "-q"
 testpaths = ["tests"]
-pythonpath = ["src", "."]
+pythonpath = ["src", ".", "tests/fixtures/dummy_engine_repo/src"]
 
 [tool.ruff]
 line-length = 88
@@ -63,5 +63,10 @@ python_version = "3.11"
 strict = true
 warn_unused_configs = true
 plugins = ["pydantic.mypy"]
-mypy_path = ["src"]
+mypy_path = [
+  "src",
+  "tests/fixtures/dummy_engine_repo/src",
+  "infra/stacks/worker/colab",
+]
+explicit_package_bases = true
 files = ["src", "scripts", "tests"]

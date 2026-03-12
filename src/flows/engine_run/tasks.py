@@ -4,7 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 from urllib import request
 
 from prefect import get_run_logger, task
@@ -17,6 +17,12 @@ from flows.engine_run.models import (
     EngineArtifactManifestEntry,
 )
 from runner.git_runner import resolve_commit, run_entrypoint
+
+
+class EngineArtifactsUploadResult(TypedDict):
+    artifact_uris: dict[str, str]
+    engine_manifest_uri: str
+    mlflow_tags_written: bool
 
 
 def _get_task_logger() -> logging.Logger:
@@ -47,7 +53,9 @@ def _resolve_engine_artifact_path(
 ) -> Path:
     resolved = (artifact_dir / entry.relative_path).resolve()
     if not str(resolved).startswith(str(artifact_dir.resolve()) + os.sep):
-        raise RuntimeError(f"engine artifact escapes artifact root: {entry.relative_path}")
+        raise RuntimeError(
+            f"engine artifact escapes artifact root: {entry.relative_path}"
+        )
     if not resolved.exists() or not resolved.is_file():
         raise RuntimeError(f"engine artifact file not found: {entry.relative_path}")
     return resolved
@@ -276,7 +284,7 @@ def upload_engine_artifacts_task(
     exit_code: int,
     already_uploaded: dict[str, str] | None = None,
     mlflow_tags_written: bool = False,
-) -> dict[str, object]:
+) -> EngineArtifactsUploadResult:
     logger = _get_task_logger()
     require_manifest = exit_code == 0
     manifest, manifest_path, artifact_dir = _load_engine_artifact_manifest(
@@ -292,9 +300,7 @@ def upload_engine_artifacts_task(
 
     uploaded: dict[str, str] = dict(already_uploaded or {})
     pending_entries = [
-        entry
-        for entry in manifest.artifacts
-        if entry.logical_name not in uploaded
+        entry for entry in manifest.artifacts if entry.logical_name not in uploaded
     ]
     if pending_entries:
         gateway = storage_base_url()
@@ -367,7 +373,9 @@ def upload_engine_artifacts_task(
     )
     upload_file(
         str(manifest_link["url"]),
-        json.dumps(engine_manifest_payload, ensure_ascii=True, indent=2).encode("utf-8"),
+        json.dumps(engine_manifest_payload, ensure_ascii=True, indent=2).encode(
+            "utf-8"
+        ),
     )
     engine_manifest_uri = str(manifest_link["object_uri"])
 
