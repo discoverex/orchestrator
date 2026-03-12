@@ -5,20 +5,15 @@ import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Any, cast
 
+from flows.engine_run.models import EngineArtifactsUploadResult
 from flows.engine_run.task.support import (
     extract_run_id_from_stdout,
     load_engine_artifact_manifest,
     resolve_engine_artifact_path,
     set_mlflow_tag,
 )
-
-
-class EngineArtifactsUploadResult(TypedDict):
-    artifact_uris: dict[str, str]
-    engine_manifest_uri: str
-    mlflow_tags_written: bool
 
 
 def upload_engine_artifacts(
@@ -40,11 +35,11 @@ def upload_engine_artifacts(
         require_manifest=exit_code == 0,
     )
     if manifest is None or manifest_path is None:
-        return {
-            "artifact_uris": dict(already_uploaded or {}),
-            "engine_manifest_uri": "",
-            "mlflow_tags_written": mlflow_tags_written,
-        }
+        return EngineArtifactsUploadResult(
+            artifact_uris=dict(already_uploaded or {}),
+            engine_manifest_uri="",
+            mlflow_tags_written=mlflow_tags_written,
+        )
 
     uploaded: dict[str, str] = dict(already_uploaded or {})
     pending_entries = [
@@ -148,8 +143,8 @@ def upload_engine_artifacts(
                     )
             mlflow_tags_written = True
 
-    return {
-        "artifact_uris": uploaded,
-        "engine_manifest_uri": engine_manifest_uri,
-        "mlflow_tags_written": mlflow_tags_written,
-    }
+    return EngineArtifactsUploadResult(
+        artifact_uris=uploaded,
+        engine_manifest_uri=engine_manifest_uri,
+        mlflow_tags_written=mlflow_tags_written,
+    )

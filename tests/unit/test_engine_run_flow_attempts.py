@@ -8,7 +8,7 @@ import pytest
 
 import flows.engine_run.flow as flow_module
 from flows.engine_run.flow import run_job_flow
-from flows.engine_run.models import ArtifactLink
+from flows.engine_run.models import ArtifactLink, EngineArtifactsUploadResult
 from flows.job_spec import JobSpec
 
 
@@ -47,23 +47,24 @@ def test_run_job_flow_inline_executes_uploads_and_cleans_up(
     stdout.write_text("out", encoding="utf-8")
     stderr.write_text("err", encoding="utf-8")
     result.write_text("{}", encoding="utf-8")
-    saved_states: list[dict[str, Any]] = []
+    saved_states: list[Any] = []
     cleanup_calls: list[Path] = []
 
     flow_runtime = cast(Any, flow_module).flow_run
     monkeypatch.setattr(flow_runtime, "get_id", lambda: "flow-inline")
     monkeypatch.setattr(flow_module, "_flow_attempt", lambda: 2)
+    import json
     monkeypatch.setattr(
         flow_module,
         "parse_job_spec_json",
-        lambda raw: JobSpec.model_validate_json(raw),
+        lambda raw: JobSpec(**json.loads(raw)),
     )
     monkeypatch.setattr(
         flow_module,
         "resolve_checkpoint_path",
         lambda checkpoint_dir, resume_key: checkpoint_path,
     )
-    monkeypatch.setattr(flow_module, "load_checkpoint", lambda path: {})
+    monkeypatch.setattr(flow_module, "load_checkpoint", lambda path, model_cls: None)
     monkeypatch.setattr(
         flow_module,
         "save_checkpoint",
@@ -121,11 +122,11 @@ def test_run_job_flow_inline_executes_uploads_and_cleans_up(
     monkeypatch.setattr(
         flow_module,
         "upload_engine_artifacts_task",
-        lambda *args, **kwargs: {
-            "artifact_uris": {},
-            "engine_manifest_uri": "",
-            "mlflow_tags_written": False,
-        },
+        lambda *args, **kwargs: EngineArtifactsUploadResult(
+            artifact_uris={},
+            engine_manifest_uri="",
+            mlflow_tags_written=False,
+        ),
     )
     monkeypatch.setattr(
         flow_module, "cleanup_workdir", lambda path: cleanup_calls.append(path)
@@ -145,14 +146,14 @@ def test_run_job_flow_inline_executes_uploads_and_cleans_up(
         checkpoint_dir=str(tmp_path),
     )
 
-    assert out["flow_run_id"] == "flow-inline"
-    assert out["attempt"] == 2
-    assert out["run_mode"] == "inline"
-    assert out["job_name"] == "inline-job"
-    assert out["resolved_commit"] == "inline"
-    assert out["outputs_prefix"] == "jobs/flow-inline/attempt-2/"
+    assert out.flow_run_id == "flow-inline"
+    assert out.attempt == 2
+    assert out.run_mode == "inline"
+    assert out.job_name == "inline-job"
+    assert out.resolved_commit == "inline"
+    assert out.outputs_prefix == "jobs/flow-inline/attempt-2/"
     assert (
-        out["manifest_uri"] == "s3://bucket/jobs/flow-inline/attempt-2/artifacts.json"
+        out.manifest_uri == "s3://bucket/jobs/flow-inline/attempt-2/artifacts.json"
     )
     assert cleanup_calls == [workdir]
-    assert saved_states[-1]["steps"]["cleanup"] is True
+    assert saved_states[-1].is_step_done("cleanup") is True

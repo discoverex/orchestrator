@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import shlex
 from collections.abc import Mapping
-
-from common.schema import StrictModel
 
 DEFAULT_BROWSER_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -14,7 +13,8 @@ DEFAULT_BROWSER_USER_AGENT = (
 )
 
 
-class WorkerStartupSummary(StrictModel):
+@dataclasses.dataclass(frozen=True)
+class WorkerStartupSummary:
     prefect_api_url: str
     prefect_work_pool: str
     prefect_work_queue: str
@@ -137,8 +137,8 @@ def main() -> int:
     if args.command == "summary":
         print(
             json.dumps(
-                startup_summary(default_queue=args.default_queue or None).model_dump(
-                    mode="json"
+                dataclasses.asdict(
+                    startup_summary(default_queue=args.default_queue or None)
                 ),
                 ensure_ascii=True,
                 sort_keys=True,

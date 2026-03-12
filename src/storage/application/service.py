@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-
-from common import StrictModel
 
 from ..ports.object_store import ObjectStorePort
 from .models import ExplorerHeadResult, ExplorerListResult, PresignResult
 
 
-class PresignEntry(StrictModel):
+@dataclass(frozen=True)
+class PresignEntry:
     flow_run_id: str
     attempt: int
     kind: str

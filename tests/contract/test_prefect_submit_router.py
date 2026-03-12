@@ -109,4 +109,4 @@ def test_router_uses_new_default_deployment_names(
     )
 
     out = capture_json_stdout(mod.main)
-    assert out["selected_deployment"] == "e2e-test"
+    assert out["selected_deployment"] == "e2e-job/e2e-test"

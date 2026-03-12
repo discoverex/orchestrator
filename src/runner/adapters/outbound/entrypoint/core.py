@@ -9,14 +9,14 @@ import subprocess
 from pathlib import Path
 from tempfile import mkdtemp
 
-from runner.git.repo import (
+from runner.adapters.outbound.git.repo import (
     RunnerError,
     checkout_target,
     prepare_cached_repo,
     run_command,
 )
-from runner.mlflow.proxy import maybe_start_mlflow_proxy
-from runner.models import RunArtifacts
+from runner.adapters.outbound.mlflow.proxy import maybe_start_mlflow_proxy
+from runner.domain.models import RunArtifacts
 
 
 def prepare_per_repo_venv(workdir: Path, merged_env: dict[str, str]) -> None:

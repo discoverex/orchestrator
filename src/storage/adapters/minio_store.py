@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 from typing import cast
@@ -75,12 +75,12 @@ class MinioObjectStore:
                     object_uri=f"s3://{bucket}/{obj.object_name}",
                     object_key=obj.object_name,
                     size=obj.size or 0,
-                    last_modified=obj.last_modified,
+                    last_modified=cast("datetime | None", obj.last_modified),
                 )
                 for obj in objects
                 if obj.object_name
             ]
-            # Simple pagination slice for mock/wrapper if needed, 
+            # Simple pagination slice for mock/wrapper if needed,
             # but minio-py returns iterator
             # Here we just return what we got up to limit
             entries = all_entries[:limit]

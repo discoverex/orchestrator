@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import dataclasses
 import os
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from prefect.context import get_run_context
 from prefect.runtime import flow_run
@@ -12,12 +13,10 @@ from flows.checkpoint_store import (
     resolve_checkpoint_path,
     save_checkpoint,
 )
+from flows.engine_run.models import FlowResult, FlowState
 from flows.engine_run.state.main import (
     artifact_paths_exist,
     build_flow_result,
-    mark_step,
-    reset_after_missing_artifacts,
-    step_done,
 )
 from flows.engine_run.task.main import (
     prepare_manifest_task,
@@ -28,7 +27,7 @@ from flows.engine_run.task.main import (
 )
 from flows.job_spec import parse_job_spec_json
 from prefect import flow
-from runner.git.runner import cleanup_workdir
+from runner import cleanup_workdir
 
 
 def _flow_attempt() -> int:
@@ -46,7 +45,7 @@ def run_job_flow(
     job_spec_json: str | dict[str, Any],
     resume_key: str | None = None,
     checkpoint_dir: str | None = None,
-) -> dict[str, object]:
+) -> FlowResult:
     run_id = flow_run.get_id() or "unknown-flow-run"
     if isinstance(job_spec_json, dict):
         import json
@@ -60,42 +59,43 @@ def run_job_flow(
         checkpoint_dir=checkpoint_dir or os.getenv("ORCHESTRATOR_CHECKPOINT_DIR"),
         resume_key=active_resume_key,
     )
-    state = load_checkpoint(checkpoint_path)
-    state.setdefault("flow_run_id", run_id)
-    state.setdefault("resume_key", active_resume_key)
-    state.setdefault("steps", {})
 
     attempt = _flow_attempt()
-    state["attempt"] = attempt
+    state = load_checkpoint(checkpoint_path, FlowState)
+    if state is None:
+        state = FlowState(
+            flow_run_id=run_id,
+            resume_key=active_resume_key,
+            attempt=attempt,
+        )
+    else:
+        state = dataclasses.replace(state, attempt=attempt)
     save_checkpoint(checkpoint_path, state)
 
     if job.run_mode == "inline":
         resolved_commit = "inline"
-        state["resolved_commit"] = resolved_commit
-        mark_step(state, "resolve_commit")
+        state = dataclasses.replace(state, resolved_commit=resolved_commit)
+        state = state.mark_step("resolve_commit")
         save_checkpoint(checkpoint_path, state)
-    elif step_done(state, "resolve_commit"):
-        resolved_commit = str(state["resolved_commit"])
+    elif state.is_step_done("resolve_commit"):
+        resolved_commit = str(state.resolved_commit)
     else:
         if not job.repo_url or not job.ref:
             raise RuntimeError("repo_url/ref required for run_mode=repo")
         resolved_commit = resolve_commit_task(job.repo_url, job.ref)
-        state["resolved_commit"] = resolved_commit
-        mark_step(state, "resolve_commit")
+        state = dataclasses.replace(state, resolved_commit=resolved_commit)
+        state = state.mark_step("resolve_commit")
         save_checkpoint(checkpoint_path, state)
 
-    local_paths = state.get("local_paths", {})
-    if (
-        step_done(state, "run_entrypoint")
-        and isinstance(local_paths, dict)
-        and not artifact_paths_exist(local_paths)
+    if state.is_step_done("run_entrypoint") and not artifact_paths_exist(
+        state.local_paths
     ):
-        reset_after_missing_artifacts(state)
+        state = state.reset_after_missing_artifacts()
         save_checkpoint(checkpoint_path, state)
 
-    if step_done(state, "run_entrypoint"):
-        local_paths = cast(dict[str, str], state["local_paths"])
-        exit_code = int(state.get("exit_code", 1))
+    if state.is_step_done("run_entrypoint"):
+        local_paths = state.local_paths
+        exit_code = int(state.exit_code if state.exit_code is not None else 1)
     else:
         effective_outputs_prefix = (
             job.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/"
@@ -115,18 +115,19 @@ def run_job_flow(
             outputs_prefix=effective_outputs_prefix,
             job_name=job.job_name,
         )
-        state["local_paths"] = local_paths
-        state["exit_code"] = exit_code
-        mark_step(state, "run_entrypoint")
-        state["steps"]["cleanup"] = False
+        state = dataclasses.replace(state, local_paths=local_paths, exit_code=exit_code)
+        state = state.mark_step("run_entrypoint")
+        new_steps = dict(state.steps)
+        new_steps["cleanup"] = False
+        state = dataclasses.replace(state, steps=new_steps)
         save_checkpoint(checkpoint_path, state)
 
-    if step_done(state, "manifest_uploaded"):
-        uploaded = dict(state.get("uploaded", {}))
+    if state.is_step_done("manifest_uploaded"):
+        uploaded = state.uploaded
     else:
         links = prepare_manifest_task(run_id, attempt)
-        mark_step(state, "prepare_manifest")
-        state["links"] = [link.model_dump(mode="json") for link in links]
+        state = state.mark_step("prepare_manifest")
+        state = dataclasses.replace(state, links=links)
         save_checkpoint(checkpoint_path, state)
 
         uploaded = upload_outputs_task(
@@ -134,50 +135,51 @@ def run_job_flow(
             local_paths,
             run_id,
             attempt,
-            already_uploaded=state.get("uploaded", {}),
+            already_uploaded=state.uploaded,
         )
-        state["uploaded"] = uploaded
+        state = dataclasses.replace(state, uploaded=uploaded)
         for key in ("stdout", "stderr", "result", "manifest"):
             if key in uploaded:
-                mark_step(state, f"{key}_uploaded")
+                state = state.mark_step(f"{key}_uploaded")
         save_checkpoint(checkpoint_path, state)
 
     if exit_code == 0:
-        if step_done(state, "engine_manifest_uploaded"):
-            engine_uploaded = dict(state.get("engine_uploaded", {}))
-            engine_manifest_uri = str(state.get("engine_manifest_uri", ""))
+        if state.is_step_done("engine_manifest_uploaded"):
+            engine_uploaded = state.engine_uploaded
+            engine_manifest_uri = state.engine_manifest_uri
         else:
             engine_upload = upload_engine_artifacts_task(
                 local_paths,
                 run_id,
                 attempt,
                 exit_code,
-                already_uploaded=state.get("engine_uploaded", {}),
-                mlflow_tags_written=bool(
-                    state.get("steps", {}).get("engine_mlflow_tags_written")
-                ),
+                already_uploaded=state.engine_uploaded,
+                mlflow_tags_written=state.is_step_done("engine_mlflow_tags_written"),
             )
-            engine_uploaded = cast(
-                dict[str, str], dict(engine_upload.get("artifact_uris", {}))
+            engine_uploaded = engine_upload.artifact_uris
+            engine_manifest_uri = engine_upload.engine_manifest_uri
+            state = dataclasses.replace(
+                state,
+                engine_uploaded=engine_uploaded,
+                engine_manifest_uri=engine_manifest_uri,
             )
-            engine_manifest_uri = str(engine_upload.get("engine_manifest_uri", ""))
-            state["engine_uploaded"] = engine_uploaded
-            state["engine_manifest_uri"] = engine_manifest_uri
-            mark_step(state, "engine_artifacts_uploaded")
+            state = state.mark_step("engine_artifacts_uploaded")
             if engine_manifest_uri:
-                mark_step(state, "engine_manifest_uploaded")
-            if bool(engine_upload.get("mlflow_tags_written")):
-                mark_step(state, "engine_mlflow_tags_written")
+                state = state.mark_step("engine_manifest_uploaded")
+            if engine_upload.mlflow_tags_written:
+                state = state.mark_step("engine_mlflow_tags_written")
             save_checkpoint(checkpoint_path, state)
     else:
-        engine_uploaded = cast(dict[str, str], dict(state.get("engine_uploaded", {})))
-        engine_manifest_uri = str(state.get("engine_manifest_uri", ""))
+        engine_uploaded = state.engine_uploaded
+        engine_manifest_uri = state.engine_manifest_uri
 
-    workdir = Path(local_paths["workdir"])
-    if not step_done(state, "cleanup") and workdir.exists():
-        cleanup_workdir(workdir)
-        mark_step(state, "cleanup")
-        save_checkpoint(checkpoint_path, state)
+    workdir_raw = local_paths.get("workdir")
+    if workdir_raw:
+        workdir = Path(workdir_raw)
+        if not state.is_step_done("cleanup") and workdir.exists():
+            cleanup_workdir(workdir)
+            state = state.mark_step("cleanup")
+            save_checkpoint(checkpoint_path, state)
 
     return build_flow_result(
         flow_run_id=run_id,

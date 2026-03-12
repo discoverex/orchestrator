@@ -4,20 +4,14 @@ import json
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import cast
 
 from flows.engine_run.artifact.mlflow import maybe_write_mlflow_tags
 from flows.engine_run.artifact.paths import (
     load_engine_artifact_manifest,
     resolve_engine_artifact_path,
 )
-from flows.engine_run.models import EngineArtifactManifest
-
-
-class EngineArtifactsUploadResult(TypedDict):
-    artifact_uris: dict[str, str]
-    engine_manifest_uri: str
-    mlflow_tags_written: bool
+from flows.engine_run.models import EngineArtifactManifest, EngineArtifactsUploadResult
 
 
 def upload_engine_artifacts(
@@ -41,11 +35,11 @@ def upload_engine_artifacts(
         require_manifest=require_manifest,
     )
     if manifest is None or manifest_path is None:
-        return {
-            "artifact_uris": dict(already_uploaded or {}),
-            "engine_manifest_uri": "",
-            "mlflow_tags_written": mlflow_tags_written,
-        }
+        return EngineArtifactsUploadResult(
+            artifact_uris=dict(already_uploaded or {}),
+            engine_manifest_uri="",
+            mlflow_tags_written=mlflow_tags_written,
+        )
 
     uploaded = _upload_declared_artifacts(
         manifest=manifest,
@@ -76,11 +70,11 @@ def upload_engine_artifacts(
         engine_manifest_uri=engine_manifest_uri,
         set_mlflow_tag=set_mlflow_tag,
     )
-    return {
-        "artifact_uris": uploaded,
-        "engine_manifest_uri": engine_manifest_uri,
-        "mlflow_tags_written": wrote_tags,
-    }
+    return EngineArtifactsUploadResult(
+        artifact_uris=uploaded,
+        engine_manifest_uri=engine_manifest_uri,
+        mlflow_tags_written=wrote_tags,
+    )
 
 
 def _upload_declared_artifacts(

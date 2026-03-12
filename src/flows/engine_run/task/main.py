@@ -5,16 +5,15 @@ from typing import cast
 
 from prefect.exceptions import MissingContextError
 
-from flows.engine_run.models import ArtifactLink
+from flows.engine_run.models import ArtifactLink, EngineArtifactsUploadResult
 from flows.engine_run.task.engine_artifacts import (
-    EngineArtifactsUploadResult,
     upload_engine_artifacts,
 )
 from flows.engine_run.task.support import mlflow_post as _mlflow_post
 from flows.engine_run.task.uploads import prepare_manifest_links, upload_outputs
 from flows.engine_run.utils.http import http_json, storage_base_url, upload_file
 from prefect import get_run_logger, task
-from runner.git.runner import resolve_commit, run_entrypoint
+from runner import resolve_commit, run_entrypoint
 
 
 def _get_task_logger() -> logging.Logger:
