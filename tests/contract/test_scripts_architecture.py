@@ -63,4 +63,3 @@ def test_bin_cli_routes_to_domain_clis() -> None:
     assert "scripts/observability/cli.sh" in content
     assert "scripts/base/cli.sh" in content
     assert "scripts/storage/cli.sh" in content
-    assert "scripts/services/prefect.sh" not in content

@@ -31,9 +31,9 @@ def test_build_storage_app_from_env_uses_defaults(
     assert app.ttl_default == 900
     assert app.ttl_max == 3600
     assert isinstance(app.object_store, MinioObjectStore)
-    assert app.object_store.auto_create_bucket is True
-    assert app.object_store.public_base_url == ""
-    assert app.object_store.internal_presign_base_url == ""
+    assert app.object_store._auto_create_bucket is True
+    assert app.object_store._public_base_url == ""
+    assert app.object_store._internal_presign_base_url == ""
 
 
 def test_build_storage_app_from_env_applies_overrides(
@@ -56,6 +56,6 @@ def test_build_storage_app_from_env_applies_overrides(
     assert app.ttl_default == 120
     assert app.ttl_max == 600
     assert isinstance(app.object_store, MinioObjectStore)
-    assert app.object_store.public_base_url == "https://storage.example.com/objects"
-    assert app.object_store.internal_presign_base_url == "http://minio:9000"
-    assert app.object_store.auto_create_bucket is False
+    assert app.object_store._public_base_url == "https://storage.example.com/objects"
+    assert app.object_store._internal_presign_base_url == "http://minio:9000"
+    assert app.object_store._auto_create_bucket is False

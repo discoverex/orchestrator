@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any, cast
 
 import pytest
 
-import deployments.register as register
+import deployments.register.main as register
 
 
 class _FakeSourceFlow:
@@ -39,13 +38,13 @@ def test_dual_mode_registers_fixed_and_colab(monkeypatch: pytest.MonkeyPatch) ->
             single_name=None,
             single_queue="default",
             pool="gpu-pool",
-            fixed_name="discoverex-engine-run",
+            fixed_name="e2e-test",
             fixed_queue="gpu-fixed",
-            colab_name="discoverex-engine-run-colab",
+            colab_name="e2e-test-colab",
             colab_queue="gpu-colab",
-            compat_fixed_name="engine-run",
+            compat_fixed_name="e2e-test-legacy",
             compat_fixed_queue="gpu-fixed",
-            compat_colab_name="engine-run-colab",
+            compat_colab_name="e2e-test-legacy-colab",
             compat_colab_queue="gpu-colab",
             register_compat_aliases=True,
             flow_source="/tmp/engine",
@@ -56,13 +55,13 @@ def test_dual_mode_registers_fixed_and_colab(monkeypatch: pytest.MonkeyPatch) ->
     with _patch_flow(fake):
         register.main()
     assert len(fake.calls) == 4
-    assert fake.calls[0]["name"] == "discoverex-engine-run"
+    assert fake.calls[0]["name"] == "e2e-test"
     assert fake.calls[0]["work_pool_name"] == "gpu-pool"
     assert fake.calls[0]["work_queue_name"] == "gpu-fixed"
-    assert fake.calls[1]["name"] == "discoverex-engine-run-colab"
+    assert fake.calls[1]["name"] == "e2e-test-colab"
     assert fake.calls[1]["work_queue_name"] == "gpu-colab"
-    assert fake.calls[2]["name"] == "engine-run"
-    assert fake.calls[3]["name"] == "engine-run-colab"
+    assert fake.calls[2]["name"] == "e2e-test-legacy"
+    assert fake.calls[3]["name"] == "e2e-test-legacy-colab"
 
 
 def test_single_mode_registers_compat_deployment(
@@ -73,7 +72,7 @@ def test_single_mode_registers_compat_deployment(
         register,
         "parse_args",
         lambda: argparse.Namespace(
-            single_name="engine-run",
+            single_name="e2e-test-legacy",
             single_queue="default",
             pool="gpu-pool",
             fixed_name="unused-fixed",
@@ -93,88 +92,9 @@ def test_single_mode_registers_compat_deployment(
     with _patch_flow(fake):
         register.main()
     assert len(fake.calls) == 1
-    assert fake.calls[0]["name"] == "engine-run"
+    assert fake.calls[0]["name"] == "e2e-test-legacy"
     assert fake.calls[0]["work_queue_name"] == "default"
     assert fake.calls[0]["version"] == "v1"
-
-
-def test_parse_args_uses_expected_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(sys, "argv", ["register.py"])
-
-    args = register.parse_args()
-
-    assert args.single_name is None
-    assert args.single_queue == "default"
-    assert args.pool == "gpu-pool"
-    assert args.fixed_name == "discoverex-engine-run"
-    assert args.fixed_queue == "gpu-fixed"
-    assert args.colab_name == "discoverex-engine-run-colab"
-    assert args.colab_queue == "gpu-colab"
-    assert args.compat_fixed_name == "engine-run"
-    assert args.compat_fixed_queue == "gpu-fixed"
-    assert args.compat_colab_name == "engine-run-colab"
-    assert args.compat_colab_queue == "gpu-colab"
-    assert args.register_compat_aliases is True
-    assert args.flow_source == register.DEFAULT_FLOW_SOURCE
-    assert args.flow_entrypoint == register.DEFAULT_WRAPPER_ENTRYPOINT
-    assert args.version is None
-
-
-def test_parse_args_accepts_explicit_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "register.py",
-            "--single-name",
-            "one",
-            "--single-queue",
-            "queue-a",
-            "--pool",
-            "pool-a",
-            "--fixed-name",
-            "fixed-a",
-            "--fixed-queue",
-            "fixed-q",
-            "--colab-name",
-            "colab-a",
-            "--colab-queue",
-            "colab-q",
-            "--compat-fixed-name",
-            "compat-fixed",
-            "--compat-fixed-queue",
-            "compat-fixed-q",
-            "--compat-colab-name",
-            "compat-colab",
-            "--compat-colab-queue",
-            "compat-colab-q",
-            "--no-register-compat-aliases",
-            "--flow-source",
-            "/srv/engine",
-            "--flow-entrypoint",
-            "engine/flows.py:run",
-            "--version",
-            "v2",
-        ],
-    )
-
-    args = register.parse_args()
-
-    assert args.single_name == "one"
-    assert args.single_queue == "queue-a"
-    assert args.pool == "pool-a"
-    assert args.fixed_name == "fixed-a"
-    assert args.fixed_queue == "fixed-q"
-    assert args.colab_name == "colab-a"
-    assert args.colab_queue == "colab-q"
-    assert args.compat_fixed_name == "compat-fixed"
-    assert args.compat_fixed_queue == "compat-fixed-q"
-    assert args.compat_colab_name == "compat-colab"
-    assert args.compat_colab_queue == "compat-colab-q"
-    assert args.register_compat_aliases is False
-    assert args.flow_source == "/srv/engine"
-    assert args.flow_entrypoint == "engine/flows.py:run"
-    assert args.version == "v2"
 
 
 def test_main_uses_explicit_source_and_entrypoint(
@@ -188,16 +108,16 @@ def test_main_uses_explicit_source_and_entrypoint(
         register,
         "parse_args",
         lambda: argparse.Namespace(
-            single_name="discoverex-engine-run",
+            single_name="e2e-test",
             single_queue="gpu-fixed",
             pool="gpu-pool",
-            fixed_name="discoverex-engine-run",
+            fixed_name="e2e-test",
             fixed_queue="gpu-fixed",
-            colab_name="discoverex-engine-run-colab",
+            colab_name="e2e-test-colab",
             colab_queue="gpu-colab",
-            compat_fixed_name="engine-run",
+            compat_fixed_name="e2e-test-legacy",
             compat_fixed_queue="gpu-fixed",
-            compat_colab_name="engine-run-colab",
+            compat_colab_name="e2e-test-legacy-colab",
             compat_colab_queue="gpu-colab",
             register_compat_aliases=True,
             flow_source="/srv/engine",

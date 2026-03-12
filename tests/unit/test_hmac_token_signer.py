@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone, tzinfo
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Self
 
 import pytest
@@ -37,20 +37,20 @@ def test_decode_rejects_method_mismatch() -> None:
 
 def test_decode_rejects_expired_token() -> None:
     signer = HmacTokenSigner("secret")
-    base = datetime(2026, 3, 11, tzinfo=timezone.utc)
+    base = datetime(2026, 3, 11, tzinfo=UTC)
 
     class _MintClock(datetime):
         @classmethod
         def now(cls, tz: tzinfo | None = None) -> Self:
-            assert tz is timezone.utc
-            return cls.fromtimestamp(base.timestamp(), tz=timezone.utc)
+            assert tz is UTC
+            return cls.fromtimestamp(base.timestamp(), tz=UTC)
 
     class _DecodeClock(datetime):
         @classmethod
         def now(cls, tz: tzinfo | None = None) -> Self:
-            assert tz is timezone.utc
+            assert tz is UTC
             target = base + timedelta(seconds=2)
-            return cls.fromtimestamp(target.timestamp(), tz=timezone.utc)
+            return cls.fromtimestamp(target.timestamp(), tz=UTC)
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(signer_module, "datetime", _MintClock)

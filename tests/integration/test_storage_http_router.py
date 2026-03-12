@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from fastapi import FastAPI
@@ -26,7 +26,7 @@ class DummyStorageService:
         return PresignResult(
             object_uri=f"s3://bucket/jobs/{flow_run_id}/attempt-{attempt}/{filename}",
             url=f"https://storage.example/{filename}?method={method}",
-            expires_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(UTC),
         )
 
     def issue_batch_put(self, *, entries: list[Any]) -> list[PresignResult]:

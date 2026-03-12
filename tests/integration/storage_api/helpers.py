@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import importlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import pytest
@@ -39,7 +39,7 @@ class DummyStorageApp:
         return PresignResult(
             object_uri=object_uri,
             url=f"https://object.example/{filename}?method={method}&ttl={ttl}",
-            expires_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(UTC),
         )
 
     def issue_batch_put(self, *, entries: list[Any]) -> list[PresignResult]:

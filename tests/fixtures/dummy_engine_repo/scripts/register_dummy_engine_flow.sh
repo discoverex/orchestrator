@@ -8,7 +8,7 @@ export PYTHONPATH="${ROOT_DIR}/src"
 
 eval "$(
   uv run python -c \
-  'from common.prefect_client_env import shell_exports; print(shell_exports())'
+  'from common.prefect.client_env import shell_exports; print(shell_exports())'
 )"
 
 exec uv run python -m deployments.register \

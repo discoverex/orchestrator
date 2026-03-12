@@ -5,7 +5,7 @@ from types import TracebackType
 
 import pytest
 
-from flows.engine_run import http
+from flows.engine_run.utils import http
 
 
 def test_gateway_headers_use_cf_service_token(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -60,7 +60,7 @@ def test_http_json_raises_with_response_preview(
     monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
 
     class _FakeResponse:
-        def __enter__(self) -> "_FakeResponse":
+        def __enter__(self) -> _FakeResponse:
             return self
 
         def __exit__(
@@ -77,7 +77,7 @@ def test_http_json_raises_with_response_preview(
     def _fake_urlopen(_req: object) -> _FakeResponse:
         return _FakeResponse()
 
-    monkeypatch.setattr("flows.engine_run.http.request.urlopen", _fake_urlopen)
+    monkeypatch.setattr("flows.engine_run.utils.http.request.urlopen", _fake_urlopen)
 
     with pytest.raises(RuntimeError, match="non-json response from storage API"):
         http.http_json("POST", "https://gateway.example/v1/presign/batch", {"ok": True})
@@ -90,7 +90,7 @@ def test_http_json_returns_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = json.dumps([{"kind": "stdout", "url": "https://example"}]).encode("utf-8")
 
     class _FakeResponse:
-        def __enter__(self) -> "_FakeResponse":
+        def __enter__(self) -> _FakeResponse:
             return self
 
         def __exit__(
@@ -107,7 +107,7 @@ def test_http_json_returns_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     def _fake_urlopen(_req: object) -> _FakeResponse:
         return _FakeResponse()
 
-    monkeypatch.setattr("flows.engine_run.http.request.urlopen", _fake_urlopen)
+    monkeypatch.setattr("flows.engine_run.utils.http.request.urlopen", _fake_urlopen)
 
     rows = http.http_json(
         "POST", "https://gateway.example/v1/presign/batch", {"ok": True}
@@ -122,7 +122,7 @@ def test_upload_file_sends_cf_headers(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, str] = {}
 
     class _FakeResponse:
-        def __enter__(self) -> "_FakeResponse":
+        def __enter__(self) -> _FakeResponse:
             return self
 
         def __exit__(
@@ -140,7 +140,7 @@ def test_upload_file_sends_cf_headers(monkeypatch: pytest.MonkeyPatch) -> None:
         seen["cf_secret"] = headers.get("cf-access-client-secret", "")
         return _FakeResponse()
 
-    monkeypatch.setattr("flows.engine_run.http.request.urlopen", _fake_urlopen)
+    monkeypatch.setattr("flows.engine_run.utils.http.request.urlopen", _fake_urlopen)
 
     http.upload_file("https://storage-api.example.com/objects/bucket/key", b"payload")
 
