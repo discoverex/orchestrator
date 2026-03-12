@@ -444,6 +444,22 @@ def test_upload_engine_artifacts_task_uploads_manifest_and_writes_mlflow_tags(
         assert method == "POST"
         if url.endswith("/v1/presign/batch"):
             entries = cast(list[dict[str, object]], payload["entries"])
+            assert payload["flow_run_id"] == "f1"
+            assert payload["attempt"] == 1
+            assert entries == [
+                {
+                    "flow_run_id": "f1",
+                    "attempt": 1,
+                    "kind": "custom",
+                    "filename": "engine/scene.json",
+                },
+                {
+                    "flow_run_id": "f1",
+                    "attempt": 1,
+                    "kind": "custom",
+                    "filename": "engine/report.json",
+                },
+            ]
             return [
                 {
                     "kind": "custom",

@@ -303,6 +303,8 @@ def upload_engine_artifacts_task(
             "attempt": attempt,
             "entries": [
                 {
+                    "flow_run_id": flow_run_id,
+                    "attempt": attempt,
                     "kind": "custom",
                     "filename": f"engine/{entry.relative_path}",
                 }
