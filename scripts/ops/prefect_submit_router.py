@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -98,7 +99,7 @@ def main() -> int:
         if args.job_spec_file
         else str(args.job_spec_json)
     )
-    job_spec = parse_job_spec_json(job_spec_raw).model_dump(mode="json")
+    job_spec = dataclasses.asdict(parse_job_spec_json(job_spec_raw))
     if args.parameters_json:
         job_spec.update(json.loads(args.parameters_json))
         job_spec_raw = json.dumps(job_spec, ensure_ascii=True)

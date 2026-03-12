@@ -6,8 +6,8 @@ import subprocess
 from hashlib import sha256
 from pathlib import Path
 
-from runner.entrypoint.core import cleanup_workdir, run_entrypoint
-from runner.git.repo import (
+from runner.adapters.outbound.entrypoint.core import cleanup_workdir, run_entrypoint
+from runner.adapters.outbound.git.repo import (
     RunnerError,
     local_repo_path,
     normalized_repo_url,
