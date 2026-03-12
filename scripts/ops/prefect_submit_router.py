@@ -19,8 +19,8 @@ from scripts.ops.prefect_submit_router_policy import (
     select_deployment,
 )
 
-DEFAULT_FIXED_DEPLOYMENT = "e2e-test"
-DEFAULT_COLAB_DEPLOYMENT = "e2e-test-colab"
+DEFAULT_FIXED_DEPLOYMENT = "e2e-job/e2e-test"
+DEFAULT_COLAB_DEPLOYMENT = "e2e-job/e2e-test-colab"
 
 
 def _parse_bool(value: str) -> bool:
