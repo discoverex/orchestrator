@@ -8,7 +8,7 @@ import pytest
 
 import flows.engine_run.flow as flow_module
 from flows.engine_run.flow import run_job_flow
-from flows.engine_run.models import ArtifactLink
+from flows.engine_run.models import ArtifactLink, EngineArtifactsUploadResult, FlowState
 from flows.job_spec import JobSpec
 
 
@@ -24,13 +24,13 @@ def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
     stdout.write_text("out", encoding="utf-8")
     stderr.write_text("err", encoding="utf-8")
     result.write_text("{}", encoding="utf-8")
-    saved_states: list[dict[str, Any]] = []
+    saved_states: list[Any] = []
     rerun_calls: list[dict[str, Any]] = []
-    loaded_state = {
-        "flow_run_id": "flow-repo",
-        "resume_key": "resume-key",
-        "resolved_commit": "abc123",
-        "steps": {
+    loaded_state = FlowState(
+        flow_run_id="flow-repo",
+        resume_key="resume-key",
+        resolved_commit="abc123",
+        steps={
             "resolve_commit": True,
             "run_entrypoint": True,
             "stdout_uploaded": True,
@@ -38,15 +38,15 @@ def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
             "result_uploaded": True,
             "manifest_uploaded": True,
         },
-        "local_paths": {
+        local_paths={
             "workdir": str(tmp_path / "missing"),
             "stdout": str(tmp_path / "missing" / "stdout.log"),
             "stderr": str(tmp_path / "missing" / "stderr.log"),
             "result": str(tmp_path / "missing" / "result.json"),
         },
-        "uploaded": {"stdout": "s3://bucket/stale"},
-        "exit_code": 9,
-    }
+        uploaded={"stdout": "s3://bucket/stale"},
+        exit_code=9,
+    )
 
     flow_runtime = cast(Any, flow_module).flow_run
     monkeypatch.setattr(flow_runtime, "get_id", lambda: "flow-repo")
@@ -62,7 +62,7 @@ def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
         lambda checkpoint_dir, resume_key: checkpoint_path,
     )
     monkeypatch.setattr(
-        flow_module, "load_checkpoint", lambda path: deepcopy(loaded_state)
+        flow_module, "load_checkpoint", lambda path, model_cls: deepcopy(loaded_state)
     )
     monkeypatch.setattr(
         flow_module,
@@ -124,12 +124,13 @@ def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
     monkeypatch.setattr(
         flow_module,
         "upload_engine_artifacts_task",
-        lambda *args, **kwargs: {
-            "artifact_uris": {},
-            "engine_manifest_uri": "",
-            "mlflow_tags_written": False,
-        },
+        lambda *args, **kwargs: EngineArtifactsUploadResult(
+            artifact_uris={},
+            engine_manifest_uri="",
+            mlflow_tags_written=False,
+        ),
     )
+
     monkeypatch.setattr(flow_module, "cleanup_workdir", lambda path: None)
 
     out = run_job_flow.fn(
@@ -149,6 +150,6 @@ def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
     )
 
     assert rerun_calls[0]["resolved_commit"] == "abc123"
-    assert saved_states[1]["steps"]["run_entrypoint"] is False
-    assert saved_states[1]["uploaded"] == {}
-    assert out["stdout_uri"] == "s3://bucket/jobs/flow-repo/attempt-1/stdout.log"
+    assert saved_states[1].is_step_done("run_entrypoint") is False
+    assert saved_states[1].uploaded == {}
+    assert out.stdout_uri == "s3://bucket/jobs/flow-repo/attempt-1/stdout.log"
