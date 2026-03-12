@@ -52,9 +52,9 @@ worker compatibility.
 
 ## 7) Deployment routing compatibility
 
-- The engine can be registered as `discoverex-engine-run`.
-- The engine can be registered as `discoverex-engine-run-colab`.
-- If needed, compatibility aliases `engine-run` and `engine-run-colab` are supported during cutover.
+- The engine can be registered as `e2e-test`.
+- The engine can be registered as `e2e-test-colab`.
+- If needed, compatibility aliases `e2e-test-legacy` and `e2e-test-colab-legacy` are supported during cutover.
 - The deployment is routed to queues that actual workers are polling.
 
 ## 8) Validation

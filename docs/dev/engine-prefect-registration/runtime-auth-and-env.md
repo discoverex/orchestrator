@@ -27,7 +27,7 @@ environment.
 
 Reference implementation:
 
-- [src/runner/git_runner.py](/home/esillileu/discoverex/orchestrator/src/runner/git_runner.py)
+- [src/runner/entrypoint/core.py](/home/esillileu/discoverex/orchestrator/src/runner/entrypoint/core.py)
 
 ## 2) Repository execution model
 

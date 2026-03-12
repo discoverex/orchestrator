@@ -185,7 +185,7 @@ The engine may also receive additional environment values from `job_spec.env`.
 
 Reference implementation:
 
-- [src/runner/git_runner.py](/home/esillileu/discoverex/orchestrator/src/runner/git_runner.py)
+- [src/runner/entrypoint/core.py](/home/esillileu/discoverex/orchestrator/src/runner/entrypoint/core.py)
 
 ## 2.7 Worker-managed auth and proxy behavior
 
@@ -245,7 +245,7 @@ Required names:
 Compatibility aliases during cutover:
 
 - fixed alias: `e2e-test-legacy`
-- colab alias: `e2e-test-legacy-colab`
+- colab alias: `e2e-test-colab-legacy`
 
 Current flow name expected in Prefect UI:
 
@@ -316,7 +316,7 @@ This repository currently registers deployments by:
 
 Canonical registration implementation:
 
-- [src/deployments/register.py](/home/esillileu/discoverex/orchestrator/src/deployments/register.py)
+- [src/deployments/register/main.py](/home/esillileu/discoverex/orchestrator/src/deployments/register/main.py)
 - [infra/images/entrypoints/register-entrypoint.sh](/home/esillileu/discoverex/orchestrator/infra/images/entrypoints/register-entrypoint.sh)
 
 The engine repo does not need to copy this repository's register scripts. It
