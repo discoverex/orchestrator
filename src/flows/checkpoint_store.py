@@ -3,9 +3,13 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, cast
+from typing import TypeVar
+
+from common.schema import StrictModel
 
 _SAFE_KEY = re.compile(r"[^a-zA-Z0-9._-]+")
+
+T = TypeVar("T", bound=StrictModel)
 
 
 def sanitize_resume_key(value: str) -> str:
@@ -25,24 +29,22 @@ def resolve_checkpoint_path(checkpoint_dir: str | None, resume_key: str) -> Path
     return base / f"{sanitize_resume_key(resume_key)}.json"
 
 
-def load_checkpoint(path: Path | None) -> dict[str, Any]:
+def load_checkpoint(path: Path | None, model_cls: type[T]) -> T | None:
     if path is None or not path.exists():
-        return {}
+        return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            return cast(dict[str, Any], data)
-        return {}
-    except (json.JSONDecodeError, OSError):
-        return {}
+        raw = path.read_text(encoding="utf-8")
+        return model_cls.model_validate_json(raw)
+    except (json.JSONDecodeError, OSError, ValueError):
+        return None
 
 
-def save_checkpoint(path: Path | None, state: dict[str, Any]) -> None:
+def save_checkpoint(path: Path | None, state: StrictModel) -> None:
     if path is None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(f"{path.suffix}.tmp")
     tmp_path.write_text(
-        json.dumps(state, ensure_ascii=True, indent=2), encoding="utf-8"
+        state.model_dump_json(indent=2), encoding="utf-8"
     )
     tmp_path.replace(path)
