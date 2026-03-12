@@ -39,7 +39,7 @@ def json_request(
         req_headers["Content-Type"] = "application/json"
     req = request.Request(url, method=method, data=body, headers=req_headers)
     try:
-        with request.urlopen(req, timeout=30) as resp:  # nosec B310 - env-controlled endpoints
+        with request.urlopen(req, timeout=30) as resp:
             raw = resp.read()
     except error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
@@ -56,7 +56,7 @@ class Cursor(BaseModel):
     ids_at_last_end_time: list[str] = Field(default_factory=list)
 
     @classmethod
-    def load(cls, path: Path) -> "Cursor":
+    def load(cls, path: Path) -> Cursor:
         if not path.exists():
             return cls(last_end_time="", ids_at_last_end_time=[])
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -163,7 +163,7 @@ def put_presigned(url: str, body: bytes) -> None:
         data=body,
         headers=headers,
     )
-    with request.urlopen(req, timeout=60):  # nosec B310 - presigned URL
+    with request.urlopen(req, timeout=60):
         return
 
 

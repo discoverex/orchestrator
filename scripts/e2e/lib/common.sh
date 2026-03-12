@@ -33,10 +33,35 @@ run_step_cmd() {
   local name="$3"
   shift 3
   log_step_line "${run_log}" "STEP ${name}"
-  if "$@" >>"${run_log}" 2>&1; then
+  local step_tmp_log
+  step_tmp_log=$(mktemp)
+  if "$@" >"${step_tmp_log}" 2>&1; then
+    cat "${step_tmp_log}" >>"${run_log}"
     record_step_line "${steps_file}" "${name}" "pass" "ok"
+    rm -f "${step_tmp_log}"
     return 0
   fi
+  cat "${step_tmp_log}" >>"${run_log}"
   record_step_line "${steps_file}" "${name}" "fail" "failed (see run.log)"
+  echo "FAILED: STEP ${name}" >&2
+  echo "--- BEGIN STEP LOG: ${name} ---" >&2
+  cat "${step_tmp_log}" >&2
+  echo "--- END STEP LOG: ${name} ---" >&2
+  rm -f "${step_tmp_log}"
   return 1
+}
+
+must_step_cmd() {
+  local run_log="$1"
+  local steps_file="$2"
+  local fail_cb="$3"
+  local name="$4"
+  shift 4
+  if run_step_cmd "${run_log}" "${steps_file}" "${name}" "$@"; then
+    return 0
+  fi
+  if [[ -n "${fail_cb}" && "$(type -t "${fail_cb}")" == "function" ]]; then
+    "${fail_cb}"
+  fi
+  exit 1
 }
