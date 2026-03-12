@@ -5,9 +5,8 @@ from typing import cast
 
 from prefect.exceptions import MissingContextError
 
-from flows.engine_run.models import ArtifactLink
+from flows.engine_run.models import ArtifactLink, EngineArtifactsUploadResult
 from flows.engine_run.task.engine_artifacts import (
-    EngineArtifactsUploadResult,
     upload_engine_artifacts,
 )
 from flows.engine_run.task.support import mlflow_post as _mlflow_post
