@@ -12,7 +12,11 @@ from scripts.observability.lib.prefect_observe_format import (
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch a Prefect deployment.")
-    parser.add_argument("--deployment-name", required=True)
+    parser.add_argument(
+        "--deployment-name",
+        default="e2e-job/e2e-test",
+        help="Target deployment name (flow/deployment)",
+    )
     parser.add_argument("--env-file", default=None)
     args = parser.parse_args()
 

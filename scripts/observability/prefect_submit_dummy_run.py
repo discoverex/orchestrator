@@ -17,7 +17,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Submit a dummy flow run to a Prefect deployment."
     )
-    parser.add_argument("--deployment-name", default="e2e-job/e2e-test")
+    parser.add_argument(
+        "--deployment-name",
+        default="e2e-job/e2e-test",
+        help="Target deployment name (flow/deployment)",
+    )
     parser.add_argument("--job-spec-file", default=None)
     parser.add_argument("--env-file", default=None)
     args = parser.parse_args()

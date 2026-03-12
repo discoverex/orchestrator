@@ -12,10 +12,15 @@ def main() -> int:
         description="Smoke test for fixed-dummy engine run."
     )
     parser.add_argument("--env-file", default=None)
+    parser.add_argument(
+        "--deployment-name",
+        default="e2e-job/e2e-test",
+        help="Target deployment name (flow/deployment)",
+    )
     args = parser.parse_args()
 
     client = build_client(args.env_file)
-    deployment = client.find_deployment("e2e-job/e2e-test")
+    deployment = client.find_deployment(args.deployment_name)
 
     # Fixed dummy spec
     job_spec_raw = '{"run_mode": "inline", "engine": "fixed-dummy"}'
