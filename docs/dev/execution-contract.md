@@ -77,7 +77,7 @@ The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the or
 
 Core pass criteria:
 
-1. `run-job/discoverex-engine-run` deployment exists after register.
+1. `e2e-job/e2e-test` deployment exists after register.
 2. Submitted flow run reaches `COMPLETED`.
 3. All required objects exist:
    - `stdout.log`

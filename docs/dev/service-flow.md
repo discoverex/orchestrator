@@ -43,8 +43,8 @@ operator / script
 ### 3.1 Register
 
 1. `register` container connects to Prefect API.
-2. Primary deployments `run-job/discoverex-engine-run` and `run-job/discoverex-engine-run-colab` are registered.
-3. Compatibility aliases `run-job/engine-run` and `run-job/engine-run-colab` may also be registered during cutover.
+2. Primary deployments `e2e-job/e2e-test` and `e2e-job/e2e-test-colab` are registered.
+3. Compatibility aliases `e2e-job/e2e-test-legacy` and `e2e-job/e2e-test-legacy-colab` may also be registered during cutover.
 4. Deployment points to the configured flow source + entrypoint, which may still be the compatibility `run_job_flow`.
 
 ### 3.2 Submit

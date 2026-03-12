@@ -239,22 +239,22 @@ the deployment names already expected by this repository.
 
 Required names:
 
-- fixed primary: `discoverex-engine-run`
-- colab primary: `discoverex-engine-run-colab`
+- fixed primary: `e2e-test`
+- colab primary: `e2e-test-colab`
 
 Compatibility aliases during cutover:
 
-- fixed alias: `engine-run`
-- colab alias: `engine-run-colab`
+- fixed alias: `e2e-test-legacy`
+- colab alias: `e2e-test-legacy-colab`
 
 Current flow name expected in Prefect UI:
 
-- `run-job`
+- `e2e-job`
 
 That yields deployment identifiers such as:
 
-- `run-job/discoverex-engine-run`
-- `run-job/discoverex-engine-run-colab`
+- `e2e-job/e2e-test`
+- `e2e-job/e2e-test-colab`
 
 If these names change, at minimum the following paths must be reviewed:
 
@@ -502,7 +502,7 @@ Useful downstream checks:
 prefect deployment ls
 
 ./bin/cli observability fixed-dummy-smoke \
-  --deployment-name discoverex-engine-run \
+  --deployment-name e2e-test \
   --timeout-sec 240
 ```
 
