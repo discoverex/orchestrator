@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import Field
 
 from common import StrictModel
 
 
-class ArtifactKind(str, Enum):
+class ArtifactKind(StrEnum):
     stdout = "stdout"
     stderr = "stderr"
     result = "result"

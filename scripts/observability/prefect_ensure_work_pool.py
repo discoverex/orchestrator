@@ -2,17 +2,9 @@
 from __future__ import annotations
 
 import argparse
-import sys
-from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
-from scripts.observability.lib.prefect_observe import (  # noqa: E402
-    build_client,
-    print_json,
-)
+from scripts.observability.lib.prefect_observe_env import build_client
+from scripts.observability.lib.prefect_observe_format import print_json
 
 
 def main() -> int:
@@ -23,15 +15,8 @@ def main() -> int:
     args = parser.parse_args()
 
     client = build_client(args.env_file)
-    row = client.ensure_work_pool(args.work_pool, pool_type=args.type)
-    print_json(
-        {
-            "id": row.get("id"),
-            "name": row.get("name"),
-            "type": row.get("type"),
-            "is_paused": row.get("is_paused"),
-        }
-    )
+    out = client.ensure_work_pool(args.work_pool, pool_type=args.type)
+    print_json(out)
     return 0
 
 

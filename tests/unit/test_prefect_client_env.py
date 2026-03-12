@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import common.prefect_client_env as prefect_client_env
-from common.prefect_client_env import (
+import common.prefect.client_env as prefect_client_env
+from common.prefect.client_env import (
     WorkerStartupSummary,
     apply_prefect_client_env,
     build_prefect_client_headers,
@@ -92,7 +92,10 @@ def test_shell_exports_emits_custom_headers_when_changed() -> None:
 
     assert exports == [
         "export PREFECT_WORK_QUEUE=gpu-fixed",
-        'export PREFECT_CLIENT_CUSTOM_HEADERS=\'{"CF-Access-Client-Id": "prefect-id", "CF-Access-Client-Secret": "prefect-secret"}\'',
+        'export PREFECT_CLIENT_CUSTOM_HEADERS='
+        '\'{'
+        '"CF-Access-Client-Id": "prefect-id", '
+        '"CF-Access-Client-Secret": "prefect-secret"}\'',
     ]
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from minio import Minio
@@ -43,9 +43,7 @@ def main() -> None:
     client = Minio(
         endpoint, access_key=access_key, secret_key=secret_key, secure=secure
     )
-    drill_bucket = (
-        f"restore-drill-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-    )
+    drill_bucket = f"restore-drill-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
     client.make_bucket(drill_bucket)
 
     restored = 0

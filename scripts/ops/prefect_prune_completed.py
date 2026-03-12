@@ -40,7 +40,7 @@ def _json_request(method: str, path: str, payload: dict[str, Any] | None = None)
     req = request.Request(
         f"{_api_url()}/{path.lstrip('/')}", method=method, data=body, headers=headers
     )
-    with request.urlopen(req, timeout=30) as resp:  # nosec B310 - env-controlled endpoint
+    with request.urlopen(req, timeout=30) as resp:
         raw = resp.read()
     if not raw:
         return {}

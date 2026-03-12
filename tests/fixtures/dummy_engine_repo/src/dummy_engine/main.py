@@ -36,7 +36,7 @@ def _mlflow_post(
         headers=headers,
         method="POST",
     )
-    with request.urlopen(req, timeout=30) as resp:  # nosec B310
+    with request.urlopen(req, timeout=30) as resp:
         raw = resp.read().decode("utf-8")
     parsed = json.loads(raw or "{}")
     if not isinstance(parsed, dict):
@@ -53,7 +53,7 @@ def _mlflow_get(
         headers=headers,
         method="GET",
     )
-    with request.urlopen(req, timeout=30) as resp:  # nosec B310
+    with request.urlopen(req, timeout=30) as resp:
         raw = resp.read().decode("utf-8")
     parsed = json.loads(raw or "{}")
     if not isinstance(parsed, dict):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from minio import Minio
@@ -24,7 +24,7 @@ def main() -> None:
     backup_root = Path(os.getenv("BACKUP_ROOT", "./backups/minio"))
     retention_days = int(os.getenv("BACKUP_RETENTION_DAYS", "30"))
 
-    run_at = datetime.now(timezone.utc)
+    run_at = datetime.now(UTC)
     stamp = run_at.strftime("%Y%m%dT%H%M%SZ")
     dest = backup_root / stamp
     dest.mkdir(parents=True, exist_ok=False)
@@ -74,9 +74,7 @@ def main() -> None:
         if not child.is_dir() or child.name == stamp:
             continue
         try:
-            ts = datetime.strptime(child.name, "%Y%m%dT%H%M%SZ").replace(
-                tzinfo=timezone.utc
-            )
+            ts = datetime.strptime(child.name, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
         except ValueError:
             continue
         if ts < cutoff:

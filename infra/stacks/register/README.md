@@ -3,10 +3,10 @@
 This profile registers Prefect deployments through a one-shot control-plane container.
 Default mode creates two primary deployments and two compatibility aliases:
 
-- fixed: `run-job/discoverex-engine-run` on queue `gpu-fixed`
-- colab: `run-job/discoverex-engine-run-colab` on queue `gpu-colab`
-- compat fixed alias: `run-job/engine-run`
-- compat colab alias: `run-job/engine-run-colab`
+- fixed: `e2e-job/e2e-test` on queue `gpu-fixed`
+- colab: `e2e-job/e2e-test-colab` on queue `gpu-colab`
+- compat fixed alias: `e2e-job/e2e-test-legacy`
+- compat colab alias: `e2e-job/e2e-test-legacy-colab`
 
 ## 1) Configure
 

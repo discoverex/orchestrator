@@ -80,7 +80,7 @@ class JobSpec(StrictModel):
         return trimmed
 
     @model_validator(mode="after")
-    def _validate_repo_fields_for_mode(self) -> "JobSpec":
+    def _validate_repo_fields_for_mode(self) -> JobSpec:
         if self.run_mode == "inline":
             if self.repo_url is not None:
                 raise ValueError("repo_url must be omitted when run_mode=inline")

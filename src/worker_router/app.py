@@ -8,7 +8,7 @@ from urllib import error, request
 
 from fastapi import APIRouter, FastAPI, Header, Request, Response
 
-from common.cloudflare_access import normalize_host, require_service_token
+from common.cloudflare.access import normalize_host, require_service_token
 from storage.composition.container import build_storage_app_from_env
 from storage.interfaces import build_artifact_router
 
@@ -103,7 +103,7 @@ async def _proxy(request_in: Request, upstream: UpstreamConfig, path: str) -> Re
         headers=forward_headers,
     )
     try:
-        with request.urlopen(req, timeout=60) as resp:  # nosec B310
+        with request.urlopen(req, timeout=60) as resp:
             payload = resp.read()
             headers = {
                 key: value
@@ -125,7 +125,8 @@ async def _proxy(request_in: Request, upstream: UpstreamConfig, path: str) -> Re
         payload = exc.read()
         preview = payload.decode("utf-8", errors="replace")[:200].replace("\n", "\\n")
         logger.warning(
-            "proxy_http_error upstream=%s method=%s path=%s status=%s request_id=%s preview=%s",
+            "proxy_http_error "
+            "upstream=%s method=%s path=%s status=%s request_id=%s preview=%s",
             upstream.name,
             request_in.method,
             request_in.url.path,

@@ -46,10 +46,10 @@ pythonpath = ["src", ".", "tests/fixtures/dummy_engine_repo/src"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+src = ["src", "scripts"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
-ignore = ["B008", "E501", "UP017", "UP037", "UP042"]
 
 [tool.ruff.format]
 quote-style = "double"

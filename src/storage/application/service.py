@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from common import StrictModel
 
@@ -58,7 +58,7 @@ class StorageApplicationService:
             url = self.object_store.generate_presigned_put(object_uri, ttl)
         else:
             url = self.object_store.generate_presigned_get(object_uri, ttl)
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+        expires_at = datetime.now(UTC) + timedelta(seconds=ttl)
         return PresignResult(object_uri=object_uri, url=url, expires_at=expires_at)
 
     def issue_batch_put(self, *, entries: list[PresignEntry]) -> list[PresignResult]:

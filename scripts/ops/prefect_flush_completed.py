@@ -3,15 +3,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
-from scripts.ops.lib import prefect_flush_core as core  # noqa: E402
+from scripts.ops.lib import prefect_flush_core as core
 
 Cursor = core.Cursor
 
@@ -113,7 +108,9 @@ def _upload_snapshot(flow_run: dict[str, Any], snapshot: dict[str, Any]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Flush completed Prefect runs to the storage API as full JSON snapshots."
+        description=
+        "Flush completed Prefect runs "
+        "to the storage API as full JSON snapshots."
     )
     parser.add_argument("--once", action="store_true", help="run once and exit")
     parser.add_argument(

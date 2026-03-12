@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from common.cloudflare_access import normalize_host, require_service_token
+from common.cloudflare.access import normalize_host, require_service_token
 
 
 def test_normalize_host_strips_port_and_case() -> None:

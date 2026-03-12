@@ -4,7 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from storage.ports.token_signer import TokenSignerPort
 
@@ -31,9 +31,7 @@ class HmacTokenSigner(TokenSignerPort):
         return self._b64url_encode(digest)
 
     def mint(self, method: str, object_uri: str, ttl_seconds: int) -> str:
-        exp = int(
-            (datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)).timestamp()
-        )
+        exp = int((datetime.now(UTC) + timedelta(seconds=ttl_seconds)).timestamp())
         payload = {"m": method, "u": object_uri, "e": exp}
         payload_b64 = self._b64url_encode(
             json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode(
@@ -57,7 +55,7 @@ class HmacTokenSigner(TokenSignerPort):
         if payload.get("m") != expected_method:
             raise PermissionError("token method mismatch")
         expires = int(payload.get("e", 0))
-        if int(datetime.now(timezone.utc).timestamp()) > expires:
+        if int(datetime.now(UTC).timestamp()) > expires:
             raise PermissionError("token expired")
         object_uri = str(payload.get("u", ""))
         if not object_uri.startswith("s3://"):
