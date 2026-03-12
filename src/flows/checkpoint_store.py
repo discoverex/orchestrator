@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 from pathlib import Path
-from typing import TypeVar
+from typing import Any, TypeVar
 
-from common.schema import StrictModel
+from pydantic import TypeAdapter
 
 _SAFE_KEY = re.compile(r"[^a-zA-Z0-9._-]+")
 
-T = TypeVar("T", bound=StrictModel)
+T = TypeVar("T")
 
 
 def sanitize_resume_key(value: str) -> str:
@@ -34,17 +35,26 @@ def load_checkpoint(path: Path | None, model_cls: type[T]) -> T | None:
         return None
     try:
         raw = path.read_text(encoding="utf-8")
-        return model_cls.model_validate_json(raw)
+        adapter = TypeAdapter(model_cls)
+        return adapter.validate_json(raw)
     except (json.JSONDecodeError, OSError, ValueError):
         return None
 
 
-def save_checkpoint(path: Path | None, state: StrictModel) -> None:
+def save_checkpoint(path: Path | None, state: Any) -> None:
     if path is None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(f"{path.suffix}.tmp")
-    tmp_path.write_text(
-        state.model_dump_json(indent=2), encoding="utf-8"
-    )
+
+    if dataclasses.is_dataclass(state):
+        # Use TypeAdapter to handle potential Pydantic-friendly types if any nested
+        adapter = TypeAdapter(type(state))
+        payload = adapter.dump_json(state, indent=2).decode("utf-8")
+    elif hasattr(state, "model_dump_json"):
+        payload = state.model_dump_json(indent=2)
+    else:
+        payload = json.dumps(state, indent=2)
+
+    tmp_path.write_text(payload, encoding="utf-8")
     tmp_path.replace(path)

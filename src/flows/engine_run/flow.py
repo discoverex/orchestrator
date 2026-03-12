@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import os
 from pathlib import Path
 from typing import Any
@@ -26,7 +27,7 @@ from flows.engine_run.task.main import (
 )
 from flows.job_spec import parse_job_spec_json
 from prefect import flow
-from runner.git.runner import cleanup_workdir
+from runner import cleanup_workdir
 
 
 def _flow_attempt() -> int:
@@ -68,12 +69,12 @@ def run_job_flow(
             attempt=attempt,
         )
     else:
-        state = state.model_copy(update={"attempt": attempt})
+        state = dataclasses.replace(state, attempt=attempt)
     save_checkpoint(checkpoint_path, state)
 
     if job.run_mode == "inline":
         resolved_commit = "inline"
-        state = state.model_copy(update={"resolved_commit": resolved_commit})
+        state = dataclasses.replace(state, resolved_commit=resolved_commit)
         state = state.mark_step("resolve_commit")
         save_checkpoint(checkpoint_path, state)
     elif state.is_step_done("resolve_commit"):
@@ -82,13 +83,12 @@ def run_job_flow(
         if not job.repo_url or not job.ref:
             raise RuntimeError("repo_url/ref required for run_mode=repo")
         resolved_commit = resolve_commit_task(job.repo_url, job.ref)
-        state = state.model_copy(update={"resolved_commit": resolved_commit})
+        state = dataclasses.replace(state, resolved_commit=resolved_commit)
         state = state.mark_step("resolve_commit")
         save_checkpoint(checkpoint_path, state)
 
-    if (
-        state.is_step_done("run_entrypoint")
-        and not artifact_paths_exist(state.local_paths)
+    if state.is_step_done("run_entrypoint") and not artifact_paths_exist(
+        state.local_paths
     ):
         state = state.reset_after_missing_artifacts()
         save_checkpoint(checkpoint_path, state)
@@ -115,13 +115,11 @@ def run_job_flow(
             outputs_prefix=effective_outputs_prefix,
             job_name=job.job_name,
         )
-        state = state.model_copy(
-            update={"local_paths": local_paths, "exit_code": exit_code}
-        )
+        state = dataclasses.replace(state, local_paths=local_paths, exit_code=exit_code)
         state = state.mark_step("run_entrypoint")
         new_steps = dict(state.steps)
         new_steps["cleanup"] = False
-        state = state.model_copy(update={"steps": new_steps})
+        state = dataclasses.replace(state, steps=new_steps)
         save_checkpoint(checkpoint_path, state)
 
     if state.is_step_done("manifest_uploaded"):
@@ -129,7 +127,7 @@ def run_job_flow(
     else:
         links = prepare_manifest_task(run_id, attempt)
         state = state.mark_step("prepare_manifest")
-        state = state.model_copy(update={"links": links})
+        state = dataclasses.replace(state, links=links)
         save_checkpoint(checkpoint_path, state)
 
         uploaded = upload_outputs_task(
@@ -139,7 +137,7 @@ def run_job_flow(
             attempt,
             already_uploaded=state.uploaded,
         )
-        state = state.model_copy(update={"uploaded": uploaded})
+        state = dataclasses.replace(state, uploaded=uploaded)
         for key in ("stdout", "stderr", "result", "manifest"):
             if key in uploaded:
                 state = state.mark_step(f"{key}_uploaded")
@@ -160,11 +158,10 @@ def run_job_flow(
             )
             engine_uploaded = engine_upload.artifact_uris
             engine_manifest_uri = engine_upload.engine_manifest_uri
-            state = state.model_copy(
-                update={
-                    "engine_uploaded": engine_uploaded,
-                    "engine_manifest_uri": engine_manifest_uri,
-                }
+            state = dataclasses.replace(
+                state,
+                engine_uploaded=engine_uploaded,
+                engine_manifest_uri=engine_manifest_uri,
             )
             state = state.mark_step("engine_artifacts_uploaded")
             if engine_manifest_uri:
@@ -185,12 +182,17 @@ def run_job_flow(
             save_checkpoint(checkpoint_path, state)
 
     return build_flow_result(
-        flow_run_id=run_id, attempt=attempt,
-        engine=job.engine, run_mode=job.run_mode,
-        job_name=job.job_name, resolved_commit=resolved_commit,
+        flow_run_id=run_id,
+        attempt=attempt,
+        engine=job.engine,
+        run_mode=job.run_mode,
+        job_name=job.job_name,
+        resolved_commit=resolved_commit,
         outputs_prefix=job.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/",
-        uploaded=uploaded, engine_manifest_uri=engine_manifest_uri,
-        engine_uploaded=engine_uploaded, exit_code=exit_code,
+        uploaded=uploaded,
+        engine_manifest_uri=engine_manifest_uri,
+        engine_uploaded=engine_uploaded,
+        exit_code=exit_code,
     )
 
 
