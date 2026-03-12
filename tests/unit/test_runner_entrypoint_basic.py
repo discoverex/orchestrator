@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from runner.git.runner import cleanup_workdir, run_entrypoint
+from runner.adapters.outbound.git.runner import cleanup_workdir, run_entrypoint
 
 
 def test_run_entrypoint_inline_mode_without_repo() -> None:

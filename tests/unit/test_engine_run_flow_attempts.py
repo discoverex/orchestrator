@@ -53,10 +53,11 @@ def test_run_job_flow_inline_executes_uploads_and_cleans_up(
     flow_runtime = cast(Any, flow_module).flow_run
     monkeypatch.setattr(flow_runtime, "get_id", lambda: "flow-inline")
     monkeypatch.setattr(flow_module, "_flow_attempt", lambda: 2)
+    import json
     monkeypatch.setattr(
         flow_module,
         "parse_job_spec_json",
-        lambda raw: JobSpec.model_validate_json(raw),
+        lambda raw: JobSpec(**json.loads(raw)),
     )
     monkeypatch.setattr(
         flow_module,

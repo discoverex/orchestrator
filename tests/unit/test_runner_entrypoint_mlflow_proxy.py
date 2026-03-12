@@ -8,7 +8,7 @@ from socketserver import ThreadingMixIn
 
 import pytest
 
-from runner.git.runner import cleanup_workdir, run_entrypoint
+from runner.adapters.outbound.git.runner import cleanup_workdir, run_entrypoint
 
 
 class _ThreadingHTTPServer(ThreadingMixIn, http.server.HTTPServer):

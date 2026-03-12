@@ -7,8 +7,8 @@ from typing import Any, cast
 
 import pytest
 
-import runner.git.runner as git_runner
-from runner.git.repo import RunnerError
+import runner.adapters.outbound.git.runner as git_runner
+from runner.adapters.outbound.git.repo import RunnerError
 
 
 def test_run_raises_runner_error_on_nonzero_exit(

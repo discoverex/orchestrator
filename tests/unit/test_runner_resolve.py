@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from runner.git.repo import RunnerError
-from runner.git.runner import resolve_commit
+from runner.adapters.outbound.git.repo import RunnerError
+from runner.adapters.outbound.git.runner import resolve_commit
 
 
 def test_resolve_commit_accepts_sha() -> None:
@@ -18,7 +18,7 @@ def test_resolve_commit_invalid_ref_raises(monkeypatch: pytest.MonkeyPatch) -> N
         _ = cwd
         raise RunnerError("fail")
 
-    monkeypatch.setattr("runner.git.runner._run", _always_fail)
+    monkeypatch.setattr("runner.adapters.outbound.git.runner._run", _always_fail)
     with pytest.raises(RunnerError):
         resolve_commit("https://invalid.invalid/repo.git", "main")
 
@@ -41,8 +41,8 @@ def test_resolve_commit_uses_safe_directory_for_local_repo(
             return "deadbeef" * 5 + "\trefs/heads/main"
         return ""
 
-    monkeypatch.setattr("runner.git.runner._run", _fake_run)
-    monkeypatch.setattr("runner.git.repo.repo_cache_root", lambda: tmp_path / "cache")
+    monkeypatch.setattr("runner.adapters.outbound.git.runner._run", _fake_run)
+    monkeypatch.setattr("runner.adapters.outbound.git.repo.repo_cache_root", lambda: tmp_path / "cache")
 
     resolve_commit(repo_url, "main")
 
@@ -64,7 +64,7 @@ def test_resolve_commit_skips_fetch_if_already_sha(
         calls.append(cmd)
         return ""
 
-    monkeypatch.setattr("runner.git.runner._run", _fake_run)
+    monkeypatch.setattr("runner.adapters.outbound.git.runner._run", _fake_run)
 
     assert resolve_commit(repo_url, sha) == sha
     assert len(calls) == 0
@@ -85,7 +85,7 @@ def test_resolve_commit_handles_github_ssh_url(
             return "c" * 40 + "\trefs/heads/main"
         return ""
 
-    monkeypatch.setattr("runner.git.runner._run", _fake_run)
-    monkeypatch.setattr("runner.git.repo.repo_cache_root", lambda: tmp_path / "cache")
+    monkeypatch.setattr("runner.adapters.outbound.git.runner._run", _fake_run)
+    monkeypatch.setattr("runner.adapters.outbound.git.repo.repo_cache_root", lambda: tmp_path / "cache")
 
     assert resolve_commit(repo_url, "main") == "c" * 40
