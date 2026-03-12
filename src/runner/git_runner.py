@@ -1,3 +1,5 @@
+"""Execution adapter for materializing source and launching engine entrypoints."""
+
 from __future__ import annotations
 
 import json
@@ -197,6 +199,9 @@ def run_entrypoint(
     stdout_path = workdir / "stdout.log"
     stderr_path = workdir / "stderr.log"
     result_path = workdir / "result.json"
+    engine_artifact_dir = workdir / "engine-artifacts"
+    engine_artifact_manifest_path = workdir / "engine-artifacts.manifest.json"
+    engine_artifact_dir.mkdir(parents=True, exist_ok=True)
 
     merged_env = os.environ.copy()
     config_path = ""
@@ -217,6 +222,8 @@ def run_entrypoint(
             "ORCH_OUTPUTS_PREFIX": outputs_prefix,
             "ORCH_RESOLVED_COMMIT": resolved_commit or "",
             "ORCH_JOB_INPUTS_JSON": json.dumps(inputs or {}, ensure_ascii=True),
+            "ORCH_ENGINE_ARTIFACT_DIR": str(engine_artifact_dir),
+            "ORCH_ENGINE_ARTIFACT_MANIFEST_PATH": str(engine_artifact_manifest_path),
         }
     )
     if job_name:
@@ -263,6 +270,8 @@ def run_entrypoint(
         stdout_path=stdout_path,
         stderr_path=stderr_path,
         result_path=result_path,
+        engine_artifact_dir=engine_artifact_dir,
+        engine_artifact_manifest_path=engine_artifact_manifest_path,
         exit_code=proc.returncode,
     )
 

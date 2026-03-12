@@ -148,14 +148,20 @@ def gateway_post(path: str, payload: dict[str, Any]) -> Any:
 
 
 def put_presigned(url: str, body: bytes) -> None:
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "orchestrator-e2e/1.0",
+    }
+    cf_id = env("CF_ACCESS_CLIENT_ID", "")
+    cf_secret = env("CF_ACCESS_CLIENT_SECRET", "")
+    if cf_id and cf_secret:
+        headers["CF-Access-Client-Id"] = cf_id
+        headers["CF-Access-Client-Secret"] = cf_secret
     req = request.Request(
         url,
         method="PUT",
         data=body,
-        headers={
-            "Content-Type": "application/json",
-            "User-Agent": "orchestrator-e2e/1.0",
-        },
+        headers=headers,
     )
     with request.urlopen(req, timeout=60):  # nosec B310 - presigned URL
         return

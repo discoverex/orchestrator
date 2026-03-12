@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 FORBIDDEN_CLI_PATTERNS = (
     "docker compose ",
     "docker build ",
@@ -51,9 +50,9 @@ def test_cli_scripts_do_not_execute_low_level_drivers_directly() -> None:
         for path in _script_paths(root):
             content = _runtime_script_content(path)
             for token in FORBIDDEN_CLI_PATTERNS:
-                assert (
-                    token not in content
-                ), f"{path} contains low-level driver token: {token}"
+                assert token not in content, (
+                    f"{path} contains low-level driver token: {token}"
+                )
 
 
 def test_bin_cli_routes_to_domain_clis() -> None:

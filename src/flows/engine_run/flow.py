@@ -1,3 +1,5 @@
+"""Compatibility wrapper flow around engine execution during control-plane cutover."""
+
 from __future__ import annotations
 
 import os
@@ -17,6 +19,7 @@ from flows.engine_run.tasks import (
     prepare_manifest_task,
     resolve_commit_task,
     run_entrypoint_job_task,
+    upload_engine_artifacts_task,
     upload_outputs_task,
 )
 from flows.job_spec import parse_job_spec_json
@@ -100,10 +103,15 @@ def run_job_flow(
             "stderr_uploaded",
             "result_uploaded",
             "manifest_uploaded",
+            "engine_artifacts_uploaded",
+            "engine_manifest_uploaded",
+            "engine_mlflow_tags_written",
             "cleanup",
         ):
             state["steps"][key] = False
         state["uploaded"] = {}
+        state["engine_uploaded"] = {}
+        state["engine_manifest_uri"] = ""
         save_checkpoint(checkpoint_path, state)
 
     if _step_done(state, "run_entrypoint"):
@@ -155,6 +163,37 @@ def run_job_flow(
                 _mark_step(state, f"{key}_uploaded")
         save_checkpoint(checkpoint_path, state)
 
+    if exit_code == 0:
+        if _step_done(state, "engine_manifest_uploaded"):
+            engine_uploaded = dict(state.get("engine_uploaded", {}))
+            engine_manifest_uri = str(state.get("engine_manifest_uri", ""))
+        else:
+            engine_upload = upload_engine_artifacts_task(
+                local_paths,
+                run_id,
+                attempt,
+                exit_code,
+                already_uploaded=state.get("engine_uploaded", {}),
+                mlflow_tags_written=bool(
+                    state.get("steps", {}).get("engine_mlflow_tags_written")
+                ),
+            )
+            engine_uploaded = cast(
+                dict[str, str], dict(engine_upload.get("artifact_uris", {}))
+            )
+            engine_manifest_uri = str(engine_upload.get("engine_manifest_uri", ""))
+            state["engine_uploaded"] = engine_uploaded
+            state["engine_manifest_uri"] = engine_manifest_uri
+            _mark_step(state, "engine_artifacts_uploaded")
+            if engine_manifest_uri:
+                _mark_step(state, "engine_manifest_uploaded")
+            if bool(engine_upload.get("mlflow_tags_written")):
+                _mark_step(state, "engine_mlflow_tags_written")
+            save_checkpoint(checkpoint_path, state)
+    else:
+        engine_uploaded = cast(dict[str, str], dict(state.get("engine_uploaded", {})))
+        engine_manifest_uri = str(state.get("engine_manifest_uri", ""))
+
     workdir = Path(local_paths["workdir"])
     if not _step_done(state, "cleanup") and workdir.exists():
         cleanup_workdir(workdir)
@@ -174,6 +213,8 @@ def run_job_flow(
         "stderr_uri": uploaded.get("stderr"),
         "result_uri": uploaded.get("result"),
         "manifest_uri": uploaded.get("manifest"),
+        "engine_manifest_uri": engine_manifest_uri or None,
+        "engine_artifact_uris": engine_uploaded,
         "exit_code": exit_code,
     }
 

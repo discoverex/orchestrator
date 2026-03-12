@@ -36,8 +36,8 @@ def test_router_diverts_when_fixed_running(monkeypatch: pytest.MonkeyPatch) -> N
                 "strict_priority": "false",
                 "queue_depth_threshold": 1,
                 "divert_when_running": "true",
-                "fixed_deployment": "engine-run",
-                "colab_deployment": "engine-run-colab",
+                "fixed_deployment": "discoverex-engine-run",
+                "colab_deployment": "discoverex-engine-run-colab",
                 "fixed_queue": "gpu-fixed",
                 "colab_queue": "gpu-colab",
                 "job_spec_json": '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo test"],"config":null,"inputs":{},"env":{},"outputs_prefix":null}',
@@ -63,7 +63,7 @@ def test_router_diverts_when_fixed_running(monkeypatch: pytest.MonkeyPatch) -> N
     )
 
     out = _capture_json_stdout(mod.main)
-    assert out["selected_deployment"] == "engine-run-colab"
+    assert out["selected_deployment"] == "discoverex-engine-run-colab"
     assert out["reason"] == "running-diverted-to-secondary"
 
 
@@ -80,8 +80,8 @@ def test_router_strict_priority_keeps_preferred(
                 "strict_priority": "true",
                 "queue_depth_threshold": 0,
                 "divert_when_running": "true",
-                "fixed_deployment": "engine-run",
-                "colab_deployment": "engine-run-colab",
+                "fixed_deployment": "discoverex-engine-run",
+                "colab_deployment": "discoverex-engine-run-colab",
                 "fixed_queue": "gpu-fixed",
                 "colab_queue": "gpu-colab",
                 "job_spec_json": '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo test"],"config":null,"inputs":{},"env":{},"outputs_prefix":null}',
@@ -109,7 +109,7 @@ def test_router_strict_priority_keeps_preferred(
     )
 
     out = _capture_json_stdout(mod.main)
-    assert out["selected_deployment"] == "engine-run"
+    assert out["selected_deployment"] == "discoverex-engine-run"
     assert out["reason"] == "strict-priority-selected-preferred"
 
 
@@ -126,8 +126,8 @@ def test_router_forwards_job_name_to_flow_run_name(
                 "strict_priority": "true",
                 "queue_depth_threshold": 0,
                 "divert_when_running": "true",
-                "fixed_deployment": "engine-run",
-                "colab_deployment": "engine-run-colab",
+                "fixed_deployment": "discoverex-engine-run",
+                "colab_deployment": "discoverex-engine-run-colab",
                 "fixed_queue": "gpu-fixed",
                 "colab_queue": "gpu-colab",
                 "job_spec_json": '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo test"],"config":null,"job_name":"my-job","inputs":{},"env":{},"outputs_prefix":null}',
@@ -155,6 +155,37 @@ def test_router_forwards_job_name_to_flow_run_name(
     out = _capture_json_stdout(mod.main)
     assert calls["name"] == "my-job"
     assert out["flow_run_name"] == "my-job"
+
+
+def test_router_uses_new_default_deployment_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mod = _load_module()
+    monkeypatch.delenv("ROUTER_FIXED_DEPLOYMENT", raising=False)
+    monkeypatch.delenv("ROUTER_COLAB_DEPLOYMENT", raising=False)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "prefect_submit_router.py",
+            "--job-spec-json",
+            '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo test"],"config":null,"inputs":{},"env":{},"outputs_prefix":null}',
+        ],
+    )
+    monkeypatch.setattr(mod, "_scheduled_count_for_queue", lambda q: 0)
+    monkeypatch.setattr(mod, "_running_count_for_queue", lambda q: 0)
+    monkeypatch.setattr(mod, "_find_deployment_id", lambda d: f"id-{d}")
+    monkeypatch.setattr(
+        mod,
+        "_create_flow_run",
+        lambda dep_id, params, flow_run_name=None: {
+            "id": "run-defaults",
+            "name": flow_run_name or "generated",
+        },
+    )
+
+    out = _capture_json_stdout(mod.main)
+    assert out["selected_deployment"] == "discoverex-engine-run"
 
 
 class _FakeParser:

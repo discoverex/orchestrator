@@ -73,7 +73,7 @@ Implementation-facing runtime contract:
 The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the orchestration chain in two modes:
 
 - `core`: deployment register, worker execution, object persistence in MinIO
-- `mlflow`: `core` + MLflow run tag linkage (`artifact_*_uri`)
+- `mlflow`: `core` + engine MLflow run presence
 
 Core pass criteria:
 
@@ -85,3 +85,9 @@ Core pass criteria:
    - `result.json`
    - `artifacts.json`
 4. `artifacts.json` metadata matches expected `flow_run_id`, `attempt`, and object URIs.
+
+MLflow pass criteria:
+
+1. Engine output exposes `scene_id` and `version_id`.
+2. A matching MLflow run exists for that `scene_id` / `version_id`.
+3. In local e2e, verification is done inside the MLflow container against `/tmp/mlflow/mlflow.db` because this local MLflow build does not return a stable `runs/search` HTTP payload for the helper.

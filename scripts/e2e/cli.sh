@@ -10,7 +10,8 @@ usage() {
   cat <<'EOF'
 Usage:
   cli e2e local [core|mlflow] [--keep-on-fail] [--timeout-sec N]
-  cli e2e remote [--prefect-api-url URL] [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
+  cli e2e remote [engine] [--prefect-api-url URL] [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
+  cli e2e remote dummy [--prefect-api-url URL] [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
 EOF
 }
 

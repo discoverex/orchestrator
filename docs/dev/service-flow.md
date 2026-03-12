@@ -43,8 +43,9 @@ operator / script
 ### 3.1 Register
 
 1. `register` container connects to Prefect API.
-2. Deployment `run-job/engine-run` and optional variants are registered.
-3. Deployment points to the current `run_job_flow`.
+2. Primary deployments `run-job/discoverex-engine-run` and `run-job/discoverex-engine-run-colab` are registered.
+3. Compatibility aliases `run-job/engine-run` and `run-job/engine-run-colab` may also be registered during cutover.
+4. Deployment points to the configured flow source + entrypoint, which may still be the compatibility `run_job_flow`.
 
 ### 3.2 Submit
 
@@ -83,7 +84,8 @@ If the engine uses MLflow:
 1. Engine writes to `MLFLOW_TRACKING_URI`.
 2. For remote HTTP(S) MLflow with Cloudflare Access, the worker injects a local proxy.
 3. worker-router proxies `/mlflow/*` to the MLflow backend.
-4. Engine records params/metrics/tags/status only.
+4. In local e2e, the generated job spec injects `MLFLOW_TRACKING_PROXY_URL=http://worker-router:8200/mlflow`.
+5. Engine records params/metrics/tags/status only.
 
 ### 3.7 Flush / Prune
 

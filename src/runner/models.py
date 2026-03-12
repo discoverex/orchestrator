@@ -17,4 +17,6 @@ class RunArtifacts(StrictModel):
     stdout_path: Path
     stderr_path: Path
     result_path: Path
+    engine_artifact_dir: Path
+    engine_artifact_manifest_path: Path
     exit_code: int

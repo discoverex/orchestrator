@@ -92,7 +92,7 @@ def test_shell_exports_emits_custom_headers_when_changed() -> None:
 
     assert exports == [
         "export PREFECT_WORK_QUEUE=gpu-fixed",
-        "export PREFECT_CLIENT_CUSTOM_HEADERS='{\"CF-Access-Client-Id\": \"prefect-id\", \"CF-Access-Client-Secret\": \"prefect-secret\"}'",
+        'export PREFECT_CLIENT_CUSTOM_HEADERS=\'{"CF-Access-Client-Id": "prefect-id", "CF-Access-Client-Secret": "prefect-secret"}\'',
     ]
 
 
@@ -134,7 +134,9 @@ def test_startup_summary_ignores_invalid_custom_headers() -> None:
     assert summary.cf_access_configured is False
 
 
-def test_main_shell_prints_exports(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_shell_prints_exports(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.setattr(
         prefect_client_env,
         "_parse_args",
@@ -152,7 +154,9 @@ def test_main_shell_prints_exports(monkeypatch: pytest.MonkeyPatch, capsys: pyte
     assert capsys.readouterr().out.strip() == "export PREFECT_WORK_QUEUE=gpu-fixed"
 
 
-def test_main_summary_prints_json(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_summary_prints_json(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.setattr(
         prefect_client_env,
         "_parse_args",

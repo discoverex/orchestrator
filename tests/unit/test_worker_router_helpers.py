@@ -19,6 +19,8 @@ def _request(host: str) -> Request:
             "headers": [(b"host", host.encode("ascii"))],
         }
     )
+
+
 def test_storage_host_mode_distinguishes_machine_human_and_compat(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

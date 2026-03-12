@@ -6,7 +6,11 @@ This document summarizes the contracts between the main services.
 
 Deployment name:
 
-- `run-job/engine-run`
+- primary fixed: `run-job/discoverex-engine-run`
+- primary colab: `run-job/discoverex-engine-run-colab`
+- compatibility aliases during cutover:
+  - `run-job/engine-run`
+  - `run-job/engine-run-colab`
 
 Current flow parameters:
 

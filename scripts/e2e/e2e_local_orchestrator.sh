@@ -8,8 +8,8 @@ source "./scripts/e2e/lib/common.sh"
 PY_HELPER="./scripts/e2e/shell_python_helpers.py"
 LOCAL_COMPOSE_FILE="scripts/e2e/docker-compose.local.test.yml"
 LOCAL_PROJECT_NAME="orchestrator-e2e-local"
-ENGINE_DIR="${ENGINE_DIR:-$(cd "${ROOT_DIR}/../engine" && pwd)}"
-ENGINE_JOB_SCRIPT="${ENGINE_DIR}/scripts/register_orchestrator_job.py"
+ENGINE_DIR="${ENGINE_DIR:-${ROOT_DIR}/tests/fixtures/dummy_engine_repo}"
+ENGINE_JOB_SCRIPT="${ENGINE_DIR}/infra/register/register_orchestrator_job.py"
 ENGINE_REPO_URL_CONTAINER="${ENGINE_REPO_URL_CONTAINER:-/opt/engine-src}"
 ENGINE_BACKGROUND_ASSET_REF="${ENGINE_BACKGROUND_ASSET_REF:-bg://dummy}"
 
@@ -159,21 +159,89 @@ verify_storage_objects() {
   if [[ "${MODE}" == "core" ]]; then
     extra_args+=(--skip-engine-artifacts)
   fi
-  python3 "${PY_HELPER}" verify-storage-objects \
-    --flow-run-id "${FLOW_RUN_ID}" \
-    --storage-api-url "${STORAGE_API_URL}" \
-    --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" \
-    --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" \
-    --artifact-bucket "${ARTIFACT_BUCKET}" \
-    --presigned-host-header "${STORAGE_DOWNLOAD_HOST_HEADER:-minio:9000}" \
-    --log-dir "${LOG_DIR}" \
-    "${extra_args[@]}"
+  docker run --rm \
+    --network "${LOCAL_PROJECT_NAME}_default" \
+    -v "${ROOT_DIR}:/workspace" \
+    -w /workspace \
+    orchestrator-base:local \
+    /bin/sh -lc "\
+      /opt/venv/bin/python scripts/e2e/shell_python_helpers.py verify-storage-objects \
+      --flow-run-id '${FLOW_RUN_ID}' \
+      --storage-api-url 'http://worker-router:8200' \
+      --cf-access-client-id '${CF_ACCESS_CLIENT_ID:-}' \
+      --cf-access-client-secret '${CF_ACCESS_CLIENT_SECRET:-}' \
+      --artifact-bucket '${ARTIFACT_BUCKET}' \
+      --presigned-host-header '${STORAGE_DOWNLOAD_HOST_HEADER:-}' \
+      --presigned-internal-base-url 'http://minio:9000' \
+      --log-dir '/workspace/${LOG_DIR}' \
+      ${extra_args[*]}"
 }
 
 verify_engine_mlflow_run() {
-  python3 "${PY_HELPER}" verify-engine-mlflow-run \
-    --mlflow-tracking-uri "${ENGINE_MLFLOW_VERIFY_URI}" \
-    --log-dir "${LOG_DIR}"
+  local scene_id
+  local version_id
+  scene_id="$(
+    python3 - "${LOG_DIR}/engine_output.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+print(str(payload.get("scene_id", "")).strip())
+PY
+  )"
+  version_id="$(
+    python3 - "${LOG_DIR}/engine_output.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+print(str(payload.get("version_id", "")).strip())
+PY
+  )"
+  if [[ -z "${scene_id}" || -z "${version_id}" ]]; then
+    echo "engine output missing scene_id/version_id" >&2
+    return 1
+  fi
+
+  docker exec \
+    -e E2E_SCENE_ID="${scene_id}" \
+    -e E2E_VERSION_ID="${version_id}" \
+    orchestrator-e2e-local-mlflow \
+    python - <<'PY'
+import os
+import sqlite3
+import sys
+
+scene_id = os.environ["E2E_SCENE_ID"]
+version_id = os.environ["E2E_VERSION_ID"]
+conn = sqlite3.connect("/tmp/mlflow/mlflow.db")
+cur = conn.cursor()
+rows = cur.execute(
+    """
+    SELECT DISTINCT r.run_uuid
+    FROM runs AS r
+    JOIN params AS p_scene
+      ON p_scene.run_uuid = r.run_uuid
+     AND p_scene.key = 'scene_id'
+    JOIN params AS p_version
+      ON p_version.run_uuid = r.run_uuid
+     AND p_version.key = 'version_id'
+    WHERE r.experiment_id = 1
+      AND p_scene.value = ?
+      AND p_version.value = ?
+    ORDER BY r.start_time DESC, r.run_uuid DESC
+    LIMIT 1
+    """,
+    (scene_id, version_id),
+).fetchall()
+if not rows:
+    raise SystemExit(
+        f"no matching MLflow run found in sqlite for scene_id={scene_id} version_id={version_id}"
+    )
+print(rows[0][0])
+PY
 }
 
 verify_prefect_flush() {
@@ -246,7 +314,7 @@ payload = {
     "entrypoint": [
         "/bin/sh",
         "-lc",
-        "printf '%s\n' '{\"status\":\"ok\",\"scene_id\":\"local-e2e-scene\",\"version_id\":\"attempt-1\"}'",
+        "mkdir -p \"$ORCH_ENGINE_ARTIFACT_DIR/scene\" && printf '%s\n' '{\"scene_id\":\"local-e2e-scene\",\"version_id\":\"attempt-1\"}' > \"$ORCH_ENGINE_ARTIFACT_DIR/scene/scene.json\" && printf '%s\n' '{\"status\":\"ok\"}' > \"$ORCH_ENGINE_ARTIFACT_DIR/scene/verification.json\" && printf '%s\n' '{\"schema_version\":1,\"artifacts\":[{\"logical_name\":\"scene_json\",\"relative_path\":\"scene/scene.json\",\"content_type\":\"application/json\",\"mlflow_tag\":\"artifact_scene_uri\"},{\"logical_name\":\"verification_json\",\"relative_path\":\"scene/verification.json\",\"content_type\":\"application/json\",\"mlflow_tag\":\"artifact_verification_uri\"}]}' > \"$ORCH_ENGINE_ARTIFACT_MANIFEST_PATH\" && printf '%s\n' '{\"status\":\"ok\",\"scene_id\":\"local-e2e-scene\",\"version_id\":\"attempt-1\"}'",
     ],
     "config": None,
     "job_name": "local-e2e-dummy",
@@ -271,7 +339,7 @@ PY
       --artifact-bucket "${ARTIFACT_BUCKET}"
     )
   fi
-  python3 "${ENGINE_JOB_SCRIPT}" \
+  uv run python "${ENGINE_JOB_SCRIPT}" \
     --dry-run \
     --run-mode inline \
     --entrypoint-shell-command "tmpdir=\$(mktemp -d /tmp/discoverex-engine-XXXXXX) && tar -C ${ENGINE_REPO_URL_CONTAINER} --exclude=.git --exclude=.venv --exclude=.cache --exclude=.ruff_cache -cf - . | tar -C \"\$tmpdir\" -xf - && cd \"\$tmpdir\" && PYTHONPATH=src python -m discoverex.orchestrator_contract.launcher" \
@@ -279,6 +347,24 @@ PY
     --command generate \
     --background-asset-ref "${ENGINE_BACKGROUND_ASSET_REF}" \
     "${extra_args[@]}" >"${job_spec_path}"
+  python3 - "${job_spec_path}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8"))
+engine_run = payload.pop("engine_run", None)
+if not isinstance(engine_run, dict):
+    raise SystemExit("generated job spec missing engine_run payload")
+payload["inputs"] = engine_run
+env = payload.get("env")
+if not isinstance(env, dict):
+    env = {}
+env["MLFLOW_TRACKING_PROXY_URL"] = "http://worker-router:8200/mlflow"
+payload["env"] = env
+path.write_text(json.dumps(payload, ensure_ascii=True), encoding="utf-8")
+PY
   echo "${job_spec_path}"
 }
 
@@ -290,7 +376,7 @@ submit_prefect_run() {
     -e PREFECT_API_URL=http://127.0.0.1:4200/api \
     -e JOB_SPEC_JSON_B64="${job_spec_b64}" \
     prefect sh -lc \
-    'JOB_SPEC_JSON="$(printf %s "$JOB_SPEC_JSON_B64" | base64 -d)" && prefect deployment run "run-job/engine-run" -p "job_spec_json=$JOB_SPEC_JSON"' \
+    'JOB_SPEC_JSON="$(printf %s "$JOB_SPEC_JSON_B64" | base64 -d)" && prefect deployment run "run-job/discoverex-engine-run" -p "job_spec_json=$JOB_SPEC_JSON"' \
     | tee "${LOG_DIR}/prefect-submit.log"
 }
 
@@ -311,7 +397,7 @@ run_step "prefect.ensure_work_pool" bash -lc "docker compose -p '${LOCAL_PROJECT
 
 run_step "build.register_image" compose_local build register
 run_step "register.apply_deployment" compose_local run --rm register
-run_step "register.verify_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls | grep -q 'run-job/engine-run'"
+run_step "register.verify_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls | grep -q 'run-job/discoverex-engine-run'"
 run_step "engine.build_job_spec" build_engine_job_spec
 run_step "prefect.submit_flow_run" submit_prefect_run "${LOG_DIR}/job-spec.json"
 FLOW_RUN_ID="$(grep -Eo '[0-9a-fA-F-]{36}' "${LOG_DIR}/prefect-submit.log" | head -n1 || true)"
