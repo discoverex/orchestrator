@@ -67,7 +67,6 @@ Optional additional gateway protection:
 Implementation-facing runtime contract:
 
 - [Engine Implementation Contract](/home/esillileu/discoverex/orchestrator/docs/dev/engine-implementation-contract.md)
-
 ## E2E Acceptance (Register -> Worker -> Storage)
 
 The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the orchestration chain in two modes:
@@ -77,9 +76,11 @@ The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the or
 
 Core pass criteria:
 
-1. `e2e-job/e2e-test` deployment exists after register.
+1. `e2e-job/e2e-test` deployment exists after register (default name).
 2. Submitted flow run reaches `COMPLETED`.
 3. All required objects exist:
+...
+Note: `e2e-job/e2e-test` is the standard default, but both the flow name and the deployment name can be customized via the registrar and passed to observability tools.
    - `stdout.log`
    - `stderr.log`
    - `result.json`

@@ -234,10 +234,9 @@ Reference implementation:
 
 ## 3) Deployment naming requirements
 
-Unless there is a coordinated cutover, the engine flow must be registered under
-the deployment names already expected by this repository.
+Unless there is a coordinated cutover, the engine flow is typically registered under the standard default names already expected by this repository.
 
-Required names:
+Standard default names:
 
 - fixed primary: `e2e-test`
 - colab primary: `e2e-test-colab`
@@ -247,16 +246,18 @@ Compatibility aliases during cutover:
 - fixed alias: `e2e-test-legacy`
 - colab alias: `e2e-test-colab-legacy`
 
-Current flow name expected in Prefect UI:
+Current flow name expected by default in Prefect UI:
 
 - `e2e-job`
 
-That yields deployment identifiers such as:
+That yields standard deployment identifiers such as:
 
 - `e2e-job/e2e-test`
 - `e2e-job/e2e-test-colab`
 
-If these names change, at minimum the following paths must be reviewed:
+Note: These are only defaults. The registrar allows custom names, and all observability/routing scripts accept `--deployment-name` (or related flags) to target non-standard identifiers.
+
+If these names change and you want to continue using the standard scripts without extra flags, at minimum the following paths must be reviewed:
 
 - [scripts/ops/prefect_submit_router.py](/home/esillileu/discoverex/orchestrator/scripts/ops/prefect_submit_router.py)
 - [scripts/observability/prefect_fixed_dummy_smoke.py](/home/esillileu/discoverex/orchestrator/scripts/observability/prefect_fixed_dummy_smoke.py)

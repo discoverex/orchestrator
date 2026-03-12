@@ -43,8 +43,9 @@ operator / script
 ### 3.1 Register
 
 1. `register` container connects to Prefect API.
-2. Primary deployments `e2e-job/e2e-test` and `e2e-job/e2e-test-colab` are registered.
+2. Primary deployments `e2e-job/e2e-test` and `e2e-job/e2e-test-colab` are registered by default.
 3. Compatibility aliases `e2e-job/e2e-test-legacy` and `e2e-job/e2e-test-legacy-colab` may also be registered during cutover.
+4. Custom flow names and deployment names are supported and can be injected during registration.
 4. Deployment points to the configured flow source + entrypoint, which may still be the compatibility `run_job_flow`.
 
 ### 3.2 Submit

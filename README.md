@@ -47,11 +47,16 @@ Core interaction path:
 
 Standard validation path:
 
-1. run the standard Prefect dummy smoke
+1. run the standard Prefect dummy smoke (uses `e2e-job/e2e-test` by default)
 2. verify artifact objects and MLflow linkage
 
 ```bash
-./bin/cli observability fixed-dummy-smoke --deployment-name e2e-test --timeout-sec 240
+# Default deployment
+./bin/cli observability fixed-dummy-smoke --timeout-sec 240
+
+# Custom deployment
+./bin/cli observability fixed-dummy-smoke --deployment-name my-flow/my-test --timeout-sec 240
+
 uv run python scripts/observability/prefect_verify_standard_dummy_run.py --flow-run-id <FLOW_RUN_ID>
 ```
 

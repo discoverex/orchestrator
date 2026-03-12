@@ -213,7 +213,12 @@ An engine implementation is considered contract-compliant if:
 Use the standard smoke path first:
 
 ```bash
-./bin/cli observability fixed-dummy-smoke --deployment-name discoverex-engine-run --timeout-sec 240
+# Default deployment is e2e-job/e2e-test
+./bin/cli observability fixed-dummy-smoke --timeout-sec 240
+
+# Or specify a custom deployment name
+./bin/cli observability fixed-dummy-smoke --deployment-name my-custom-flow/my-deployment --timeout-sec 240
+
 uv run python scripts/observability/prefect_verify_standard_dummy_run.py --flow-run-id <FLOW_RUN_ID>
 ```
 
