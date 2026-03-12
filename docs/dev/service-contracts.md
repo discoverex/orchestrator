@@ -4,13 +4,15 @@ This document summarizes the contracts between the main services.
 
 ## 1) Prefect Deployment Contract
 
-Deployment name:
+Standard default names:
 
 - primary fixed: `e2e-job/e2e-test`
 - primary colab: `e2e-job/e2e-test-colab`
 - compatibility aliases during cutover:
   - `e2e-job/e2e-test-legacy`
   - `e2e-job/e2e-test-legacy-colab`
+
+Note: The flow name (`e2e-job`) and deployment names are defaults and can be customized during registration.
 
 Current flow parameters:
 
