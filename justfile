@@ -22,9 +22,7 @@ check p=path:
     just linecheck
 
 tree:
-    git ls-files --cached --others --exclude-standard \
-      | sed 's#^\./##' \
-      | sort
+    tree --gitignore -f 
 
 linecheck:
     #!/usr/bin/env bash
