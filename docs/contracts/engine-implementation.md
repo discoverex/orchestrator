@@ -27,7 +27,7 @@ storage services.
 ## 2) Job Spec Contract
 
 The worker receives a `job_spec_json` payload and validates it against
-[job_spec.py](/home/esillileu/discoverex/orchestrator/src/flows/job_spec.py).
+[src/flows/domain/job_spec.py](../../src/flows/domain/job_spec.py).
 
 Required fields:
 
@@ -69,6 +69,8 @@ Before launching the engine process, the worker injects these variables:
 - `ORCH_OUTPUTS_PREFIX`
 - `ORCH_RESOLVED_COMMIT`
 - `ORCH_JOB_INPUTS_JSON`
+- `ORCH_ENGINE_ARTIFACT_DIR`
+- `ORCH_ENGINE_ARTIFACT_MANIFEST_PATH`
 
 Conditionally injected:
 
@@ -77,7 +79,7 @@ Conditionally injected:
 
 The engine may also receive additional variables from `job_spec.env`.
 
-Source: [git_runner.py](/home/esillileu/discoverex/orchestrator/src/runner/git_runner.py)
+Source: [src/runner/adapters/outbound/git/runner.py](../../src/runner/adapters/outbound/git/runner.py)
 
 ## 4) Execution Rules
 
@@ -156,7 +158,7 @@ When the tracking URI is remote HTTP(S) and Cloudflare Access credentials are
 present, the worker starts a local proxy and rewrites `MLFLOW_TRACKING_URI`
 for the child process. The engine does not need to know about this proxy.
 
-Source: [mlflow_proxy.py](/home/esillileu/discoverex/orchestrator/src/runner/mlflow_proxy.py)
+Source: [src/runner/adapters/outbound/mlflow/proxy.py](../../src/runner/adapters/outbound/mlflow/proxy.py)
 
 ## 8) Output Expectations
 
@@ -179,7 +181,7 @@ The standard smoke job currently validates:
 - MLflow tag persistence
 
 Reference job:
-[fixed_dummy_inline_job.json](/home/esillileu/discoverex/orchestrator/scripts/e2e/fixed_dummy_inline_job.json)
+[scripts/e2e/fixed_dummy_inline_job.json](../../scripts/e2e/fixed_dummy_inline_job.json)
 
 ## 9) Worker Environment Requirements
 

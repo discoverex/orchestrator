@@ -30,7 +30,7 @@ If it does not, the worker fails before engine execution with a signature mismat
 
 Canonical validator:
 
-- [job_spec.py](/home/esillileu/discoverex/orchestrator/src/flows/job_spec.py)
+- [src/flows/domain/job_spec.py](../../src/flows/domain/job_spec.py)
 
 Required:
 
@@ -52,7 +52,7 @@ Forbidden for `inline` mode:
 
 Canonical launcher:
 
-- [git_runner.py](/home/esillileu/discoverex/orchestrator/src/runner/git_runner.py)
+- [src/runner/adapters/outbound/git/runner.py](../../src/runner/adapters/outbound/git/runner.py)
 
 Inputs:
 
@@ -154,8 +154,8 @@ Contract:
 
 Standard smoke tools:
 
-- [prefect_fixed_dummy_smoke.py](/home/esillileu/discoverex/orchestrator/scripts/observability/prefect_fixed_dummy_smoke.py)
-- [prefect_verify_standard_dummy_run.py](/home/esillileu/discoverex/orchestrator/scripts/observability/prefect_verify_standard_dummy_run.py)
+- [scripts/observability/prefect_fixed_dummy_smoke.py](../../scripts/observability/prefect_fixed_dummy_smoke.py)
+- [scripts/observability/prefect_verify_standard_dummy_run.py](../../scripts/observability/prefect_verify_standard_dummy_run.py)
 
 Expected outcome:
 

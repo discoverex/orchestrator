@@ -10,21 +10,21 @@ compatible flow source, callable, and runtime contract.
 Start here, then read the companion docs in this same directory:
 
 - requirements overview:
-  [README.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/README.md)
+  [README.md](README.md)
 - runtime env and auth boundary:
-  [runtime-auth-and-env.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/runtime-auth-and-env.md)
+  [runtime-auth-and-env.md](runtime-auth-and-env.md)
 - artifact persistence contract:
-  [artifact-persistence-contract.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/artifact-persistence-contract.md)
+  [artifact-persistence-contract.md](artifact-persistence-contract.md)
 - worker-managed output directory contract:
-  [worker-managed-output-directory-contract.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/worker-managed-output-directory-contract.md)
+  [worker-managed-output-directory-contract.md](worker-managed-output-directory-contract.md)
 - implementation checklist:
-  [implementation-checklist.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/implementation-checklist.md)
+  [implementation-checklist.md](implementation-checklist.md)
 - registration handoff form:
-  [register.engine.env.example](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/register.engine.env.example)
+  [register.engine.env.example](register.engine.env.example)
 - example submit payload:
-  [job_spec.repo.example.json](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/job_spec.repo.example.json)
+  [job_spec.repo.example.json](job_spec.repo.example.json)
 - example engine artifact manifest:
-  [engine-artifacts.manifest.example.json](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/engine-artifacts.manifest.example.json)
+  [engine-artifacts.manifest.example.json](engine-artifacts.manifest.example.json)
 
 ## 1) Scope
 
@@ -120,24 +120,21 @@ without changing submitters, its live Prefect flow signature must accept:
 
 Current compatible reference:
 
-- [src/flows/engine_run/flow.py](/home/esillileu/discoverex/orchestrator/src/flows/engine_run/flow.py)
+- [src/flows/engine_run/flow.py](../../../src/flows/engine_run/flow.py)
 
 Contract rule:
 
 - the registered deployment parameter schema must match the live flow signature
 
-If the engine flow exposes a different signature, this repository's submit and
-observability paths will need coordinated changes.
-
 ### 2.4 Job spec compatibility
 
 The engine flow must accept `job_spec_json` values that validate against:
 
-- [src/flows/job_spec.py](/home/esillileu/discoverex/orchestrator/src/flows/job_spec.py)
+- [src/flows/domain/job_spec.py](../../../src/flows/domain/job_spec.py)
 
 Reference payload:
 
-- [job_spec.repo.example.json](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/job_spec.repo.example.json)
+- [job_spec.repo.example.json](job_spec.repo.example.json)
 
 Required minimum payload shape:
 
@@ -154,7 +151,7 @@ Required minimum payload shape:
 
 The engine repo must remain runnable under the worker contract documented in:
 
-- [docs/dev/engine-implementation-contract.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-implementation-contract.md)
+- [../engine-implementation.md](../engine-implementation.md)
 
 In practice this means:
 
@@ -185,7 +182,7 @@ The engine may also receive additional environment values from `job_spec.env`.
 
 Reference implementation:
 
-- [src/runner/entrypoint/core.py](/home/esillileu/discoverex/orchestrator/src/runner/entrypoint/core.py)
+- [src/runner/adapters/outbound/entrypoint/core.py](../../../src/runner/adapters/outbound/entrypoint/core.py)
 
 ## 2.7 Worker-managed auth and proxy behavior
 
@@ -229,8 +226,8 @@ Important boundary rules:
 
 Reference implementation:
 
-- [src/runner/mlflow_proxy.py](/home/esillileu/discoverex/orchestrator/src/runner/mlflow_proxy.py)
-- [docs/dev/service-auth-model.md](/home/esillileu/discoverex/orchestrator/docs/dev/service-auth-model.md)
+- [src/runner/adapters/outbound/mlflow/proxy.py](../../../src/runner/adapters/outbound/mlflow/proxy.py)
+- [../../concepts/auth-model.md](../../concepts/auth-model.md)
 
 ## 3) Deployment naming requirements
 
@@ -259,16 +256,16 @@ Note: These are only defaults. The registrar allows custom names, and all observ
 
 If these names change and you want to continue using the standard scripts without extra flags, at minimum the following paths must be reviewed:
 
-- [scripts/ops/prefect_submit_router.py](/home/esillileu/discoverex/orchestrator/scripts/ops/prefect_submit_router.py)
-- [scripts/observability/prefect_fixed_dummy_smoke.py](/home/esillileu/discoverex/orchestrator/scripts/observability/prefect_fixed_dummy_smoke.py)
-- [docs/dev/service-contracts.md](/home/esillileu/discoverex/orchestrator/docs/dev/service-contracts.md)
+- [scripts/ops/prefect_submit_router.py](../../../scripts/ops/prefect_submit_router.py)
+- [scripts/observability/prefect_fixed_dummy_smoke.py](../../../scripts/observability/prefect_fixed_dummy_smoke.py)
+- [../service-interface.md](../service-interface.md)
 
 ## 4) Registration input form
 
 The engine team must hand the following values to whoever operates
 registration from this repository.
 
-Use [register.engine.env.example](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/register.engine.env.example)
+Use [register.engine.env.example](register.engine.env.example)
 as the handoff form.
 
 Fields the engine repo must supply:
@@ -317,8 +314,8 @@ This repository currently registers deployments by:
 
 Canonical registration implementation:
 
-- [src/deployments/register/main.py](/home/esillileu/discoverex/orchestrator/src/deployments/register/main.py)
-- [infra/images/entrypoints/register-entrypoint.sh](/home/esillileu/discoverex/orchestrator/infra/images/entrypoints/register-entrypoint.sh)
+- [src/deployments/register/main.py](../../../src/deployments/register/main.py)
+- [infra/images/entrypoints/register-entrypoint.sh](../../../infra/images/entrypoints/register-entrypoint.sh)
 
 The engine repo does not need to copy this repository's register scripts. It
 needs only to satisfy the input contract those scripts consume.
@@ -477,7 +474,7 @@ An engine repo is ready for integration when all of the following are true.
 
 1. The repo exposes a Prefect flow callable at a stable source path.
 2. The flow callable accepts the required orchestrator parameters.
-3. `job_spec_json` is parsed compatibly with [job_spec.py](/home/esillileu/discoverex/orchestrator/src/flows/job_spec.py).
+3. `job_spec_json` is parsed compatibly with [src/flows/domain/job_spec.py](../../../src/flows/domain/job_spec.py).
 4. The engine entrypoint can run under the worker contract.
 5. The engine does not require direct storage credentials, MLflow backend addresses, or Prefect auth details.
 6. The engine can operate with worker-managed `MLFLOW_TRACKING_URI` and optional proxy rewriting.
@@ -511,16 +508,16 @@ prefect deployment ls
 
 Primary handoff files:
 
-- [docs/dev/engine-prefect-registration/README.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/README.md)
-- [docs/dev/engine-prefect-registration/runtime-auth-and-env.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/runtime-auth-and-env.md)
-- [docs/dev/engine-prefect-registration/artifact-persistence-contract.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/artifact-persistence-contract.md)
-- [docs/dev/engine-prefect-registration/worker-managed-output-directory-contract.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/worker-managed-output-directory-contract.md)
-- [docs/dev/engine-prefect-registration/implementation-checklist.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/implementation-checklist.md)
-- [docs/dev/engine-prefect-registration/register.engine.env.example](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/register.engine.env.example)
-- [docs/dev/engine-prefect-registration/job_spec.repo.example.json](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/job_spec.repo.example.json)
-- [docs/dev/engine-prefect-registration/engine-artifacts.manifest.example.json](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/engine-artifacts.manifest.example.json)
+- [README.md](README.md)
+- [runtime-auth-and-env.md](runtime-auth-and-env.md)
+- [artifact-persistence-contract.md](artifact-persistence-contract.md)
+- [worker-managed-output-directory-contract.md](worker-managed-output-directory-contract.md)
+- [implementation-checklist.md](implementation-checklist.md)
+- [register.engine.env.example](register.engine.env.example)
+- [job_spec.repo.example.json](job_spec.repo.example.json)
+- [engine-artifacts.manifest.example.json](engine-artifacts.manifest.example.json)
 
 Related contracts:
 
-- [docs/dev/engine-implementation-contract.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-implementation-contract.md)
-- [docs/dev/service-contracts.md](/home/esillileu/discoverex/orchestrator/docs/dev/service-contracts.md)
+- [../engine-implementation.md](../engine-implementation.md)
+- [../service-interface.md](../service-interface.md)

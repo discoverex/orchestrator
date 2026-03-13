@@ -11,9 +11,9 @@ Prefect server must run on another node.
 
 Related design docs:
 
-- [Service Flow](/home/esillileu/discoverex/orchestrator/docs/dev/service-flow.md)
-- [Service Auth Model](/home/esillileu/discoverex/orchestrator/docs/dev/service-auth-model.md)
-- [Service Contracts](/home/esillileu/discoverex/orchestrator/docs/dev/service-contracts.md)
+- [Service Flow](../concepts/service-flow.md)
+- [Service Auth Model](../concepts/auth-model.md)
+- [Service Contracts](../contracts/service-interface.md)
 
 ## 1) Deploy (production profile)
 
@@ -123,7 +123,7 @@ uv run python scripts/ops/storage_backup.py
 Recommend cron:
 
 ```cron
-15 2 * * * cd /home/esillileu/discoverex/orchestrator && /usr/bin/env bash -lc 'set -a; source infra/stacks/storage-node/.env; set +a; uv run python scripts/ops/storage_backup.py >> ../runtime/storage/logs/backup.log 2>&1'
+15 2 * * * cd /path/to/orchestrator && /usr/bin/env bash -lc 'set -a; source infra/stacks/storage-node/.env; set +a; uv run python scripts/ops/storage_backup.py >> ../runtime/storage/logs/backup.log 2>&1'
 ```
 
 ## 6) Restore drill (weekly)

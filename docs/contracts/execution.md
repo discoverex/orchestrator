@@ -66,7 +66,7 @@ Optional additional gateway protection:
 
 Implementation-facing runtime contract:
 
-- [Engine Implementation Contract](/home/esillileu/discoverex/orchestrator/docs/dev/engine-implementation-contract.md)
+- [Engine Implementation Contract](engine-implementation.md)
 ## E2E Acceptance (Register -> Worker -> Storage)
 
 The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the orchestration chain in two modes:

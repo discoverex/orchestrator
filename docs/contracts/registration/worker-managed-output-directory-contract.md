@@ -56,7 +56,7 @@ The engine must not assume that files written outside
 
 Reference example:
 
-- [engine-artifacts.manifest.example.json](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/engine-artifacts.manifest.example.json)
+- [engine-artifacts.manifest.example.json](engine-artifacts.manifest.example.json)
 
 Required top-level fields:
 
