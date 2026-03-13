@@ -43,8 +43,8 @@ def test_legacy_cli_entrypoints_removed() -> None:
 def test_docs_use_bin_cli() -> None:
     targets = [
         Path("README.md"),
-        Path("docs/ops/prefect-server.md"),
-        Path("docs/ops/storage-node.md"),
+        Path("docs/guides/setup-prefect.md"),
+        Path("docs/guides/setup-storage.md"),
         Path("infra/stacks/prefect-server/README.md"),
         Path("infra/stacks/worker/fixed/README.md"),
     ]

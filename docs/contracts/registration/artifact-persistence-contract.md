@@ -21,7 +21,7 @@ Current object layout:
 
 Current implementation:
 
-- [src/flows/engine_run/task/uploads.py](/home/esillileu/discoverex/orchestrator/src/flows/engine_run/task/uploads.py)
+- [src/flows/engine_run/task/uploads.py](../../src/flows/engine_run/task/uploads.py)
 
 ## 2) What `result.json` is for
 
@@ -68,7 +68,7 @@ The official contract going forward is worker-managed artifact directory upload.
 
 Normative spec:
 
-- [worker-managed-output-directory-contract.md](/home/esillileu/discoverex/orchestrator/docs/dev/engine-prefect-registration/worker-managed-output-directory-contract.md)
+- [worker-managed-output-directory-contract.md](worker-managed-output-directory-contract.md)
 
 Under that contract:
 
@@ -112,7 +112,7 @@ tag names such as:
 
 Reference tagging example:
 
-- [scripts/e2e/shell_python_helpers.py](/home/esillileu/discoverex/orchestrator/scripts/e2e/shell_python_helpers.py)
+- [scripts/e2e/shell_python_helpers.py](../../scripts/e2e/shell_python_helpers.py)
 
 ## 8) Decision point
 

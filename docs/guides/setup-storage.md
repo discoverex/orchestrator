@@ -11,9 +11,9 @@ Prefect server must run on another node.
 
 Related design docs:
 
-- [Service Flow](/home/esillileu/discoverex/orchestrator/docs/dev/service-flow.md)
-- [Service Auth Model](/home/esillileu/discoverex/orchestrator/docs/dev/service-auth-model.md)
-- [Service Contracts](/home/esillileu/discoverex/orchestrator/docs/dev/service-contracts.md)
+- [Service Flow](../concepts/service-flow.md)
+- [Service Auth Model](../concepts/auth-model.md)
+- [Service Contracts](../contracts/service-interface.md)
 
 ## 1) Deploy (production profile)
 

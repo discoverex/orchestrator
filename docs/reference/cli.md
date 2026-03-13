@@ -94,7 +94,7 @@ Behavior:
 
 Related runbook:
 
-- [storage-node.md](/home/esillileu/discoverex/orchestrator/docs/ops/storage-node.md)
+- [setup-storage.md](../guides/setup-storage.md)
 
 ### `local`
 
@@ -280,7 +280,7 @@ Remote defaults:
 
 Related runbook:
 
-- [prefect-server.md](/home/esillileu/discoverex/orchestrator/docs/ops/prefect-server.md)
+- [setup-prefect.md](../guides/setup-prefect.md)
 
 ### `e2e`
 
@@ -353,6 +353,6 @@ Behavior:
 
 ## 5) Related documents
 
-- [README.md](/home/esillileu/discoverex/orchestrator/README.md)
-- [prefect-server.md](/home/esillileu/discoverex/orchestrator/docs/ops/prefect-server.md)
-- [storage-node.md](/home/esillileu/discoverex/orchestrator/docs/ops/storage-node.md)
+- [README.md](../../README.md)
+- [setup-prefect.md](../guides/setup-prefect.md)
+- [setup-storage.md](../guides/setup-storage.md)

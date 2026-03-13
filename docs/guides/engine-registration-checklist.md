@@ -20,7 +20,7 @@ worker compatibility.
 
 ## 3) Job spec compatibility
 
-- `job_spec_json` is compatible with [job_spec.py](/home/esillileu/discoverex/orchestrator/src/flows/job_spec.py).
+- `job_spec_json` is compatible with [job_spec.py](../../src/flows/job_spec.py).
 - `repo_url` and `ref` work for `run_mode=repo`.
 - `entrypoint` is non-empty and deterministic.
 - `config` paths are repository-relative only.
