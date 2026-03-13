@@ -123,7 +123,7 @@ uv run python scripts/ops/storage_backup.py
 Recommend cron:
 
 ```cron
-15 2 * * * cd /home/esillileu/discoverex/orchestrator && /usr/bin/env bash -lc 'set -a; source infra/stacks/storage-node/.env; set +a; uv run python scripts/ops/storage_backup.py >> ../runtime/storage/logs/backup.log 2>&1'
+15 2 * * * cd /path/to/orchestrator && /usr/bin/env bash -lc 'set -a; source infra/stacks/storage-node/.env; set +a; uv run python scripts/ops/storage_backup.py >> ../runtime/storage/logs/backup.log 2>&1'
 ```
 
 ## 6) Restore drill (weekly)

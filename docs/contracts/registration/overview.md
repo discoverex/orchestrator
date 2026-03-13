@@ -120,20 +120,17 @@ without changing submitters, its live Prefect flow signature must accept:
 
 Current compatible reference:
 
-- [src/flows/engine_run/flow.py](../../src/flows/engine_run/flow.py)
+- [src/flows/engine_run/flow.py](../../../src/flows/engine_run/flow.py)
 
 Contract rule:
 
 - the registered deployment parameter schema must match the live flow signature
 
-If the engine flow exposes a different signature, this repository's submit and
-observability paths will need coordinated changes.
-
 ### 2.4 Job spec compatibility
 
 The engine flow must accept `job_spec_json` values that validate against:
 
-- [src/flows/job_spec.py](../../src/flows/job_spec.py)
+- [src/flows/domain/job_spec.py](../../../src/flows/domain/job_spec.py)
 
 Reference payload:
 
@@ -185,7 +182,7 @@ The engine may also receive additional environment values from `job_spec.env`.
 
 Reference implementation:
 
-- [src/runner/entrypoint/core.py](../../src/runner/entrypoint/core.py)
+- [src/runner/adapters/outbound/entrypoint/core.py](../../../src/runner/adapters/outbound/entrypoint/core.py)
 
 ## 2.7 Worker-managed auth and proxy behavior
 
@@ -229,7 +226,7 @@ Important boundary rules:
 
 Reference implementation:
 
-- [src/runner/mlflow_proxy.py](../../src/runner/mlflow_proxy.py)
+- [src/runner/adapters/outbound/mlflow/proxy.py](../../../src/runner/adapters/outbound/mlflow/proxy.py)
 - [../../concepts/auth-model.md](../../concepts/auth-model.md)
 
 ## 3) Deployment naming requirements
@@ -259,8 +256,8 @@ Note: These are only defaults. The registrar allows custom names, and all observ
 
 If these names change and you want to continue using the standard scripts without extra flags, at minimum the following paths must be reviewed:
 
-- [scripts/ops/prefect_submit_router.py](../../scripts/ops/prefect_submit_router.py)
-- [scripts/observability/prefect_fixed_dummy_smoke.py](../../scripts/observability/prefect_fixed_dummy_smoke.py)
+- [scripts/ops/prefect_submit_router.py](../../../scripts/ops/prefect_submit_router.py)
+- [scripts/observability/prefect_fixed_dummy_smoke.py](../../../scripts/observability/prefect_fixed_dummy_smoke.py)
 - [../service-interface.md](../service-interface.md)
 
 ## 4) Registration input form
@@ -317,8 +314,8 @@ This repository currently registers deployments by:
 
 Canonical registration implementation:
 
-- [src/deployments/register/main.py](../../src/deployments/register/main.py)
-- [infra/images/entrypoints/register-entrypoint.sh](../../infra/images/entrypoints/register-entrypoint.sh)
+- [src/deployments/register/main.py](../../../src/deployments/register/main.py)
+- [infra/images/entrypoints/register-entrypoint.sh](../../../infra/images/entrypoints/register-entrypoint.sh)
 
 The engine repo does not need to copy this repository's register scripts. It
 needs only to satisfy the input contract those scripts consume.
@@ -477,7 +474,7 @@ An engine repo is ready for integration when all of the following are true.
 
 1. The repo exposes a Prefect flow callable at a stable source path.
 2. The flow callable accepts the required orchestrator parameters.
-3. `job_spec_json` is parsed compatibly with [job_spec.py](../../src/flows/job_spec.py).
+3. `job_spec_json` is parsed compatibly with [src/flows/domain/job_spec.py](../../../src/flows/domain/job_spec.py).
 4. The engine entrypoint can run under the worker contract.
 5. The engine does not require direct storage credentials, MLflow backend addresses, or Prefect auth details.
 6. The engine can operate with worker-managed `MLFLOW_TRACKING_URI` and optional proxy rewriting.
