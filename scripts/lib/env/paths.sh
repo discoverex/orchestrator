@@ -3,6 +3,8 @@
 RUNTIME_ROOT_DEFAULT="$(cd "${ROOT_DIR}/.." && pwd)/runtime"
 RUNTIME_ROOT="${RUNTIME_ROOT:-${RUNTIME_ROOT_DEFAULT}}"
 
+WORKER_REPO_CACHE_DIR="${RUNTIME_ROOT}/worker/repo_cache"
+
 LOCAL_COMPOSE="${ROOT_DIR}/scripts/e2e/docker-compose.local.test.yml"
 STORAGE_ENV="${ROOT_DIR}/infra/stacks/storage-node/.env"
 STORAGE_COMPOSE="${ROOT_DIR}/infra/stacks/storage-node/docker-compose.yml"

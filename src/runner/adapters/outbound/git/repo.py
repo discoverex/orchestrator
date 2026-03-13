@@ -24,7 +24,7 @@ def run_command(cmd: list[str], cwd: Path | None = None) -> str:
 
 
 def repo_cache_root() -> Path:
-    return Path(os.getenv("ORCH_REPO_CACHE_DIR", "/tmp/orchestrator-repo-cache"))
+    return Path(os.getenv("ORCH_REPO_CACHE_DIR", "/var/lib/orchestrator/repo_cache"))
 
 
 def normalized_repo_url(repo_url: str) -> str:
