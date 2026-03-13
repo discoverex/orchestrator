@@ -131,6 +131,7 @@ The worker environment is expected to provide:
 - reachable `STORAGE_API_URL`
 - working DNS for public service hosts
 - writable checkpoint storage
+- writable repository cache storage
 
 For GPU engines, the worker host must also already provide:
 
