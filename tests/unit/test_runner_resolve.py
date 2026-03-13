@@ -42,7 +42,9 @@ def test_resolve_commit_uses_safe_directory_for_local_repo(
         return ""
 
     monkeypatch.setattr("runner.adapters.outbound.git.runner._run", _fake_run)
-    monkeypatch.setattr("runner.adapters.outbound.git.repo.repo_cache_root", lambda: tmp_path / "cache")
+    monkeypatch.setattr(
+        "runner.adapters.outbound.git.repo.repo_cache_root", lambda: tmp_path / "cache"
+    )
 
     resolve_commit(repo_url, "main")
 
@@ -86,6 +88,8 @@ def test_resolve_commit_handles_github_ssh_url(
         return ""
 
     monkeypatch.setattr("runner.adapters.outbound.git.runner._run", _fake_run)
-    monkeypatch.setattr("runner.adapters.outbound.git.repo.repo_cache_root", lambda: tmp_path / "cache")
+    monkeypatch.setattr(
+        "runner.adapters.outbound.git.repo.repo_cache_root", lambda: tmp_path / "cache"
+    )
 
     assert resolve_commit(repo_url, "main") == "c" * 40

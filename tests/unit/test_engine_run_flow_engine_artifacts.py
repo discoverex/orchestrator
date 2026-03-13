@@ -109,8 +109,7 @@ def test_upload_engine_artifacts_task_uploads_manifest_and_writes_mlflow_tags(
         "report": "s3://bucket/jobs/f1/attempt-1/engine/report.json",
     }
     assert (
-        out.engine_manifest_uri
-        == "s3://bucket/jobs/f1/attempt-1/engine-artifacts.json"
+        out.engine_manifest_uri == "s3://bucket/jobs/f1/attempt-1/engine-artifacts.json"
     )
     manifest_payload = json.loads(
         uploaded_payloads["https://storage.example/engine-artifacts.json"].decode(

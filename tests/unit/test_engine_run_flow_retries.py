@@ -52,6 +52,7 @@ def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
     monkeypatch.setattr(flow_runtime, "get_id", lambda: "flow-repo")
     monkeypatch.setattr(flow_module, "_flow_attempt", lambda: 1)
     import json
+
     monkeypatch.setattr(
         flow_module,
         "parse_job_spec_json",

@@ -108,8 +108,7 @@ def _upload_snapshot(flow_run: dict[str, Any], snapshot: dict[str, Any]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description=
-        "Flush completed Prefect runs "
+        description="Flush completed Prefect runs "
         "to the storage API as full JSON snapshots."
     )
     parser.add_argument("--once", action="store_true", help="run once and exit")

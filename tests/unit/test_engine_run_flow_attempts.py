@@ -54,6 +54,7 @@ def test_run_job_flow_inline_executes_uploads_and_cleans_up(
     monkeypatch.setattr(flow_runtime, "get_id", lambda: "flow-inline")
     monkeypatch.setattr(flow_module, "_flow_attempt", lambda: 2)
     import json
+
     monkeypatch.setattr(
         flow_module,
         "parse_job_spec_json",
@@ -152,8 +153,6 @@ def test_run_job_flow_inline_executes_uploads_and_cleans_up(
     assert out.job_name == "inline-job"
     assert out.resolved_commit == "inline"
     assert out.outputs_prefix == "jobs/flow-inline/attempt-2/"
-    assert (
-        out.manifest_uri == "s3://bucket/jobs/flow-inline/attempt-2/artifacts.json"
-    )
+    assert out.manifest_uri == "s3://bucket/jobs/flow-inline/attempt-2/artifacts.json"
     assert cleanup_calls == [workdir]
     assert saved_states[-1].is_step_done("cleanup") is True

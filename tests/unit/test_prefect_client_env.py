@@ -92,8 +92,8 @@ def test_shell_exports_emits_custom_headers_when_changed() -> None:
 
     assert exports == [
         "export PREFECT_WORK_QUEUE=gpu-fixed",
-        'export PREFECT_CLIENT_CUSTOM_HEADERS='
-        '\'{'
+        "export PREFECT_CLIENT_CUSTOM_HEADERS="
+        "'{"
         '"CF-Access-Client-Id": "prefect-id", '
         '"CF-Access-Client-Secret": "prefect-secret"}\'',
     ]

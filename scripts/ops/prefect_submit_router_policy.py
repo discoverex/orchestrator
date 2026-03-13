@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from flows.job_spec import JobSpecError, parse_job_spec_json
@@ -51,7 +51,7 @@ def parse_and_merge_job_spec(
     job_spec_raw: str, parameters_json: str | None
 ) -> dict[str, Any]:
     try:
-        job_spec = parse_job_spec_json(job_spec_raw).model_dump(mode="json")
+        job_spec = asdict(parse_job_spec_json(job_spec_raw))
     except JobSpecError as exc:
         raise SystemExit(str(exc)) from exc
     if not parameters_json:
