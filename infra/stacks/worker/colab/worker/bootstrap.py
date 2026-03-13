@@ -5,8 +5,8 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-from colab_exec import log_step, run_command
-from colab_runtime import ColabRuntimeConfig
+from .exec import log_step, run_command
+from .runtime import ColabRuntimeConfig
 
 
 @dataclass(frozen=True)

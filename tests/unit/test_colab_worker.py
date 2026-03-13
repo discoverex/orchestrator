@@ -148,7 +148,7 @@ def test_stop_worker_reports_timeout_when_process_survives(
 
 
 def test_runner_main_dispatches_status(monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = _load_module("colab_worker_runner")
+    runner = _load_module("colab_runner")
     monkeypatch.setattr(
         runner,
         "_parse_args",

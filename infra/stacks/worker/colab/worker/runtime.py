@@ -9,7 +9,7 @@ from pathlib import Path
 from common.prefect.client_env import apply_prefect_client_env
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[3]
+REPO_ROOT = SCRIPT_DIR.parents[5]
 DEFAULT_ENV_PATH = REPO_ROOT / ".env"
 DEFAULT_PID_PATH = Path("/tmp/orchestrator-colab-worker.pid")
 DEFAULT_LOG_PATH = Path("/tmp/orchestrator-colab-worker.log")

@@ -53,7 +53,7 @@ def test_presign_url_uses_configured_public_domain(
     mock_client = MagicMock()
     internal_url = "http://minio:9000/bucket/key?sig=xyz"
     mock_client.get_presigned_url.return_value = internal_url
-    
+
     store = cast(MinioObjectStore, app.object_store)
     store._client = mock_client
 
@@ -78,7 +78,7 @@ def test_presign_url_fallback_when_no_base_url(monkeypatch: pytest.MonkeyPatch) 
     mock_client = MagicMock()
     internal_url = "http://minio:9000/bucket/key?sig=xyz"
     mock_client.get_presigned_url.return_value = internal_url
-    
+
     store = cast(MinioObjectStore, app.object_store)
     store._client = mock_client
 

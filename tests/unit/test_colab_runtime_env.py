@@ -33,7 +33,7 @@ def _build_config(runtime_mod: ModuleType, tmp_path: Path) -> Any:
 
 
 def test_prefect_env_sets_default_queue(monkeypatch: pytest.MonkeyPatch) -> None:
-    runtime = _load_module("colab_runtime")
+    runtime = _load_module("worker.runtime")
     monkeypatch.delenv("PREFECT_WORK_QUEUE", raising=False)
     monkeypatch.delenv("PREFECT_CLIENT_CUSTOM_HEADERS", raising=False)
     monkeypatch.delenv("CF_ACCESS_CLIENT_ID", raising=False)
@@ -48,7 +48,7 @@ def test_prefect_env_sets_default_queue(monkeypatch: pytest.MonkeyPatch) -> None
 def test_populate_colab_env_maps_cf_access_headers(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    runtime = _load_module("colab_runtime")
+    runtime = _load_module("worker.runtime")
     config = _build_config(runtime, tmp_path)
     monkeypatch.delenv("PREFECT_CLIENT_CUSTOM_HEADERS", raising=False)
     monkeypatch.delenv("CF_ACCESS_CLIENT_ID", raising=False)
@@ -66,7 +66,7 @@ def test_populate_colab_env_maps_cf_access_headers(
 def test_load_dotenv_sets_missing_values_only(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    runtime = _load_module("colab_runtime")
+    runtime = _load_module("worker.runtime")
     env_path = tmp_path / ".env"
     env_path.write_text(
         "PREFECT_API_URL=https://prefect.example/api\nPREFECT_WORK_POOL=gpu-pool\n",
@@ -82,7 +82,7 @@ def test_load_dotenv_sets_missing_values_only(
 
 
 def test_resolve_path_uses_repo_root_for_relative_paths() -> None:
-    runtime = _load_module("colab_runtime")
+    runtime = _load_module("worker.runtime")
 
     resolved = runtime.resolve_path(Path("infra/stacks/worker/colab"))
 

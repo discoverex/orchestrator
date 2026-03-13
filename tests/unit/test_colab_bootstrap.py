@@ -32,7 +32,7 @@ def _build_config(runtime_mod: ModuleType, tmp_path: Path) -> Any:
 
 
 def test_bootstrap_env_sets_pip_and_xdg_cache(tmp_path: Path) -> None:
-    bootstrap = _load_module("colab_bootstrap")
+    bootstrap = _load_module("worker.bootstrap")
 
     env = bootstrap.bootstrap_env(tmp_path / "cache")
 
@@ -41,7 +41,7 @@ def test_bootstrap_env_sets_pip_and_xdg_cache(tmp_path: Path) -> None:
 
 
 def test_prepare_cache_dirs_creates_pip_and_xdg_only(tmp_path: Path) -> None:
-    bootstrap = _load_module("colab_bootstrap")
+    bootstrap = _load_module("worker.bootstrap")
     cache_root = tmp_path / "cache"
 
     bootstrap.prepare_cache_dirs(cache_root)
@@ -54,8 +54,8 @@ def test_prepare_cache_dirs_creates_pip_and_xdg_only(tmp_path: Path) -> None:
 def test_bootstrap_runtime_installs_runtime_requirements(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    runtime = _load_module("colab_runtime")
-    bootstrap = _load_module("colab_bootstrap")
+    runtime = _load_module("worker.runtime")
+    bootstrap = _load_module("worker.bootstrap")
     config = _build_config(runtime, tmp_path)
     config.repo_dir.mkdir()
     commands: list[list[str]] = []
@@ -96,7 +96,7 @@ def test_bootstrap_runtime_installs_runtime_requirements(
 def test_project_runtime_requirements_reads_project_dependencies(
     tmp_path: Path,
 ) -> None:
-    bootstrap = _load_module("colab_bootstrap")
+    bootstrap = _load_module("worker.bootstrap")
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
     (repo_dir / "pyproject.toml").write_text(
@@ -114,7 +114,7 @@ dependencies = ["prefect>=3.0.0", "fastapi>=0.116.0"]
 
 
 def test_ensure_drive_mounted_requires_drive(monkeypatch: pytest.MonkeyPatch) -> None:
-    bootstrap = _load_module("colab_bootstrap")
+    bootstrap = _load_module("worker.bootstrap")
     monkeypatch.setattr(bootstrap.Path, "exists", lambda self: False)
 
     with pytest.raises(RuntimeError, match="Google Drive is not mounted"):

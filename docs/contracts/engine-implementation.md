@@ -188,9 +188,10 @@ Reference job:
 An engine implementation can assume the worker node already has:
 
 - a reachable `PREFECT_API_URL`
-- a reachable `STORAGE_API_URL`
+- reachable `STORAGE_API_URL`
 - working DNS for public service hosts
 - writable checkpoint storage
+- writable repository cache storage
 
 For GPU engines, the worker node must additionally have:
 

@@ -7,11 +7,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from colab_exec import log_step, run_command
-from colab_runtime import ColabRuntimeConfig, load_dotenv, prefect_env, require_env
-
+from .exec import log_step, run_command
 from .logs import append_worker_log_banner
 from .models import WorkerStartResult
+from .runtime import ColabRuntimeConfig, load_dotenv, prefect_env, require_env
 from .status import is_running, read_pid
 
 
@@ -48,7 +47,7 @@ def ensure_runtime_ready(skip_install: bool) -> None:
         "prefect>=3 is not installed in the current interpreter. "
         "Run bootstrap first, then start the worker with "
         f"{sys.executable} "
-        "infra/stacks/worker/colab/colab_worker_runner.py start"
+        "infra/stacks/worker/colab/runner.py start"
     )
 
 
