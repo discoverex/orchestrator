@@ -20,6 +20,7 @@ Design and contracts:
 
 Operations:
 
+- `docs/ops/cli-reference.md`
 - `docs/ops/prefect-server.md`
 - `docs/ops/storage-node.md`
 
@@ -184,6 +185,10 @@ Runbook: `docs/ops/prefect-server.md`
 
 ## Internal CLI shortcuts
 
+Full reference:
+
+- `docs/ops/cli-reference.md`
+
 `bin/cli` is the canonical internal operator command:
 
 ```bash
@@ -204,8 +209,13 @@ Runbook: `docs/ops/prefect-server.md`
 ./bin/cli worker submit --job-spec-json '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo hello"]}'
 ```
 
-Runtime data policy:
+Fixed Worker (`worker fixed up`) Behavior:
+- Automatically ensures the runtime directory via `runtime init worker`.
+- Sets ownership of the checkpoint directory to UID 10001 (`appuser`) to ensure writability from within the container.
+- Uses `../../../../runtime/worker/checkpoints` as the default host path for the checkpoint volume.
 
+Runtime data policy:
+...
 - Run internal commands from project root (`orchestrator`).
 - Keep runtime data outside repo under `../runtime` (for example `../runtime/storage`, `../runtime/worker`).
 

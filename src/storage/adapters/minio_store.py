@@ -156,4 +156,6 @@ class MinioObjectStore:
         )
         if self._internal_presign_base_url:
             return rewrite_presigned_url(url, self._internal_presign_base_url)
+        if self._public_base_url:
+            return rewrite_presigned_url(url, self._public_base_url)
         return url

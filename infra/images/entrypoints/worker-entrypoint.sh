@@ -17,8 +17,7 @@ eval "$(
 POOL="${PREFECT_WORK_POOL:-gpu-pool}"
 QUEUE="${PREFECT_WORK_QUEUE:-}"
 SUMMARY="$(
-  /opt/venv/bin/python -c \
-  'from common.prefect.client_env import startup_summary; import json; print(json.dumps(startup_summary(default_queue="gpu-fixed").model_dump(mode="json"), ensure_ascii=True, sort_keys=True))'
+  /opt/venv/bin/python -m common.prefect.client_env summary --default-queue "gpu-fixed"
 )"
 
 set -- /opt/venv/bin/prefect worker start --pool "${POOL}" --type process

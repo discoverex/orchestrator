@@ -54,11 +54,13 @@ def test_parse_job_spec_json_accepts_inline_mode_without_repo() -> None:
 
 
 def test_parse_job_spec_json_rejects_repo_mode_without_repo_fields() -> None:
-    raw = ('{"run_mode":"repo",'
-           '"engine":"shell",'
-           '"entrypoint":["/bin/sh","-lc","echo ok"],'
-           '"config":null,'
-           '"inputs":{},'
-           '"env":{},"outputs_prefix":null}')
+    raw = (
+        '{"run_mode":"repo",'
+        '"engine":"shell",'
+        '"entrypoint":["/bin/sh","-lc","echo ok"],'
+        '"config":null,'
+        '"inputs":{},'
+        '"env":{},"outputs_prefix":null}'
+    )
     with pytest.raises(JobSpecError):
         parse_job_spec_json(raw)
