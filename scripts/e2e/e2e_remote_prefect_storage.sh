@@ -37,7 +37,8 @@ ENGINE_REPO_REF="${ENGINE_REPO_REF:-$(git -C "${ENGINE_DIR}" branch --show-curre
 ENGINE_BACKGROUND_ASSET_REF="${ENGINE_BACKGROUND_ASSET_REF:-bg://dummy}"
 ENGINE_EXECUTION_PROFILE="${ENGINE_EXECUTION_PROFILE:-remote-gpu-hf}"
 ENGINE_MLFLOW_TRACKING_URI="${ENGINE_MLFLOW_TRACKING_URI:-${MLFLOW_TRACKING_URI:-}}"
-ENGINE_MLFLOW_S3_ENDPOINT_URL="${ENGINE_MLFLOW_S3_ENDPOINT_URL:-${MLFLOW_S3_ENDPOINT_URL:-http://127.0.0.1:${MINIO_API_PORT}}}"
+# Default S3 endpoint should not point to localhost:9000 by default in remote mode
+ENGINE_MLFLOW_S3_ENDPOINT_URL="${ENGINE_MLFLOW_S3_ENDPOINT_URL:-${MLFLOW_S3_ENDPOINT_URL:-}}"
 ENGINE_AWS_ACCESS_KEY_ID="${ENGINE_AWS_ACCESS_KEY_ID:-${MINIO_ACCESS_KEY:-}}"
 ENGINE_AWS_SECRET_ACCESS_KEY="${ENGINE_AWS_SECRET_ACCESS_KEY:-${MINIO_SECRET_KEY:-}}"
 MLFLOW_RUN_ID=""
@@ -50,6 +51,7 @@ while [[ $# -gt 0 ]]; do
     --work-pool) PREFECT_WORK_POOL="${2:-}"; shift 2 ;;
     --work-queue) PREFECT_WORK_QUEUE="${2:-}"; shift 2 ;;
     --storage-api-url) STORAGE_API_URL="${2:-}"; shift 2 ;;
+    --mlflow-s3-endpoint-url) ENGINE_MLFLOW_S3_ENDPOINT_URL="${2:-}"; shift 2 ;;
     --prefect-access-client-id) CF_ACCESS_CLIENT_ID="${2:-}"; shift 2 ;;
     --prefect-access-client-secret) CF_ACCESS_CLIENT_SECRET="${2:-}"; shift 2 ;;
     --artifact-bucket) ARTIFACT_BUCKET="${2:-}"; shift 2 ;;
@@ -86,8 +88,8 @@ if [[ -n "${CF_ACCESS_CLIENT_ID}" && -n "${CF_ACCESS_CLIENT_SECRET}" ]]; then
 fi
 
 must_step "preflight.tools" bash -lc "command -v docker >/dev/null && command -v curl >/dev/null && command -v uv >/dev/null"
-must_step "preflight.storage_api_health" curl -fsS "${STORAGE_API_URL%/}/healthz"
-must_step "preflight.minio_health" curl -fsS "http://127.0.0.1:${MINIO_API_PORT}/minio/health/live"
+must_step "preflight.storage_api_health" curl -fsS -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID:-}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET:-}" "${STORAGE_API_URL%/}/healthz"
+# must_step "preflight.minio_health" curl -fsS "http://127.0.0.1:${MINIO_API_PORT}/minio/health/live"
 must_step "engine.build_job_spec" build_engine_job_spec
 must_step "build.base_register_worker_images" docker compose -f "${LOCAL_TEST_COMPOSE}" build base-runtime register worker
 must_step "prefect.ensure_work_pool" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e WORK_POOL='${PREFECT_WORK_POOL}' prefecthq/prefect:3-latest sh -lc 'prefect work-pool inspect \"\$WORK_POOL\" >/dev/null 2>&1 || prefect work-pool create \"\$WORK_POOL\" --type process'"
