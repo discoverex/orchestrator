@@ -41,7 +41,10 @@ Runtime policy:
 - Runtime isolation: worker-router owns storage control-plane composition; Caddy handles human/machine host routing
 - MLflow worker endpoint: `MLFLOW_TRACKING_URI=https://storage-api.discoverex.qzz.io/mlflow`
 - MLflow UI endpoint: `https://storage.discoverex.qzz.io/mlflow`
-- Artifact policy: worker presign/head requests go through storage routes on worker-router, issued upload/download URLs use `storage-api` signed object paths
+- Artifact policy: worker presign/head requests go through storage routes on worker-router, issued upload/download URLs use `storage-api` signed object paths.
+- Presigned URL Generation: 
+  - `GET` (download) URLs always use `MINIO_PUBLIC_BASE_URL`.
+  - `PUT` (upload) URLs use `MINIO_INTERNAL_PRESIGN_BASE_URL` if set (for internal worker performance), otherwise fall back to `MINIO_PUBLIC_BASE_URL` to support remote/external workers (e.g., Colab).
 - MLflow responsibility: metadata only (params/metrics/tags/status). Do not use `mlflow.log_artifact()`.
 - Human/operator UIs: MLflow at `/mlflow`, MinIO console at `/minio`, pgAdmin at `/db`
 - Worker contract: workers should carry only `STORAGE_API_URL`, `MLFLOW_TRACKING_URI`, and Cloudflare Access credentials; direct storage/MLflow credentials stay on this node.
