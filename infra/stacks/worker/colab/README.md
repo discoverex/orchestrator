@@ -22,7 +22,7 @@ Set these before start:
 ## 2) Bootstrap (recommended first step)
 
 ```bash
-PYTHONPATH=src python infra/stacks/worker/colab/runner.py bootstrap \
+PYTHONPATH=src python infra/stacks/worker/colab/colab_runner.py bootstrap \
   --repo-dir /content/drive/MyDrive/discoverex/orchestrator \
   --cache-root /content/drive/MyDrive/discoverex/cache
 ```
@@ -40,7 +40,7 @@ The pip and resolver cache is reused from Drive through:
 ## 3) Start worker
 
 ```bash
-python infra/stacks/worker/colab/runner.py start \
+python infra/stacks/worker/colab/colab_runner.py start \
   --skip-install \
   --checkpoint-dir /content/drive/MyDrive/orchestrator/checkpoints
 ```
@@ -53,17 +53,17 @@ the current interpreter. When Cloudflare Access env vars are present, it also ex
 ## 4) Status / logs / stop
 
 ```bash
-python infra/stacks/worker/colab/runner.py status
-python infra/stacks/worker/colab/runner.py logs --tail 80
-python infra/stacks/worker/colab/runner.py stop
+python infra/stacks/worker/colab/colab_runner.py status
+python infra/stacks/worker/colab/colab_runner.py logs --tail 80
+python infra/stacks/worker/colab/colab_runner.py stop
 ```
 
 ## Notebook (optional)
 
 The notebook `worker_colab.ipynb` is optional convenience only.
-Primary operation should use `runner.py`.
+Primary operation should use `colab_runner.py`.
 The notebook keeps only the minimum bootstrap logic inline. It can start from a
 state where only the notebook file exists, configure runtime env, clone or
 refresh the repository into Google Drive, and then invoke the checked-out
-`runner.py` for bootstrap and worker lifecycle. Colab output shows
+`colab_runner.py` for bootstrap and worker lifecycle. Colab output shows
 step-by-step progress logs for each stage.

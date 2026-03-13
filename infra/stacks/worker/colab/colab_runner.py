@@ -4,19 +4,14 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add the directory containing 'worker' to sys.path if needed
-SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
-
 from worker import (
-    ColabRuntimeConfig,
     DEFAULT_BOOTSTRAP_PYTHON,
     DEFAULT_CACHE_ROOT,
     DEFAULT_CHECKPOINT_DIR,
     DEFAULT_LOG_PATH,
     DEFAULT_PID_PATH,
     DEFAULT_REPO_DIR,
+    ColabRuntimeConfig,
     bootstrap_runtime,
     read_worker_logs,
     resolve_path,

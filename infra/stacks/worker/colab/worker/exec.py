@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -22,7 +23,6 @@ def run_command(
     check: bool = True,
     step: str = "run",
 ) -> CommandResult:
-    from pathlib import Path
 
     log_step(step, f"exec: {' '.join(cmd)}")
     proc = subprocess.run(

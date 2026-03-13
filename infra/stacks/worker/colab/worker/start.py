@@ -8,9 +8,9 @@ import sys
 from pathlib import Path
 
 from .exec import log_step, run_command
-from .runtime import ColabRuntimeConfig, load_dotenv, prefect_env, require_env
 from .logs import append_worker_log_banner
 from .models import WorkerStartResult
+from .runtime import ColabRuntimeConfig, load_dotenv, prefect_env, require_env
 from .status import is_running, read_pid
 
 
