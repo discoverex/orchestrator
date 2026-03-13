@@ -4,10 +4,10 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
-from colab_bootstrap import BootstrapResult, bootstrap_runtime
-from colab_exec import log_step, run_command
-from colab_repo import RepoSyncResult, sync_repo
-from colab_runtime import (
+from .bootstrap import BootstrapResult, bootstrap_runtime
+from .exec import log_step, run_command
+from .repo import RepoSyncResult, sync_repo
+from .runtime import (
     DEFAULT_CACHE_ROOT,
     DEFAULT_CHECKPOINT_DIR,
     DEFAULT_LOG_PATH,
@@ -16,14 +16,11 @@ from colab_runtime import (
     ColabRuntimeConfig,
     populate_colab_env,
 )
-from colab_worker import (
-    WorkerStartResult,
-    WorkerStatusResult,
-    read_worker_logs,
-    start_worker,
-    stop_worker,
-    worker_status,
-)
+from .logs import read_worker_logs
+from .models import WorkerStartResult, WorkerStatusResult
+from .start import start_worker
+from .status import worker_status
+from .stop import stop_worker
 
 
 def build_runtime_config(

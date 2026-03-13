@@ -7,12 +7,12 @@ This guide covers setting up a worker in a Google Colab environment.
 Primary operation should be script-first:
 
 ```bash
-PYTHONPATH=src python infra/stacks/worker/colab/colab_worker_runner.py bootstrap \
+PYTHONPATH=src python infra/stacks/worker/colab/runner.py bootstrap \
   --repo-dir /content/drive/MyDrive/discoverex/orchestrator \
   --cache-root /content/drive/MyDrive/discoverex/cache \
   --venv-dir /content/venv
 
-/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py start \
+/content/venv/bin/python infra/stacks/worker/colab/runner.py start \
   --skip-install \
   --checkpoint-dir /content/drive/MyDrive/orchestrator/checkpoints
 ```
@@ -31,16 +31,16 @@ directory after Drive is mounted. Do not create the virtualenv on Google Drive.
 Other commands:
 
 ```bash
-/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py status
-/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py logs --tail 80
-/content/venv/bin/python infra/stacks/worker/colab/colab_worker_runner.py stop
+/content/venv/bin/python infra/stacks/worker/colab/runner.py status
+/content/venv/bin/python infra/stacks/worker/colab/runner.py logs --tail 80
+/content/venv/bin/python infra/stacks/worker/colab/runner.py stop
 ```
 
 Optional notebook: `infra/stacks/worker/colab/worker_colab.ipynb`
 It keeps only minimal bootstrap logic inline: the notebook can begin from a
 session where only the notebook file is present, configure env, clone or
 refresh the repo into Drive, and then invoke the checked-out
-`infra/stacks/worker/colab/colab_worker_runner.py` with Colab-visible logs.
+`infra/stacks/worker/colab/runner.py` with Colab-visible logs.
 
 ## 3. Artifact and Experiment Policy
 

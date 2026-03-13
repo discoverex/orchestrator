@@ -1,36 +1,29 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
 
+# Add the directory containing 'worker' to sys.path if needed
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-if TYPE_CHECKING:
-    from colab_runtime import ColabRuntimeConfig as ColabRuntimeConfigType
-else:
-    ColabRuntimeConfigType = Any
-
-bootstrap_runtime = importlib.import_module("colab_bootstrap").bootstrap_runtime
-runtime = importlib.import_module("colab_runtime")
-worker = importlib.import_module("colab_worker")
-
-ColabRuntimeConfig = cast(type[ColabRuntimeConfigType], runtime.ColabRuntimeConfig)
-DEFAULT_BOOTSTRAP_PYTHON = runtime.DEFAULT_BOOTSTRAP_PYTHON
-DEFAULT_CACHE_ROOT = runtime.DEFAULT_CACHE_ROOT
-DEFAULT_CHECKPOINT_DIR = runtime.DEFAULT_CHECKPOINT_DIR
-DEFAULT_LOG_PATH = runtime.DEFAULT_LOG_PATH
-DEFAULT_PID_PATH = runtime.DEFAULT_PID_PATH
-DEFAULT_REPO_DIR = runtime.DEFAULT_REPO_DIR
-resolve_path = runtime.resolve_path
-read_worker_logs = worker.read_worker_logs
-start_worker = worker.start_worker
-stop_worker = worker.stop_worker
-worker_status = worker.worker_status
+from worker import (
+    ColabRuntimeConfig,
+    DEFAULT_BOOTSTRAP_PYTHON,
+    DEFAULT_CACHE_ROOT,
+    DEFAULT_CHECKPOINT_DIR,
+    DEFAULT_LOG_PATH,
+    DEFAULT_PID_PATH,
+    DEFAULT_REPO_DIR,
+    bootstrap_runtime,
+    read_worker_logs,
+    resolve_path,
+    start_worker,
+    stop_worker,
+    worker_status,
+)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -55,7 +48,7 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _config_from_args(args: argparse.Namespace) -> ColabRuntimeConfigType:
+def _config_from_args(args: argparse.Namespace) -> ColabRuntimeConfig:
     return ColabRuntimeConfig(
         repo_dir=resolve_path(Path(args.repo_dir)),
         cache_root=resolve_path(Path(args.cache_root)),

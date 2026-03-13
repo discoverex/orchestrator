@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from colab_exec import log_step, run_command
-from colab_runtime import ColabRuntimeConfig
+from .exec import log_step, run_command
+from .runtime import ColabRuntimeConfig
 
 
 @dataclass(frozen=True)
