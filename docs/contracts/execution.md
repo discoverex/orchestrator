@@ -6,6 +6,10 @@
 - `resume_key: str | None` (optional)
 - `checkpoint_dir: str | None` (optional)
 
+Deployment naming and canonical E2E targets are defined in:
+
+- [deployments/e2e/e2e-deployments.yaml](../../deployments/e2e/e2e-deployments.yaml)
+
 `job_spec_json` schema:
 
 - `engine: str`
@@ -89,8 +93,8 @@ Core pass criteria:
 Notes:
 
 - canonical registration entrypoint is `src/flows/worker_runtime/flow.py:run_worker_job_flow`
-- remote and local E2E scripts accept custom deployment targets
-- dummy-engine validation may use `dummy-engine-job/discoverex-engine-run`
+- canonical E2E validation target is `e2e-job/e2e-test`
+- remote and local E2E scripts accept custom deployment targets when explicitly overridden
 
 MLflow pass criteria:
 
