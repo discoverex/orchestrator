@@ -80,16 +80,16 @@ if [[ -z "${REGISTER_FLOW_SOURCE}" ]]; then
 fi
 if [[ "${RUN_MODE}" == "dummy" ]]; then
   if [[ -z "${REGISTER_FLOW_ENTRYPOINT}" ]]; then
-    REGISTER_FLOW_ENTRYPOINT="tests/fixtures/dummy_engine_repo/src/dummy_engine/prefect_flow.py:dummy_engine_flow"
+    REGISTER_FLOW_ENTRYPOINT="src/flows/worker_runtime/flow.py:run_worker_job_flow"
   fi
   if [[ -z "${REGISTER_FIXED_DEPLOYMENT_NAME}" ]]; then
-    REGISTER_FIXED_DEPLOYMENT_NAME="discoverex-engine-run"
+    REGISTER_FIXED_DEPLOYMENT_NAME="e2e-test"
   fi
   if [[ -z "${REGISTER_COLAB_DEPLOYMENT_NAME}" ]]; then
-    REGISTER_COLAB_DEPLOYMENT_NAME="discoverex-engine-run-colab"
+    REGISTER_COLAB_DEPLOYMENT_NAME="e2e-test-colab"
   fi
   if [[ -z "${TARGET_DEPLOYMENT_NAME}" ]]; then
-    TARGET_DEPLOYMENT_NAME="dummy-engine-job/${REGISTER_FIXED_DEPLOYMENT_NAME}"
+    TARGET_DEPLOYMENT_NAME="e2e-job/${REGISTER_FIXED_DEPLOYMENT_NAME}"
   fi
 else
   if [[ -z "${REGISTER_FLOW_ENTRYPOINT}" ]]; then
@@ -131,7 +131,7 @@ must_step "engine.build_job_spec" build_engine_job_spec
 must_step "build.base_register_worker_images" docker compose -f "${LOCAL_TEST_COMPOSE}" build base-runtime register worker
 must_step "prefect.ensure_work_pool" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e WORK_POOL='${PREFECT_WORK_POOL}' prefecthq/prefect:3-latest sh -lc 'prefect work-pool inspect \"\$WORK_POOL\" >/dev/null 2>&1 || prefect work-pool create \"\$WORK_POOL\" --type process'"
 must_step "register.apply_deployment" bash -lc "run_register_compose() { if [[ -f '${REGISTER_ENV}' ]]; then docker compose --env-file '${REGISTER_ENV}' -f '${REGISTER_COMPOSE}' \"\$@\"; else docker compose -f '${REGISTER_COMPOSE}' \"\$@\"; fi; }; run_register_compose run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e PREFECT_WORK_POOL='${PREFECT_WORK_POOL}' -e PREFECT_WORK_QUEUE='${PREFECT_WORK_QUEUE}' -e REGISTER_FLOW_SOURCE='${REGISTER_FLOW_SOURCE}' -e REGISTER_FLOW_ENTRYPOINT='${REGISTER_FLOW_ENTRYPOINT}' -e REGISTER_FIXED_DEPLOYMENT_NAME='${REGISTER_FIXED_DEPLOYMENT_NAME}' -e REGISTER_COLAB_DEPLOYMENT_NAME='${REGISTER_COLAB_DEPLOYMENT_NAME}' register"
-must_step "register.verify_deployment" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' prefecthq/prefect:3-latest prefect deployment ls | grep -F -q '${TARGET_DEPLOYMENT_NAME}'"
+must_step "register.verify_deployment" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' prefecthq/prefect:3-latest prefect deployment inspect '${TARGET_DEPLOYMENT_NAME}' >/dev/null"
 
 if [[ "${REGISTER_ONLY}" == "true" ]]; then
   record_step "register.only" "pass" "stopped after register verification"

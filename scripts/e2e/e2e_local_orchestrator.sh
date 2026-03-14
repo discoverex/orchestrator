@@ -68,7 +68,7 @@ must_step "prefect.ensure_work_pool" bash -lc "docker compose -p '${LOCAL_PROJEC
 
 run_step "build.register_image" compose_local build register
 run_step "register.apply_deployment" compose_local run --rm register
-must_step "register.verify_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls | grep -F -q '${TARGET_DEPLOYMENT_NAME}'"
+must_step "register.verify_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment inspect '${TARGET_DEPLOYMENT_NAME}' >/dev/null"
 
 if [[ "${MODE}" == "mlflow" ]]; then
   cp scripts/e2e/fixed_dummy_inline_job.json "${LOG_DIR}/job-spec.json"
