@@ -31,7 +31,7 @@ def test_router_diverts_when_fixed_running(monkeypatch: pytest.MonkeyPatch) -> N
     )
 
     out = capture_json_stdout(mod.main)
-    assert out["selected_deployment"] == "e2e-test-colab"
+    assert out["selected_deployment"] == "e2e-job/e2e-test-colab"
     assert out["reason"] == "running-diverted-to-secondary"
 
 
@@ -53,7 +53,7 @@ def test_router_strict_priority_keeps_preferred(
     )
 
     out = capture_json_stdout(mod.main)
-    assert out["selected_deployment"] == "e2e-test"
+    assert out["selected_deployment"] == "e2e-job/e2e-test"
     assert out["reason"] == "strict-priority-selected-preferred"
 
 
@@ -110,3 +110,37 @@ def test_router_uses_new_default_deployment_names(
 
     out = capture_json_stdout(mod.main)
     assert out["selected_deployment"] == "e2e-job/e2e-test"
+
+
+def test_router_builds_default_fqn_from_flow_and_deployment_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mod = load_router_module()
+    monkeypatch.delenv("ROUTER_FIXED_DEPLOYMENT", raising=False)
+    monkeypatch.delenv("ROUTER_COLAB_DEPLOYMENT", raising=False)
+    monkeypatch.setenv("ROUTER_FLOW_NAME", "dummy-engine-job")
+    monkeypatch.setenv("ROUTER_FIXED_DEPLOYMENT_NAME", "discoverex-engine-run")
+    monkeypatch.setenv("ROUTER_COLAB_DEPLOYMENT_NAME", "discoverex-engine-run-colab")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "prefect_submit_router.py",
+            "--job-spec-json",
+            '{"run_mode":"inline","engine":"shell","entrypoint":["ls"]}',
+        ],
+    )
+    monkeypatch.setattr(mod, "scheduled_count_for_queue", lambda q: 0)
+    monkeypatch.setattr(mod, "running_count_for_queue", lambda q: 0)
+    monkeypatch.setattr(mod, "find_deployment_id", lambda d: f"id-{d}")
+    monkeypatch.setattr(
+        mod,
+        "create_flow_run",
+        lambda dep_id, params, flow_run_name=None: {
+            "id": "run-env-defaults",
+            "name": "gen",
+        },
+    )
+
+    out = capture_json_stdout(mod.main)
+    assert out["selected_deployment"] == "dummy-engine-job/discoverex-engine-run"

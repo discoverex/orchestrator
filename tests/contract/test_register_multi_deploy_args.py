@@ -25,7 +25,7 @@ def test_parse_args_uses_expected_defaults(monkeypatch: pytest.MonkeyPatch) -> N
     assert args.compat_colab_queue == "gpu-colab"
     assert args.register_compat_aliases is True
     assert args.flow_source == register.DEFAULT_FLOW_SOURCE
-    assert args.flow_entrypoint == register.DEFAULT_WRAPPER_ENTRYPOINT
+    assert args.flow_entrypoint == register.DEFAULT_RUNTIME_ENTRYPOINT
     assert args.version is None
 
 

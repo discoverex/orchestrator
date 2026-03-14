@@ -85,7 +85,7 @@ def test_single_mode_registers_compat_deployment(
             compat_colab_queue="compat-colab-queue",
             register_compat_aliases=True,
             flow_source=".",
-            flow_entrypoint="src/flows/engine_run_flow.py:engine_run_flow",
+            flow_entrypoint="src/flows/worker_runtime/flow.py:run_worker_job_flow",
             version="v1",
         ),
     )
