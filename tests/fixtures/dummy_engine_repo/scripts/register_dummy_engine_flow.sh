@@ -14,7 +14,7 @@ eval "$(
 exec uv run python -m deployments.register \
   --pool "${PREFECT_WORK_POOL:-gpu-pool}" \
   --flow-source "${ENGINE_SOURCE}" \
-  --flow-entrypoint "tests/fixtures/dummy_engine_repo/src/dummy_engine/prefect_flow.py:run_job_flow" \
+  --flow-entrypoint "tests/fixtures/dummy_engine_repo/src/dummy_engine/prefect_flow.py:dummy_engine_flow" \
   --fixed-name "${REGISTER_FIXED_DEPLOYMENT_NAME:-discoverex-engine-run}" \
   --fixed-queue "${REGISTER_FIXED_DEPLOYMENT_QUEUE:-gpu-fixed}" \
   --colab-name "${REGISTER_COLAB_DEPLOYMENT_NAME:-discoverex-engine-run-colab}" \

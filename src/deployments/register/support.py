@@ -5,10 +5,16 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from common.prefect.deployment_targets import (
+    DEFAULT_COLAB_DEPLOYMENT_NAME,
+    DEFAULT_FIXED_DEPLOYMENT_NAME,
+)
+
 DEFAULT_FLOW_SOURCE = str(Path.cwd())
-DEFAULT_WRAPPER_ENTRYPOINT = "src/flows/engine_run/flow.py:run_job_flow"
-DEFAULT_FIXED_DEPLOYMENT = "e2e-test"
-DEFAULT_COLAB_DEPLOYMENT = "e2e-test-colab"
+DEFAULT_RUNTIME_ENTRYPOINT = "src/flows/worker_runtime/flow.py:run_worker_job_flow"
+DEFAULT_WRAPPER_ENTRYPOINT = DEFAULT_RUNTIME_ENTRYPOINT
+DEFAULT_FIXED_DEPLOYMENT = DEFAULT_FIXED_DEPLOYMENT_NAME
+DEFAULT_COLAB_DEPLOYMENT = DEFAULT_COLAB_DEPLOYMENT_NAME
 DEFAULT_COMPAT_FIXED_DEPLOYMENT = "e2e-test-legacy"
 DEFAULT_COMPAT_COLAB_DEPLOYMENT = "e2e-test-colab-legacy"
 
@@ -135,7 +141,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--flow-entrypoint",
-        default=DEFAULT_WRAPPER_ENTRYPOINT,
+        default=DEFAULT_RUNTIME_ENTRYPOINT,
         help="Flow entrypoint passed to Prefect flow.from_source()",
     )
     parser.add_argument("--version", default=None, help="Deployment version")

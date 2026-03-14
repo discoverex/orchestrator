@@ -42,6 +42,8 @@ ENGINE_MLFLOW_TRACKING_URI="${ENGINE_MLFLOW_TRACKING_URI:-http://mlflow:5000}"
 ENGINE_MLFLOW_S3_ENDPOINT_URL="${ENGINE_MLFLOW_S3_ENDPOINT_URL:-http://minio:9000}"
 ENGINE_AWS_ACCESS_KEY_ID="${ENGINE_AWS_ACCESS_KEY_ID:-minioadmin}"
 ENGINE_AWS_SECRET_ACCESS_KEY="${ENGINE_AWS_SECRET_ACCESS_KEY:-minioadmin}"
+REGISTER_FIXED_DEPLOYMENT_NAME="${REGISTER_FIXED_DEPLOYMENT_NAME:-e2e-test}"
+TARGET_DEPLOYMENT_NAME="${TARGET_DEPLOYMENT_NAME:-e2e-job/${REGISTER_FIXED_DEPLOYMENT_NAME}}"
 export PREFECT_API_URL PREFECT_WORK_POOL STORAGE_API_URL ARTIFACT_BUCKET ENGINE_LOCAL_REPO_PATH_HOST
 
 FLOW_RUN_ID=""; MLFLOW_RUN_ID=""
@@ -66,7 +68,7 @@ must_step "prefect.ensure_work_pool" bash -lc "docker compose -p '${LOCAL_PROJEC
 
 run_step "build.register_image" compose_local build register
 run_step "register.apply_deployment" compose_local run --rm register
-must_step "register.verify_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls | grep -q 'e2e-job/e2e-test'"
+must_step "register.verify_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment ls | grep -F -q '${TARGET_DEPLOYMENT_NAME}'"
 
 if [[ "${MODE}" == "mlflow" ]]; then
   cp scripts/e2e/fixed_dummy_inline_job.json "${LOG_DIR}/job-spec.json"

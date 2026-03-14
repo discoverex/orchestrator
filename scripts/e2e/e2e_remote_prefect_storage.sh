@@ -41,6 +41,11 @@ ENGINE_MLFLOW_TRACKING_URI="${ENGINE_MLFLOW_TRACKING_URI:-${MLFLOW_TRACKING_URI:
 ENGINE_MLFLOW_S3_ENDPOINT_URL="${ENGINE_MLFLOW_S3_ENDPOINT_URL:-${MLFLOW_S3_ENDPOINT_URL:-}}"
 ENGINE_AWS_ACCESS_KEY_ID="${ENGINE_AWS_ACCESS_KEY_ID:-${MINIO_ACCESS_KEY:-}}"
 ENGINE_AWS_SECRET_ACCESS_KEY="${ENGINE_AWS_SECRET_ACCESS_KEY:-${MINIO_SECRET_KEY:-}}"
+REGISTER_FLOW_SOURCE="${REGISTER_FLOW_SOURCE:-}"
+REGISTER_FLOW_ENTRYPOINT="${REGISTER_FLOW_ENTRYPOINT:-}"
+REGISTER_FIXED_DEPLOYMENT_NAME="${REGISTER_FIXED_DEPLOYMENT_NAME:-}"
+REGISTER_COLAB_DEPLOYMENT_NAME="${REGISTER_COLAB_DEPLOYMENT_NAME:-}"
+TARGET_DEPLOYMENT_NAME="${TARGET_DEPLOYMENT_NAME:-}"
 MLFLOW_RUN_ID=""
 
 ENGINE_REPO_URL="$(normalize_public_git_url "${ENGINE_REPO_URL}")"
@@ -59,6 +64,7 @@ while [[ $# -gt 0 ]]; do
     --mode) RUN_MODE="${2:-}"; shift 2 ;;
     --job-spec-json) JOB_SPEC_JSON="${2:-}"; shift 2 ;;
     --job-spec-file) JOB_SPEC_FILE="${2:-}"; shift 2 ;;
+    --deployment-name) TARGET_DEPLOYMENT_NAME="${2:-}"; shift 2 ;;
     --prune-mode) PRUNE_MODE="${2:-}"; shift 2 ;;
     --prune-ttl-hours) PRUNE_TTL_HOURS="${2:-}"; shift 2 ;;
     --register-only) REGISTER_ONLY="true"; shift ;;
@@ -68,6 +74,37 @@ while [[ $# -gt 0 ]]; do
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+
+if [[ -z "${REGISTER_FLOW_SOURCE}" ]]; then
+  REGISTER_FLOW_SOURCE="/app"
+fi
+if [[ "${RUN_MODE}" == "dummy" ]]; then
+  if [[ -z "${REGISTER_FLOW_ENTRYPOINT}" ]]; then
+    REGISTER_FLOW_ENTRYPOINT="tests/fixtures/dummy_engine_repo/src/dummy_engine/prefect_flow.py:dummy_engine_flow"
+  fi
+  if [[ -z "${REGISTER_FIXED_DEPLOYMENT_NAME}" ]]; then
+    REGISTER_FIXED_DEPLOYMENT_NAME="discoverex-engine-run"
+  fi
+  if [[ -z "${REGISTER_COLAB_DEPLOYMENT_NAME}" ]]; then
+    REGISTER_COLAB_DEPLOYMENT_NAME="discoverex-engine-run-colab"
+  fi
+  if [[ -z "${TARGET_DEPLOYMENT_NAME}" ]]; then
+    TARGET_DEPLOYMENT_NAME="dummy-engine-job/${REGISTER_FIXED_DEPLOYMENT_NAME}"
+  fi
+else
+  if [[ -z "${REGISTER_FLOW_ENTRYPOINT}" ]]; then
+    REGISTER_FLOW_ENTRYPOINT="src/flows/worker_runtime/flow.py:run_worker_job_flow"
+  fi
+  if [[ -z "${REGISTER_FIXED_DEPLOYMENT_NAME}" ]]; then
+    REGISTER_FIXED_DEPLOYMENT_NAME="e2e-test"
+  fi
+  if [[ -z "${REGISTER_COLAB_DEPLOYMENT_NAME}" ]]; then
+    REGISTER_COLAB_DEPLOYMENT_NAME="e2e-test-colab"
+  fi
+  if [[ -z "${TARGET_DEPLOYMENT_NAME}" ]]; then
+    TARGET_DEPLOYMENT_NAME="e2e-job/${REGISTER_FIXED_DEPLOYMENT_NAME}"
+  fi
+fi
 
 [[ -z "${PREFECT_API_URL}" ]] && { echo "missing Prefect API URL" >&2; exit 2; }
 STAMP="$(date +%Y%m%d-%H%M%S)"; SUITE_NAME="e2e_remote_prefect_storage"
@@ -93,8 +130,8 @@ must_step "preflight.storage_api_health" curl -fsS -H "CF-Access-Client-Id: ${CF
 must_step "engine.build_job_spec" build_engine_job_spec
 must_step "build.base_register_worker_images" docker compose -f "${LOCAL_TEST_COMPOSE}" build base-runtime register worker
 must_step "prefect.ensure_work_pool" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e WORK_POOL='${PREFECT_WORK_POOL}' prefecthq/prefect:3-latest sh -lc 'prefect work-pool inspect \"\$WORK_POOL\" >/dev/null 2>&1 || prefect work-pool create \"\$WORK_POOL\" --type process'"
-must_step "register.apply_deployment" bash -lc "run_register_compose() { if [[ -f '${REGISTER_ENV}' ]]; then docker compose --env-file '${REGISTER_ENV}' -f '${REGISTER_COMPOSE}' \"\$@\"; else docker compose -f '${REGISTER_COMPOSE}' \"\$@\"; fi; }; run_register_compose run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e PREFECT_WORK_POOL='${PREFECT_WORK_POOL}' -e PREFECT_WORK_QUEUE='${PREFECT_WORK_QUEUE}' register"
-must_step "register.verify_deployment" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' prefecthq/prefect:3-latest prefect deployment ls | grep -q 'e2e-job/e2e-test'"
+must_step "register.apply_deployment" bash -lc "run_register_compose() { if [[ -f '${REGISTER_ENV}' ]]; then docker compose --env-file '${REGISTER_ENV}' -f '${REGISTER_COMPOSE}' \"\$@\"; else docker compose -f '${REGISTER_COMPOSE}' \"\$@\"; fi; }; run_register_compose run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e PREFECT_WORK_POOL='${PREFECT_WORK_POOL}' -e PREFECT_WORK_QUEUE='${PREFECT_WORK_QUEUE}' -e REGISTER_FLOW_SOURCE='${REGISTER_FLOW_SOURCE}' -e REGISTER_FLOW_ENTRYPOINT='${REGISTER_FLOW_ENTRYPOINT}' -e REGISTER_FIXED_DEPLOYMENT_NAME='${REGISTER_FIXED_DEPLOYMENT_NAME}' -e REGISTER_COLAB_DEPLOYMENT_NAME='${REGISTER_COLAB_DEPLOYMENT_NAME}' register"
+must_step "register.verify_deployment" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' prefecthq/prefect:3-latest prefect deployment ls | grep -F -q '${TARGET_DEPLOYMENT_NAME}'"
 
 if [[ "${REGISTER_ONLY}" == "true" ]]; then
   record_step "register.only" "pass" "stopped after register verification"
@@ -108,7 +145,7 @@ else
 fi
 
 JOB_SPEC_JSON_B64="$(base64 -w0 <"${LOG_DIR}/job-spec.json")"
-must_step "prefect.submit_flow_run" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e JOB_SPEC_JSON_B64='${JOB_SPEC_JSON_B64}' prefecthq/prefect:3-latest sh -lc 'JOB_SPEC_JSON=\"\$(printf %s \"\$JOB_SPEC_JSON_B64\" | base64 -d)\" && prefect deployment run \"e2e-job/e2e-test\" -p \"job_spec_json=\$JOB_SPEC_JSON\"' > '${LOG_DIR}/prefect-submit.log'"
+must_step "prefect.submit_flow_run" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e JOB_SPEC_JSON_B64='${JOB_SPEC_JSON_B64}' prefecthq/prefect:3-latest sh -lc 'JOB_SPEC_JSON=\"\$(printf %s \"\$JOB_SPEC_JSON_B64\" | base64 -d)\" && prefect deployment run \"${TARGET_DEPLOYMENT_NAME}\" -p \"job_spec_json=\$JOB_SPEC_JSON\"' > '${LOG_DIR}/prefect-submit.log'"
 FLOW_RUN_ID="$(grep -Eo '[0-9a-fA-F-]{36}' "${LOG_DIR}/prefect-submit.log" | head -n1 || true)"
 if [[ -z "${FLOW_RUN_ID}" ]]; then
   record_step "prefect.extract_flow_run_id" "fail" "unable to parse flow run id"
