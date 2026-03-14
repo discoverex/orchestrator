@@ -92,7 +92,7 @@ The repo must expose a Prefect flow callable that can be referenced as:
 Examples:
 
 - `src/flows/my_engine_flow.py:my_engine_flow`
-- `engine/prefect_flow.py:run_job_flow`
+- `engine/prefect_flow.py:dummy_engine_flow`
 
 The orchestrator registrar passes this value as `REGISTER_FLOW_ENTRYPOINT`.
 
@@ -111,7 +111,7 @@ The orchestrator registrar passes this value as `REGISTER_FLOW_SOURCE`.
 
 ### 2.3 Compatible flow signature
 
-If the engine flow is intended to replace the current compatibility wrapper
+If the engine flow is intended to match the current common worker-runtime contract
 without changing submitters, its live Prefect flow signature must accept:
 
 - `job_spec_json`
@@ -120,7 +120,7 @@ without changing submitters, its live Prefect flow signature must accept:
 
 Current compatible reference:
 
-- [src/flows/engine_run/flow.py](../../../src/flows/engine_run/flow.py)
+- [src/flows/worker_runtime/flow.py](../../../src/flows/worker_runtime/flow.py)
 
 Contract rule:
 

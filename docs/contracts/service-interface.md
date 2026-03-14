@@ -4,7 +4,11 @@ This document summarizes the contracts between the main services.
 
 ## 1) Prefect Deployment Contract
 
-Standard default names:
+Canonical registration entrypoint:
+
+- [src/flows/worker_runtime/flow.py](../../src/flows/worker_runtime/flow.py)
+
+Standard default targets:
 
 - primary fixed: `e2e-job/e2e-test`
 - primary colab: `e2e-job/e2e-test-colab`
@@ -12,7 +16,12 @@ Standard default names:
   - `e2e-job/e2e-test-legacy`
   - `e2e-job/e2e-test-legacy-colab`
 
-Note: The flow name (`e2e-job`) and deployment names are defaults and can be customized during registration.
+Engine-owned example target:
+
+- dummy engine fixed: `dummy-engine-job/discoverex-engine-run`
+
+Note: These are operating defaults, not hard requirements. Registration,
+observability, routing, and E2E tools accept custom flow/deployment targets.
 
 Current flow parameters:
 

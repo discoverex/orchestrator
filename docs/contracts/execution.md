@@ -76,16 +76,21 @@ The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the or
 
 Core pass criteria:
 
-1. `e2e-job/e2e-test` deployment exists after register (default name).
+1. The expected deployment target exists after register.
+   Default target is `e2e-job/e2e-test` for the common worker runtime.
 2. Submitted flow run reaches `COMPLETED`.
 3. All required objects exist:
-...
-Note: `e2e-job/e2e-test` is the standard default, but both the flow name and the deployment name can be customized via the registrar and passed to observability tools.
    - `stdout.log`
    - `stderr.log`
    - `result.json`
    - `artifacts.json`
 4. `artifacts.json` metadata matches expected `flow_run_id`, `attempt`, and object URIs.
+
+Notes:
+
+- canonical registration entrypoint is `src/flows/worker_runtime/flow.py:run_worker_job_flow`
+- remote and local E2E scripts accept custom deployment targets
+- dummy-engine validation may use `dummy-engine-job/discoverex-engine-run`
 
 MLflow pass criteria:
 

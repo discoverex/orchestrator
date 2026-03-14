@@ -128,6 +128,7 @@ Behavior:
 - uses `infra/stacks/register/.env` and `infra/stacks/register/docker-compose.yml`
 - `run` executes `docker compose run --rm register`
 - `build` builds the shared base image first
+- default registration entrypoint is `src/flows/worker_runtime/flow.py:run_worker_job_flow`
 
 ### `worker`
 
@@ -220,6 +221,7 @@ Options:
 Behavior:
 
 - creates a flow run with inline fixed-dummy job spec
+- default target is the standard worker-runtime deployment FQN; pass `--deployment-name` for engine-owned targets such as `dummy-engine-job/discoverex-engine-run`
 - prints JSON response for the created run
 
 ### `prefect`
