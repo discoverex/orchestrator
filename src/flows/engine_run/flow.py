@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -26,8 +27,15 @@ from flows.engine_run.task.main import (
     upload_outputs_task,
 )
 from flows.job_spec import parse_job_spec_json
-from prefect import flow
+from prefect import flow, get_run_logger
 from runner import cleanup_workdir
+
+
+def _flow_logger() -> logging.Logger:
+    try:
+        return get_run_logger()
+    except Exception:
+        return logging.getLogger("flows.engine_run.flow")
 
 
 def _flow_attempt() -> int:
@@ -46,6 +54,7 @@ def run_job_flow(
     resume_key: str | None = None,
     checkpoint_dir: str | None = None,
 ) -> FlowResult:
+    logger = _flow_logger()
     run_id = flow_run.get_id() or "unknown-flow-run"
     if isinstance(job_spec_json, dict):
         import json
@@ -54,6 +63,17 @@ def run_job_flow(
     else:
         job_spec_raw = job_spec_json
     job = parse_job_spec_json(job_spec_raw)
+    logger.info(
+        "run_job_flow started",
+        extra={
+            "flow_run_id": run_id,
+            "engine": job.engine,
+            "run_mode": job.run_mode,
+            "repo_url": job.repo_url or "",
+            "ref": job.ref or "",
+            "job_name": job.job_name or "",
+        },
+    )
     active_resume_key = resume_key or run_id
     checkpoint_path = resolve_checkpoint_path(
         checkpoint_dir=checkpoint_dir or os.getenv("ORCHESTRATOR_CHECKPOINT_DIR"),
@@ -71,6 +91,15 @@ def run_job_flow(
     else:
         state = dataclasses.replace(state, attempt=attempt)
     save_checkpoint(checkpoint_path, state)
+    logger.info(
+        "checkpoint state loaded",
+        extra={
+            "flow_run_id": run_id,
+            "attempt": attempt,
+            "checkpoint_path": str(checkpoint_path),
+            "resume_key": active_resume_key,
+        },
+    )
 
     if job.run_mode == "inline":
         resolved_commit = "inline"
@@ -83,6 +112,15 @@ def run_job_flow(
         if not job.repo_url or not job.ref:
             raise RuntimeError("repo_url/ref required for run_mode=repo")
         resolved_commit = resolve_commit_task(job.repo_url, job.ref)
+        logger.info(
+            "resolved commit for job",
+            extra={
+                "flow_run_id": run_id,
+                "repo_url": job.repo_url,
+                "ref": job.ref,
+                "resolved_commit": resolved_commit,
+            },
+        )
         state = dataclasses.replace(state, resolved_commit=resolved_commit)
         state = state.mark_step("resolve_commit")
         save_checkpoint(checkpoint_path, state)
@@ -115,6 +153,15 @@ def run_job_flow(
             outputs_prefix=effective_outputs_prefix,
             job_name=job.job_name,
         )
+        logger.info(
+            "entrypoint execution finished",
+            extra={
+                "flow_run_id": run_id,
+                "attempt": attempt,
+                "exit_code": exit_code,
+                "workdir": local_paths.get("workdir", ""),
+            },
+        )
         state = dataclasses.replace(state, local_paths=local_paths, exit_code=exit_code)
         state = state.mark_step("run_entrypoint")
         new_steps = dict(state.steps)
@@ -137,6 +184,14 @@ def run_job_flow(
             attempt,
             already_uploaded=state.uploaded,
         )
+        logger.info(
+            "core output upload finished",
+            extra={
+                "flow_run_id": run_id,
+                "attempt": attempt,
+                "uploaded_keys": sorted(uploaded.keys()),
+            },
+        )
         state = dataclasses.replace(state, uploaded=uploaded)
         for key in ("stdout", "stderr", "result", "manifest"):
             if key in uploaded:
@@ -158,6 +213,15 @@ def run_job_flow(
             )
             engine_uploaded = engine_upload.artifact_uris
             engine_manifest_uri = engine_upload.engine_manifest_uri
+            logger.info(
+                "engine artifact upload finished",
+                extra={
+                    "flow_run_id": run_id,
+                    "attempt": attempt,
+                    "engine_manifest_uri": engine_manifest_uri or "",
+                    "engine_artifact_count": len(engine_uploaded),
+                },
+            )
             state = dataclasses.replace(
                 state,
                 engine_uploaded=engine_uploaded,
@@ -180,8 +244,12 @@ def run_job_flow(
             cleanup_workdir(workdir)
             state = state.mark_step("cleanup")
             save_checkpoint(checkpoint_path, state)
+            logger.info(
+                "workdir cleanup finished",
+                extra={"flow_run_id": run_id, "workdir": str(workdir)},
+            )
 
-    return build_flow_result(
+    result = build_flow_result(
         flow_run_id=run_id,
         attempt=attempt,
         engine=job.engine,
@@ -194,6 +262,16 @@ def run_job_flow(
         engine_uploaded=engine_uploaded,
         exit_code=exit_code,
     )
+    logger.info(
+        "run_job_flow finished",
+        extra={
+            "flow_run_id": run_id,
+            "attempt": attempt,
+            "exit_code": exit_code,
+            "resolved_commit": resolved_commit,
+        },
+    )
+    return result
 
 
 engine_run_flow = run_job_flow

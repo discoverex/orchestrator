@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shutil
@@ -10,6 +11,7 @@ from urllib.parse import unquote, urlsplit
 
 _SHA1 = re.compile(r"^[0-9a-f]{40}$")
 _GITHUB_SSH = re.compile(r"^git@github\.com:(?P<repo>.+?)(?:\.git)?$")
+logger = logging.getLogger("runner.git.repo")
 
 
 class RunnerError(RuntimeError):
@@ -17,8 +19,19 @@ class RunnerError(RuntimeError):
 
 
 def run_command(cmd: list[str], cwd: Path | None = None) -> str:
+    logger.info("running git command", extra={"cmd": cmd, "cwd": str(cwd or "")})
     proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
     if proc.returncode != 0:
+        logger.error(
+            "git command failed",
+            extra={
+                "cmd": cmd,
+                "cwd": str(cwd or ""),
+                "returncode": proc.returncode,
+                "stdout": proc.stdout.strip(),
+                "stderr": proc.stderr.strip(),
+            },
+        )
         raise RunnerError(f"command failed: {' '.join(cmd)}\n{proc.stderr.strip()}")
     return proc.stdout.strip()
 
@@ -62,8 +75,10 @@ def checkout_target(ref: str | None, resolved_commit: str) -> str:
 
 
 def resolve_commit(repo_url: str, ref: str) -> str:
+    logger.info("resolving commit", extra={"repo_url": repo_url, "ref": ref})
     candidate = ref.strip().lower()
     if _SHA1.match(candidate):
+        logger.info("ref already resolved sha", extra={"ref": ref})
         return candidate
     normalized = normalized_repo_url(repo_url)
     local_repo = local_repo_path(normalized)
@@ -99,7 +114,21 @@ def prepare_cached_repo(repo_url: str, ref: str | None, resolved_commit: str) ->
     clone_source = (
         local_repo.resolve().as_uri() if local_repo is not None else normalized
     )
+    logger.info(
+        "preparing cached repo",
+        extra={
+            "repo_url": repo_url,
+            "normalized_repo_url": normalized,
+            "ref": ref or "",
+            "resolved_commit": resolved_commit,
+            "cache_root": str(cache_root),
+            "cache_repo": str(cache_repo),
+            "clone_source": clone_source,
+            "cache_exists": cache_repo.exists(),
+        },
+    )
     if (cache_repo / ".git").exists():
+        logger.info("reusing cached repo", extra={"cache_repo": str(cache_repo)})
         run_command(["git", "fetch", "--all", "--tags", "--prune"], cwd=cache_repo)
     else:
         if cache_repo.exists():
@@ -110,7 +139,12 @@ def prepare_cached_repo(repo_url: str, ref: str | None, resolved_commit: str) ->
         clone_cmd.extend(["clone", "--filter=blob:none", clone_source, str(cache_repo)])
         run_command(clone_cmd)
     target = checkout_target(ref, resolved_commit)
+    logger.info(
+        "checking out cached repo target",
+        extra={"cache_repo": str(cache_repo), "target": target},
+    )
     run_command(["git", "checkout", target], cwd=cache_repo)
     run_command(["git", "reset", "--hard"], cwd=cache_repo)
     run_command(["git", "clean", "-fdx"], cwd=cache_repo)
+    logger.info("cached repo ready", extra={"cache_repo": str(cache_repo)})
     return cache_repo

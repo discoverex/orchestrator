@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -18,16 +19,48 @@ from runner.adapters.outbound.git.repo import (
 from runner.adapters.outbound.mlflow.proxy import maybe_start_mlflow_proxy
 from runner.domain.models import RunArtifacts
 
+logger = logging.getLogger("runner.entrypoint")
+
+
+def _env_summary(env: dict[str, str]) -> dict[str, str]:
+    summary: dict[str, str] = {}
+    for key in (
+        "ORCH_ENGINE",
+        "ORCH_RUN_MODE",
+        "ORCH_FLOW_RUN_ID",
+        "ORCH_ATTEMPT",
+        "ORCH_OUTPUTS_PREFIX",
+        "ORCH_RESOLVED_COMMIT",
+        "ORCH_JOB_NAME",
+        "ORCH_JOB_CONFIG_PATH",
+        "ORCH_ENGINE_ARTIFACT_DIR",
+        "ORCH_ENGINE_ARTIFACT_MANIFEST_PATH",
+        "MLFLOW_TRACKING_URI",
+        "STORAGE_API_URL",
+    ):
+        value = env.get(key)
+        if value:
+            summary[key] = value
+    return summary
+
 
 def prepare_per_repo_venv(workdir: Path, merged_env: dict[str, str]) -> None:
     uv_bin = shutil.which("uv")
     if not uv_bin:
+        logger.info(
+            "uv not found; skipping per-repo venv",
+            extra={"workdir": str(workdir)},
+        )
         return
 
     venv_dir = workdir / ".venv"
     merged_env["UV_PROJECT_ENVIRONMENT"] = str(venv_dir)
     merged_env["PATH"] = f"{venv_dir / 'bin'}:{merged_env.get('PATH', '')}"
     if not (workdir / "pyproject.toml").exists():
+        logger.info(
+            "pyproject missing; skipping per-repo venv sync",
+            extra={"workdir": str(workdir)},
+        )
         return
 
     sync_cmd = (
@@ -39,9 +72,22 @@ def prepare_per_repo_venv(workdir: Path, merged_env: dict[str, str]) -> None:
         sync_cmd, cwd=workdir, env=merged_env, capture_output=True, text=True
     )
     if proc.returncode != 0:
+        logger.error(
+            "per-repo venv sync failed",
+            extra={
+                "workdir": str(workdir),
+                "cmd": sync_cmd,
+                "stdout": proc.stdout.strip(),
+                "stderr": proc.stderr.strip(),
+            },
+        )
         raise RunnerError(
             f"venv setup failed: {' '.join(sync_cmd)}\n{proc.stderr.strip()}"
         )
+    logger.info(
+        "per-repo venv ready",
+        extra={"workdir": str(workdir), "cmd": sync_cmd, "venv_dir": str(venv_dir)},
+    )
 
 
 def run_entrypoint(
@@ -61,11 +107,29 @@ def run_entrypoint(
     job_name: str | None = None,
 ) -> RunArtifacts:
     workdir = Path(mkdtemp(prefix="orchestrator-run-"))
+    logger.info(
+        "starting entrypoint run",
+        extra={
+            "workdir": str(workdir),
+            "run_mode": run_mode,
+            "engine": engine,
+            "repo_url": repo_url or "",
+            "ref": ref or "",
+            "resolved_commit": resolved_commit or "",
+            "attempt": attempt,
+            "flow_run_id": flow_run_id,
+            "job_name": job_name or "",
+        },
+    )
     if run_mode == "repo":
         if not repo_url or not ref or not resolved_commit:
             raise RunnerError(
                 "repo_url/ref/resolved_commit are required when run_mode=repo"
             )
+        logger.info(
+            "preparing repo-backed workdir",
+            extra={"workdir": str(workdir), "repo_url": repo_url, "ref": ref},
+        )
         cached_repo = prepare_cached_repo(repo_url, ref, resolved_commit)
         run_command(["git", "clone", "--no-checkout", str(cached_repo), str(workdir)])
         run_command(
@@ -101,6 +165,14 @@ def run_entrypoint(
         engine_artifact_dir=engine_artifact_dir,
         engine_artifact_manifest_path=engine_artifact_manifest_path,
     )
+    logger.info(
+        "runtime environment prepared",
+        extra={
+            "workdir": str(workdir),
+            "env": _env_summary(merged_env),
+            "entrypoint": entrypoint,
+        },
+    )
     with maybe_start_mlflow_proxy(merged_env) as child_env:
         if run_mode == "repo":
             prepare_per_repo_venv(workdir, child_env)
@@ -108,6 +180,10 @@ def run_entrypoint(
             stdout_path.open("w", encoding="utf-8") as stdout_f,
             stderr_path.open("w", encoding="utf-8") as stderr_f,
         ):
+            logger.info(
+                "launching child entrypoint",
+                extra={"workdir": str(workdir), "entrypoint": entrypoint},
+            )
             proc = subprocess.run(
                 entrypoint,
                 cwd=workdir,
@@ -116,6 +192,17 @@ def run_entrypoint(
                 stderr=stderr_f,
                 text=True,
             )
+    logger.info(
+        "child entrypoint finished",
+        extra={
+            "workdir": str(workdir),
+            "entrypoint": entrypoint,
+            "exit_code": proc.returncode,
+            "stdout_path": str(stdout_path),
+            "stderr_path": str(stderr_path),
+            "result_path": str(result_path),
+        },
+    )
 
     result_path.write_text(
         json.dumps(
@@ -124,6 +211,10 @@ def run_entrypoint(
                 "resolved_commit": resolved_commit,
                 "run_mode": run_mode,
                 "entrypoint": entrypoint,
+                "workdir": str(workdir),
+                "stdout_path": str(stdout_path),
+                "stderr_path": str(stderr_path),
+                "env_summary": _env_summary(merged_env),
             },
             ensure_ascii=True,
             indent=2,
@@ -142,6 +233,7 @@ def run_entrypoint(
 
 
 def cleanup_workdir(path: Path) -> None:
+    logger.info("cleaning up workdir", extra={"workdir": str(path)})
     shutil.rmtree(path, ignore_errors=True)
 
 

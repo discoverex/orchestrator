@@ -25,7 +25,14 @@ def _get_task_logger() -> logging.Logger:
 
 @task
 def resolve_commit_task(repo_url: str, ref: str) -> str:
-    return resolve_commit(repo_url, ref)
+    logger = _get_task_logger()
+    logger.info("resolve_commit_task started", extra={"repo_url": repo_url, "ref": ref})
+    resolved = resolve_commit(repo_url, ref)
+    logger.info(
+        "resolve_commit_task finished",
+        extra={"repo_url": repo_url, "ref": ref, "resolved_commit": resolved},
+    )
+    return resolved
 
 
 @task
@@ -65,6 +72,20 @@ def run_entrypoint_job_task(
     outputs_prefix: str,
     job_name: str | None = None,
 ) -> tuple[dict[str, str], int]:
+    logger = _get_task_logger()
+    logger.info(
+        "run_entrypoint_job_task started",
+        extra={
+            "run_mode": run_mode,
+            "engine": engine,
+            "repo_url": repo_url or "",
+            "ref": ref or "",
+            "resolved_commit": resolved_commit or "",
+            "flow_run_id": flow_run_id,
+            "attempt": attempt,
+            "job_name": job_name or "",
+        },
+    )
     artifacts = run_entrypoint(
         repo_url=repo_url,
         ref=ref,
@@ -79,6 +100,18 @@ def run_entrypoint_job_task(
         attempt=attempt,
         outputs_prefix=outputs_prefix,
         job_name=job_name,
+    )
+    logger.info(
+        "run_entrypoint_job_task finished",
+        extra={
+            "flow_run_id": flow_run_id,
+            "attempt": attempt,
+            "exit_code": artifacts.exit_code,
+            "workdir": str(artifacts.workdir),
+            "stdout": str(artifacts.stdout_path),
+            "stderr": str(artifacts.stderr_path),
+            "result": str(artifacts.result_path),
+        },
     )
     return (
         {
@@ -101,6 +134,10 @@ def upload_outputs_task(
     attempt: int,
     already_uploaded: dict[str, str] | None = None,
 ) -> dict[str, str]:
+    _get_task_logger().info(
+        "upload_outputs_task started",
+        extra={"flow_run_id": flow_run_id, "attempt": attempt},
+    )
     return upload_outputs(
         links,
         local_paths,
@@ -121,6 +158,10 @@ def upload_engine_artifacts_task(
     already_uploaded: dict[str, str] | None = None,
     mlflow_tags_written: bool = False,
 ) -> EngineArtifactsUploadResult:
+    _get_task_logger().info(
+        "upload_engine_artifacts_task started",
+        extra={"flow_run_id": flow_run_id, "attempt": attempt, "exit_code": exit_code},
+    )
     return upload_engine_artifacts(
         local_paths,
         flow_run_id,
