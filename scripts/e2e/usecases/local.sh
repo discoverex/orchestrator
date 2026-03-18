@@ -9,6 +9,10 @@ run_e2e_local() {
       shift
       exec "${ROOT_DIR}/scripts/e2e/e2e_local_orchestrator.sh" --mode "${mode}" "$@"
       ;;
+    priority)
+      shift
+      exec "${ROOT_DIR}/scripts/e2e/e2e_local_prefect_priority.sh" "$@"
+      ;;
     "")
       exec "${ROOT_DIR}/scripts/e2e/e2e_local_orchestrator.sh" --mode core "$@"
       ;;
