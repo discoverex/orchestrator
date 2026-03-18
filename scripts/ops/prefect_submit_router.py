@@ -7,6 +7,14 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+from common.prefect.deployment_targets import (
+    DEFAULT_COLAB_DEPLOYMENT_NAME,
+    DEFAULT_FIXED_DEPLOYMENT_NAME,
+    DEFAULT_FLOW_NAME,
+    default_colab_deployment_fqn,
+    default_fixed_deployment_fqn,
+    deployment_fqn,
+)
 from flows.job_spec import parse_job_spec_json
 from scripts.ops.prefect_submit_router_client import (
     create_flow_run,
@@ -20,12 +28,31 @@ from scripts.ops.prefect_submit_router_policy import (
     select_deployment,
 )
 
-DEFAULT_FIXED_DEPLOYMENT = "e2e-job/e2e-test"
-DEFAULT_COLAB_DEPLOYMENT = "e2e-job/e2e-test-colab"
+DEFAULT_FIXED_DEPLOYMENT = default_fixed_deployment_fqn()
+DEFAULT_COLAB_DEPLOYMENT = default_colab_deployment_fqn()
 
 
 def _parse_bool(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _resolve_deployment_target(
+    *,
+    explicit_fqn: str | None,
+    env_fqn: str | None,
+    flow_name_env: str,
+    deployment_name_env: str,
+    default_flow_name: str,
+    default_deployment_name: str,
+) -> str:
+    if explicit_fqn:
+        return explicit_fqn
+    if env_fqn:
+        return env_fqn
+    return deployment_fqn(
+        env(flow_name_env, default_flow_name),
+        env(deployment_name_env, default_deployment_name),
+    )
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -50,14 +77,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--divert-when-running",
         default=env("WORKER_ROUTING_DIVERT_WHEN_RUNNING", "true"),
     )
-    parser.add_argument(
-        "--fixed-deployment",
-        default=env("ROUTER_FIXED_DEPLOYMENT", DEFAULT_FIXED_DEPLOYMENT),
-    )
-    parser.add_argument(
-        "--colab-deployment",
-        default=env("ROUTER_COLAB_DEPLOYMENT", DEFAULT_COLAB_DEPLOYMENT),
-    )
+    parser.add_argument("--fixed-deployment", default=None)
+    parser.add_argument("--colab-deployment", default=None)
     parser.add_argument("--fixed-queue", default=env("ROUTER_FIXED_QUEUE", "gpu-fixed"))
     parser.add_argument("--colab-queue", default=env("ROUTER_COLAB_QUEUE", "gpu-colab"))
     parser.add_argument("--job-spec-json", default=None)
@@ -70,6 +91,22 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = _build_parser().parse_args()
+    fixed_deployment = _resolve_deployment_target(
+        explicit_fqn=args.fixed_deployment,
+        env_fqn=env("ROUTER_FIXED_DEPLOYMENT", ""),
+        flow_name_env="ROUTER_FLOW_NAME",
+        deployment_name_env="ROUTER_FIXED_DEPLOYMENT_NAME",
+        default_flow_name=DEFAULT_FLOW_NAME,
+        default_deployment_name=DEFAULT_FIXED_DEPLOYMENT_NAME,
+    )
+    colab_deployment = _resolve_deployment_target(
+        explicit_fqn=args.colab_deployment,
+        env_fqn=env("ROUTER_COLAB_DEPLOYMENT", ""),
+        flow_name_env="ROUTER_FLOW_NAME",
+        deployment_name_env="ROUTER_COLAB_DEPLOYMENT_NAME",
+        default_flow_name=DEFAULT_FLOW_NAME,
+        default_deployment_name=DEFAULT_COLAB_DEPLOYMENT_NAME,
+    )
     fixed_depth = QueueDepth(
         args.fixed_queue,
         scheduled_count_for_queue(args.fixed_queue),
@@ -88,8 +125,8 @@ def main() -> int:
         queue_depth_threshold=args.queue_depth_threshold,
         fixed_depth=fixed_depth,
         colab_depth=colab_depth,
-        fixed_deployment=args.fixed_deployment,
-        colab_deployment=args.colab_deployment,
+        fixed_deployment=fixed_deployment,
+        colab_deployment=colab_deployment,
     )
     selected = decision.selected_deployment
     decision_reason = decision.reason

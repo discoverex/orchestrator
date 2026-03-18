@@ -29,5 +29,4 @@ services:
       ORCHESTRATOR_CHECKPOINT_DIR: /var/lib/orchestrator/checkpoints
       ORCH_REPO_CACHE_DIR: /var/lib/orchestrator/repo_cache
     volumes:
-      - ${WORKER_CHECKPOINT_DIR:-../../../../runtime/worker/checkpoints}:/var/lib/orchestrator/checkpoints
-      - ${WORKER_REPO_CACHE_DIR:-../../../../runtime/worker/repo_cache}:/var/lib/orchestrator/repo_cache
+      - ${WORKER_RUNTIME_DIR:-../../../../../runtime/worker}:/var/lib/orchestrator

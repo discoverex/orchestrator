@@ -37,6 +37,7 @@ def test_dual_mode_registers_fixed_and_colab(monkeypatch: pytest.MonkeyPatch) ->
         lambda: argparse.Namespace(
             single_name=None,
             single_queue="default",
+            spec_file="unused.yaml",
             pool="gpu-pool",
             fixed_name="e2e-test",
             fixed_queue="gpu-fixed",
@@ -74,6 +75,7 @@ def test_single_mode_registers_compat_deployment(
         lambda: argparse.Namespace(
             single_name="e2e-test-legacy",
             single_queue="default",
+            spec_file="unused.yaml",
             pool="gpu-pool",
             fixed_name="unused-fixed",
             fixed_queue="unused-fixed-queue",
@@ -85,7 +87,7 @@ def test_single_mode_registers_compat_deployment(
             compat_colab_queue="compat-colab-queue",
             register_compat_aliases=True,
             flow_source=".",
-            flow_entrypoint="src/flows/engine_run_flow.py:engine_run_flow",
+            flow_entrypoint="src/flows/worker_runtime/flow.py:run_worker_job_flow",
             version="v1",
         ),
     )
@@ -110,6 +112,7 @@ def test_main_uses_explicit_source_and_entrypoint(
         lambda: argparse.Namespace(
             single_name="e2e-test",
             single_queue="gpu-fixed",
+            spec_file="unused.yaml",
             pool="gpu-pool",
             fixed_name="e2e-test",
             fixed_queue="gpu-fixed",

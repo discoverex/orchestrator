@@ -72,7 +72,7 @@ Prepare runtime directories outside the repo.
 Created directories:
 
 - `storage`: `../runtime/storage/data/minio`, `../runtime/storage/data/mlflow-db`, `../runtime/storage/backup`, `../runtime/storage/logs`
-- `worker`: `../runtime/worker/checkpoints`, `../runtime/worker/logs`
+- `worker`: `../runtime/worker/checkpoints`, `../runtime/worker/repo_cache`
 
 ### `storage`
 
@@ -128,6 +128,8 @@ Behavior:
 - uses `infra/stacks/register/.env` and `infra/stacks/register/docker-compose.yml`
 - `run` executes `docker compose run --rm register`
 - `build` builds the shared base image first
+- default registration spec is `deployments/e2e/e2e-deployments.yaml`
+- default registration entrypoint is `src/flows/worker_runtime/flow.py:run_worker_job_flow`
 
 ### `worker`
 
@@ -146,7 +148,8 @@ Fixed worker:
 Behavior:
 
 - uses `infra/stacks/worker/fixed/.env` and `infra/stacks/worker/fixed/docker-compose.yml`
-- `up` runs `scripts/ops/install_nvidia_container_toolkit.sh`, ensures runtime directories via `runtime init worker`, and applies `chown` for UID 10001 before `docker compose up -d --build`
+- host `../runtime/worker` is mounted to `/var/lib/orchestrator`
+- `up` runs `scripts/ops/install_nvidia_container_toolkit.sh`, ensures runtime directories via `runtime init worker`, and requires elevated privileges to assign worker runtime ownership to UID 10001 before `docker compose up -d --build`
 - `build` builds the shared base image first
 
 Deployment registration shortcut:
@@ -220,6 +223,7 @@ Options:
 Behavior:
 
 - creates a flow run with inline fixed-dummy job spec
+- default target is the standard worker-runtime deployment FQN `e2e-job/e2e-test`
 - prints JSON response for the created run
 
 ### `prefect`

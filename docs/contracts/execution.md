@@ -6,6 +6,10 @@
 - `resume_key: str | None` (optional)
 - `checkpoint_dir: str | None` (optional)
 
+Deployment naming and canonical E2E targets are defined in:
+
+- [deployments/e2e/e2e-deployments.yaml](../../deployments/e2e/e2e-deployments.yaml)
+
 `job_spec_json` schema:
 
 - `engine: str`
@@ -76,16 +80,21 @@ The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the or
 
 Core pass criteria:
 
-1. `e2e-job/e2e-test` deployment exists after register (default name).
+1. The expected deployment target exists after register.
+   Default target is `e2e-job/e2e-test` for the common worker runtime.
 2. Submitted flow run reaches `COMPLETED`.
 3. All required objects exist:
-...
-Note: `e2e-job/e2e-test` is the standard default, but both the flow name and the deployment name can be customized via the registrar and passed to observability tools.
    - `stdout.log`
    - `stderr.log`
    - `result.json`
    - `artifacts.json`
 4. `artifacts.json` metadata matches expected `flow_run_id`, `attempt`, and object URIs.
+
+Notes:
+
+- canonical registration entrypoint is `src/flows/worker_runtime/flow.py:run_worker_job_flow`
+- canonical E2E validation target is `e2e-job/e2e-test`
+- remote and local E2E scripts accept custom deployment targets when explicitly overridden
 
 MLflow pass criteria:
 

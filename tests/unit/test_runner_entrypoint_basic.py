@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from runner.adapters.outbound.git.runner import cleanup_workdir, run_entrypoint
 
 
-def test_run_entrypoint_inline_mode_without_repo() -> None:
+def test_run_entrypoint_inline_mode_without_repo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
     artifacts = run_entrypoint(
         repo_url=None,
         ref=None,
@@ -24,9 +29,11 @@ def test_run_entrypoint_inline_mode_without_repo() -> None:
     try:
         assert artifacts.exit_code == 0
         assert artifacts.stdout_path.read_text(encoding="utf-8").strip() == "inline-ok"
-        assert '"run_mode": "inline"' in artifacts.result_path.read_text(
-            encoding="utf-8"
-        )
+        result = json.loads(artifacts.result_path.read_text(encoding="utf-8"))
+        assert result["run_mode"] == "inline"
+        assert result["workdir"] == str(artifacts.workdir)
+        assert result["stdout_path"] == str(artifacts.stdout_path)
+        assert result["stderr_path"] == str(artifacts.stderr_path)
     finally:
         cleanup_workdir(artifacts.workdir)
 

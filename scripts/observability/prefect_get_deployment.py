@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 
+from common.prefect.deployment_targets import default_fixed_deployment_fqn
 from scripts.observability.lib.prefect_observe_env import build_client
 from scripts.observability.lib.prefect_observe_format import (
     print_json,
@@ -14,7 +15,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch a Prefect deployment.")
     parser.add_argument(
         "--deployment-name",
-        default="e2e-job/e2e-test",
+        default=default_fixed_deployment_fqn(),
         help="Target deployment name (flow/deployment)",
     )
     parser.add_argument("--env-file", default=None)

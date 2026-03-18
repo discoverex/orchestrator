@@ -16,9 +16,13 @@ eval "$(
 
 POOL="${PREFECT_WORK_POOL:-gpu-pool}"
 QUEUE="${PREFECT_WORK_QUEUE:-}"
+CHECKPOINT_DIR="${ORCHESTRATOR_CHECKPOINT_DIR:-/var/lib/orchestrator/checkpoints}"
+REPO_CACHE_DIR="${ORCH_REPO_CACHE_DIR:-/var/lib/orchestrator/repo_cache}"
 SUMMARY="$(
   /opt/venv/bin/python -m common.prefect.client_env summary --default-queue "gpu-fixed"
 )"
+
+mkdir -p "${CHECKPOINT_DIR}" "${REPO_CACHE_DIR}"
 
 set -- /opt/venv/bin/prefect worker start --pool "${POOL}" --type process
 if [ -n "${QUEUE}" ]; then

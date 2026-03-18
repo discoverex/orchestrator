@@ -4,15 +4,24 @@ This document summarizes the contracts between the main services.
 
 ## 1) Prefect Deployment Contract
 
-Standard default names:
+Canonical registration entrypoint:
+
+- [src/flows/worker_runtime/flow.py](../../src/flows/worker_runtime/flow.py)
+
+Canonical deployment catalog:
+
+- [deployments/e2e/e2e-deployments.yaml](../../deployments/e2e/e2e-deployments.yaml)
+
+Operational defaults:
 
 - primary fixed: `e2e-job/e2e-test`
 - primary colab: `e2e-job/e2e-test-colab`
-- compatibility aliases during cutover:
-  - `e2e-job/e2e-test-legacy`
-  - `e2e-job/e2e-test-legacy-colab`
 
-Note: The flow name (`e2e-job`) and deployment names are defaults and can be customized during registration.
+Compatibility aliases exist in the catalog for one-off registration, but they
+are not the default live targets.
+
+Note: registration, observability, routing, and E2E tools still accept custom
+flow or deployment targets when explicitly overridden.
 
 Current flow parameters:
 
@@ -30,7 +39,7 @@ If it does not, the worker fails before engine execution with a signature mismat
 
 Canonical validator:
 
-- [src/flows/domain/job_spec.py](../../src/flows/domain/job_spec.py)
+- [src/flows/job_spec.py](../../src/flows/job_spec.py)
 
 Required:
 
@@ -52,13 +61,14 @@ Forbidden for `inline` mode:
 
 Canonical launcher:
 
-- [src/runner/adapters/outbound/git/runner.py](../../src/runner/adapters/outbound/git/runner.py)
+- [src/runner/adapters/outbound/entrypoint/core.py](../../src/runner/adapters/outbound/entrypoint/core.py)
 
 Inputs:
 
 - validated `job_spec_json`
 - Prefect flow-run metadata
 - worker environment
+- worker-managed runtime root mounted at `/var/lib/orchestrator`
 
 Outputs:
 
@@ -73,6 +83,7 @@ Behavior:
 - temp workdir
 - attempt-scoped output prefix
 - optional `uv sync` in repo mode
+- checkpoint and repo-cache subpaths under `/var/lib/orchestrator`
 
 ## 4) Storage Control-Plane Contract
 

@@ -14,18 +14,19 @@ def test_parse_args_uses_expected_defaults(monkeypatch: pytest.MonkeyPatch) -> N
 
     assert args.single_name is None
     assert args.single_queue == "default"
+    assert args.spec_file == register.DEFAULT_SPEC_FILE
     assert args.pool == "gpu-pool"
-    assert args.fixed_name == "e2e-test"
-    assert args.fixed_queue == "gpu-fixed"
-    assert args.colab_name == "e2e-test-colab"
-    assert args.colab_queue == "gpu-colab"
-    assert args.compat_fixed_name == "e2e-test-legacy"
-    assert args.compat_fixed_queue == "gpu-fixed"
-    assert args.compat_colab_name == "e2e-test-colab-legacy"
-    assert args.compat_colab_queue == "gpu-colab"
+    assert args.fixed_name is None
+    assert args.fixed_queue is None
+    assert args.colab_name is None
+    assert args.colab_queue is None
+    assert args.compat_fixed_name is None
+    assert args.compat_fixed_queue is None
+    assert args.compat_colab_name is None
+    assert args.compat_colab_queue is None
     assert args.register_compat_aliases is True
     assert args.flow_source == register.DEFAULT_FLOW_SOURCE
-    assert args.flow_entrypoint == register.DEFAULT_WRAPPER_ENTRYPOINT
+    assert args.flow_entrypoint is None
     assert args.version is None
 
 
@@ -39,6 +40,8 @@ def test_parse_args_accepts_explicit_overrides(monkeypatch: pytest.MonkeyPatch) 
             "one",
             "--single-queue",
             "queue-a",
+            "--spec-file",
+            "deployments/custom.yaml",
             "--pool",
             "pool-a",
             "--fixed-name",
@@ -71,6 +74,7 @@ def test_parse_args_accepts_explicit_overrides(monkeypatch: pytest.MonkeyPatch) 
 
     assert args.single_name == "one"
     assert args.single_queue == "queue-a"
+    assert args.spec_file == "deployments/custom.yaml"
     assert args.pool == "pool-a"
     assert args.fixed_name == "fixed-a"
     assert args.fixed_queue == "fixed-q"

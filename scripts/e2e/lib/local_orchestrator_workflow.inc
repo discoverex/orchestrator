@@ -254,5 +254,5 @@ submit_prefect_run() {
   local job_spec_path="$1"
   local job_spec_b64
   job_spec_b64="$(base64 -w0 <"${job_spec_path}")"
-  docker compose -p "${LOCAL_PROJECT_NAME}" -f "${LOCAL_COMPOSE_FILE}" exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api -e JOB_SPEC_JSON_B64="${job_spec_b64}" prefect sh -lc 'JOB_SPEC_JSON="$(printf %s "$JOB_SPEC_JSON_B64" | base64 -d)" && prefect deployment run "e2e-job/e2e-test" -p "job_spec_json=$JOB_SPEC_JSON"' | tee "${LOG_DIR}/prefect-submit.log"
+  docker compose -p "${LOCAL_PROJECT_NAME}" -f "${LOCAL_COMPOSE_FILE}" exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api -e JOB_SPEC_JSON_B64="${job_spec_b64}" prefect sh -lc 'JOB_SPEC_JSON="$(printf %s "$JOB_SPEC_JSON_B64" | base64 -d)" && prefect deployment run "'"${TARGET_DEPLOYMENT_NAME}"'" -p "job_spec_json=$JOB_SPEC_JSON"' | tee "${LOG_DIR}/prefect-submit.log"
 }

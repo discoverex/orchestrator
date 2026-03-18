@@ -159,7 +159,7 @@ uv run python scripts/observability/prefect_check_auth.py
 Storage + MLflow:
 
 ```bash
-# Default deployment is e2e-job/e2e-test
+# Default smoke target is e2e-job/e2e-test unless registration overrides it.
 ./bin/cli observability fixed-dummy-smoke --timeout-sec 240
 
 # Or specify a custom deployment name

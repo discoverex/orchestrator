@@ -3,6 +3,8 @@
 RUNTIME_ROOT_DEFAULT="$(cd "${ROOT_DIR}/.." && pwd)/runtime"
 RUNTIME_ROOT="${RUNTIME_ROOT:-${RUNTIME_ROOT_DEFAULT}}"
 
+WORKER_RUNTIME_DIR="${RUNTIME_ROOT}/worker"
+WORKER_CHECKPOINT_DIR="${RUNTIME_ROOT}/worker/checkpoints"
 WORKER_REPO_CACHE_DIR="${RUNTIME_ROOT}/worker/repo_cache"
 
 LOCAL_COMPOSE="${ROOT_DIR}/scripts/e2e/docker-compose.local.test.yml"

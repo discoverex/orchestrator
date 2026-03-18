@@ -21,16 +21,20 @@ python tests/fixtures/dummy_engine_repo/src/dummy_engine/main.py
 ## Flow Entrypoint
 
 ```bash
-src/dummy_engine/prefect_flow.py:run_job_flow
+src/dummy_engine/prefect_flow.py:dummy_engine_flow
 ```
 
-This sample flow keeps the orchestrator-compatible flow signature:
+Default Prefect flow name:
+
+- `dummy-engine-job`
+
+This sample flow keeps the orchestrator-compatible worker-runtime signature:
 
 - `job_spec_json`
 - `resume_key`
 - `checkpoint_dir`
 
-and delegates execution to the current worker-compatible orchestration flow.
+and delegates execution to the common worker runtime flow.
 
 ## Register Example
 
@@ -43,7 +47,7 @@ You can also register it through the existing register stack by setting:
 
 ```bash
 REGISTER_FLOW_SOURCE=/app
-REGISTER_FLOW_ENTRYPOINT=tests/fixtures/dummy_engine_repo/src/dummy_engine/prefect_flow.py:run_job_flow
+REGISTER_FLOW_ENTRYPOINT=tests/fixtures/dummy_engine_repo/src/dummy_engine/prefect_flow.py:dummy_engine_flow
 ```
 
 ## Behavior
