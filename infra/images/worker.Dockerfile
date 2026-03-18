@@ -3,7 +3,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /usr/local/bin/uv
 
 RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
-    libxcb1 \
+    libxcb1 libgl1\
  && rm -rf /var/lib/apt/lists/*
 
 COPY --chown=appuser:appuser src/common /app/src/common
