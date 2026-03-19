@@ -61,9 +61,7 @@ def test_router_forwards_job_name_to_flow_run_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     mod = load_router_module()
-    parameters = (
-        '{"run_mode":"repo","engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","job_name":"my-job","flow_entrypoint":"src/dummy_engine/prefect_flow.py:dummy_engine_flow"}'
-    )
+    parameters = '{"run_mode":"repo","engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","job_name":"my-job","flow_entrypoint":"src/dummy_engine/prefect_flow.py:dummy_engine_flow"}'
     monkeypatch.setattr(
         mod, "_build_parser", lambda: fake_args(parameters_json=parameters)
     )

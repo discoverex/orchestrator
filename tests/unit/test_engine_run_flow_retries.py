@@ -7,9 +7,9 @@ from typing import Any, cast
 import pytest
 
 import flows.engine_run.flow as flow_module
+from flows.domain.run_request import RunRequest
 from flows.engine_run.flow import run_job_flow
 from flows.engine_run.models import ArtifactLink, EngineArtifactsUploadResult, FlowState
-from flows.domain.run_request import RunRequest
 
 
 def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(

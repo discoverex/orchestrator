@@ -18,8 +18,11 @@ def apply_worker_runtime_defaults(merged_env: dict[str, str]) -> None:
         runtime_root = "/var/lib/orchestrator"
         merged_env["ORCH_WORKER_RUNTIME_DIR"] = runtime_root
 
+    explicit_cache_dir = merged_env.get("ORCH_CACHE_DIR", "").strip()
     cache_dir = merged_env.get("ORCH_CACHE_DIR", "").strip()
-    if not cache_dir:
+    if explicit_cache_dir:
+        cache_dir = explicit_cache_dir
+    else:
         repo_cache_dir = merged_env.get("ORCH_REPO_CACHE_DIR", "").strip()
         model_cache_dir = merged_env.get("ORCH_MODEL_CACHE_DIR", "").strip()
         if repo_cache_dir:
@@ -28,7 +31,8 @@ def apply_worker_runtime_defaults(merged_env: dict[str, str]) -> None:
             cache_dir = str(Path(model_cache_dir).parent)
         else:
             cache_dir = str(Path(runtime_root) / "cache")
-        merged_env["ORCH_CACHE_DIR"] = cache_dir
+    merged_env["ORCH_CACHE_DIR"] = cache_dir
+
 
 def restrict_engine_runtime_env(merged_env: dict[str, str]) -> None:
     for key in (
@@ -154,5 +158,9 @@ def apply_runtime_env(
         merged_env["ORCH_JOB_CONFIG_PATH"] = config_path
     if env:
         merged_env.update(env)
+    if "ORCH_CACHE_DIR" not in (env or {}):
+        merged_env.pop("ORCH_CACHE_DIR", None)
+        merged_env.pop("ORCH_REPO_CACHE_DIR", None)
+        merged_env.pop("ORCH_MODEL_CACHE_DIR", None)
     apply_worker_runtime_defaults(merged_env)
     restrict_engine_runtime_env(merged_env)

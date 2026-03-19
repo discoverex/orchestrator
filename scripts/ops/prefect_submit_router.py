@@ -143,7 +143,11 @@ def main() -> int:
     dep_id = find_deployment_id(selected)
     created = create_flow_run(
         dep_id,
-        {**parameters, "resume_key": args.resume_key, "checkpoint_dir": args.checkpoint_dir},
+        {
+            **parameters,
+            "resume_key": args.resume_key,
+            "checkpoint_dir": args.checkpoint_dir,
+        },
         flow_run_name=str(parameters.get("job_name") or "") or None,
     )
 

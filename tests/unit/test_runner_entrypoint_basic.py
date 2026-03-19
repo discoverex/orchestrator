@@ -9,10 +9,7 @@ import pytest
 
 from runner.adapters.outbound.git.runner import cleanup_workdir, run_entrypoint
 
-
-FIXTURE_REPO = (
-    Path(__file__).resolve().parents[1] / "fixtures" / "dummy_engine_repo"
-)
+FIXTURE_REPO = Path(__file__).resolve().parents[1] / "fixtures" / "dummy_engine_repo"
 
 
 def _git(cmd: list[str], cwd: Path) -> None:
@@ -93,7 +90,10 @@ def test_run_entrypoint_executes_prefect_subflow_from_repo(
     try:
         assert artifacts.exit_code == 0
         result = json.loads(artifacts.result_path.read_text(encoding="utf-8"))
-        assert result["flow_entrypoint"] == "src/dummy_engine/prefect_flow.py:dummy_engine_flow"
+        assert (
+            result["flow_entrypoint"]
+            == "src/dummy_engine/prefect_flow.py:dummy_engine_flow"
+        )
         assert result["result"]["scene_id"] == "scene-1"
         assert result["result"]["version_id"] == "ver-1"
 

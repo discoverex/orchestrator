@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
 import os
 from typing import Any
 
@@ -8,6 +7,7 @@ from prefect.context import get_run_context
 from prefect.runtime import flow_run
 
 import prefect
+from flows.adapters.inbound.schema import validate_run_request
 from flows.checkpoint_store import (
     load_checkpoint,
     resolve_checkpoint_path,
@@ -17,9 +17,6 @@ from flows.engine_run.models import FlowResult
 from flows.engine_run.runtime_finalize import (
     cleanup_workdir_state,
     finalize_flow_result,
-    log_core_upload,
-    log_engine_upload,
-    persist_engine_upload_state,
 )
 from flows.engine_run.runtime_logging import (
     flow_logger,
@@ -31,6 +28,7 @@ from flows.engine_run.runtime_state import (
     prepare_flow_state,
     record_entrypoint_state,
 )
+from flows.engine_run.runtime_uploads import upload_core_outputs, upload_engine_outputs
 from flows.engine_run.state.main import artifact_paths_exist, build_flow_result
 from flows.engine_run.task.main import (
     prepare_manifest_task,
@@ -39,12 +37,12 @@ from flows.engine_run.task.main import (
     upload_engine_artifacts_task,
     upload_outputs_task,
 )
-from flows.adapters.inbound.schema import validate_run_request
 from runner import cleanup_workdir
 
 
 def _flow_attempt() -> int:
     return flow_attempt(get_run_context)
+
 
 @prefect.flow(name="e2e-job", retries=3, retry_delay_seconds=30)
 def run_job_flow(
@@ -138,58 +136,29 @@ def run_job_flow(
     if state.is_step_done("manifest_uploaded"):
         uploaded = state.uploaded
     else:
-        links = prepare_manifest_task(run_id, attempt)
-        state = state.mark_step("prepare_manifest")
-        state = dataclasses.replace(state, links=links)
-        save_checkpoint(checkpoint_path, state)
-
-        uploaded = upload_outputs_task(
-            links,
-            local_paths,
-            run_id,
-            attempt,
-            already_uploaded=state.uploaded,
+        state, uploaded = upload_core_outputs(
+            logger=logger,
+            state=state,
+            checkpoint_path=checkpoint_path,
+            run_id=run_id,
+            attempt=attempt,
+            local_paths=local_paths,
+            prepare_manifest_task=prepare_manifest_task,
+            upload_outputs_task=upload_outputs_task,
+            save_checkpoint_fn=save_checkpoint,
         )
-        log_core_upload(logger, flow_run_id=run_id, attempt=attempt, uploaded=uploaded)
-        state = dataclasses.replace(state, uploaded=uploaded)
-        for key in ("stdout", "stderr", "result", "manifest"):
-            if key in uploaded:
-                state = state.mark_step(f"{key}_uploaded")
-        save_checkpoint(checkpoint_path, state)
 
-    if exit_code == 0:
-        if state.is_step_done("engine_manifest_uploaded"):
-            engine_uploaded = state.engine_uploaded
-            engine_manifest_uri = state.engine_manifest_uri
-        else:
-            engine_upload = upload_engine_artifacts_task(
-                local_paths,
-                run_id,
-                attempt,
-                exit_code,
-                already_uploaded=state.engine_uploaded,
-                mlflow_tags_written=state.is_step_done("engine_mlflow_tags_written"),
-            )
-            engine_uploaded = engine_upload.artifact_uris
-            engine_manifest_uri = engine_upload.engine_manifest_uri
-            log_engine_upload(
-                logger,
-                flow_run_id=run_id,
-                attempt=attempt,
-                engine_manifest_uri=engine_manifest_uri,
-                engine_uploaded=engine_uploaded,
-            )
-            state = persist_engine_upload_state(
-                state=state,
-                checkpoint_path=checkpoint_path,
-                engine_uploaded=engine_uploaded,
-                engine_manifest_uri=engine_manifest_uri,
-                mlflow_tags_written=engine_upload.mlflow_tags_written,
-                save_checkpoint_fn=save_checkpoint,
-            )
-    else:
-        engine_uploaded = state.engine_uploaded
-        engine_manifest_uri = state.engine_manifest_uri
+    state, engine_uploaded, engine_manifest_uri = upload_engine_outputs(
+        logger=logger,
+        state=state,
+        checkpoint_path=checkpoint_path,
+        local_paths=local_paths,
+        run_id=run_id,
+        attempt=attempt,
+        exit_code=exit_code,
+        upload_engine_artifacts_task=upload_engine_artifacts_task,
+        save_checkpoint_fn=save_checkpoint,
+    )
 
     state = cleanup_workdir_state(
         logger=logger,
@@ -215,4 +184,6 @@ def run_job_flow(
         engine_manifest_uri=engine_manifest_uri or "",
         engine_uploaded=engine_uploaded,
     )
+
+
 engine_run_flow = run_job_flow

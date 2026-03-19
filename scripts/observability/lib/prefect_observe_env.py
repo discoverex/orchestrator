@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -57,9 +58,8 @@ def build_client(env_file: str | None = None) -> PrefectObserveClient:
 
 def load_flow_parameters(path: str | None = None) -> dict[str, object]:
     if path:
-        import json
-
-        return json.loads(Path(path).read_text(encoding="utf-8"))
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        return dict(payload)
     return {
         "run_mode": "inline",
         "engine": "fixed-dummy",

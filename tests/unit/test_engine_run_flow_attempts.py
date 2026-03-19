@@ -7,9 +7,9 @@ from typing import Any, cast
 import pytest
 
 import flows.engine_run.flow as flow_module
+from flows.domain.run_request import RunRequest
 from flows.engine_run.flow import run_job_flow
 from flows.engine_run.models import ArtifactLink, EngineArtifactsUploadResult
-from flows.domain.run_request import RunRequest
 
 
 def test_flow_attempt_uses_run_context_run_count(

@@ -21,7 +21,10 @@ def test_iter_specs_uses_yaml_catalog_defaults(tmp_path: Path) -> None:
                 "    engine: dummy-engine",
                 "    repo_url: https://github.com/example/repo.git",
                 "    ref: main",
-                "    flow_entrypoint: src/dummy_engine/prefect_flow.py:dummy_engine_flow",
+                (
+                    "    flow_entrypoint: "
+                    "src/dummy_engine/prefect_flow.py:dummy_engine_flow"
+                ),
                 "    config: null",
                 "    job_name: null",
                 "    inputs: {}",

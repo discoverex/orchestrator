@@ -135,6 +135,7 @@ def validate_engine_registry(engine: str) -> None:
     if engine not in allowed:
         raise RunRequestError(f"engine not in registry: {engine}")
 
+
 def load_parameters_json(raw: str) -> RunRequest:
     try:
         request_schema = RunRequestSchema.model_validate_json(raw)
@@ -153,3 +154,11 @@ def validate_run_request(parameters: dict[str, Any]) -> RunRequest:
 
     validate_engine_registry(request_schema.engine)
     return request_schema.to_domain()
+
+
+__all__ = [
+    "RunRequestError",
+    "RunRequestSchema",
+    "load_parameters_json",
+    "validate_run_request",
+]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import common.prefect.work_queues as work_queues
 
@@ -15,7 +15,9 @@ def test_default_work_queue_names_adds_batch_queue() -> None:
 
 
 def test_split_work_queue_names_dedupes_and_trims() -> None:
-    assert work_queues.split_work_queue_names(" gpu-fixed, gpu-fixed-batch ,gpu-fixed ") == [
+    assert work_queues.split_work_queue_names(
+        " gpu-fixed, gpu-fixed-batch ,gpu-fixed "
+    ) == [
         "gpu-fixed",
         "gpu-fixed-batch",
     ]
@@ -48,7 +50,7 @@ class _FakeClient:
 
     def read_work_pool(self, name: str) -> object:
         if not self.pool_exists:
-            raise work_queues.ObjectNotFound("pool")
+            raise work_queues.ObjectNotFound(Exception("pool"))
         return object()
 
     def create_work_pool(self, work_pool: Any) -> object:
@@ -56,9 +58,11 @@ class _FakeClient:
         self.created_pools.append((work_pool.name, work_pool.type))
         return object()
 
-    def read_work_queue_by_name(self, name: str, work_pool_name: str | None = None) -> Any:
+    def read_work_queue_by_name(
+        self, name: str, work_pool_name: str | None = None
+    ) -> Any:
         if name not in self.queues:
-            raise work_queues.ObjectNotFound("queue")
+            raise work_queues.ObjectNotFound(Exception("queue"))
         return self.queues[name]
 
     def create_work_queue(
@@ -80,18 +84,19 @@ class _FakeClient:
 
 
 @contextmanager
-def _patched_client(fake: _FakeClient):
-    original = work_queues.get_client
+def _patched_client(fake: _FakeClient) -> Any:
+    module_any = cast(Any, work_queues)
+    original = module_any.get_client
 
     @contextmanager
-    def _manager(*_: Any, **__: Any):
+    def _manager(*_: Any, **__: Any) -> Any:
         yield fake
 
-    work_queues.get_client = _manager  # type: ignore[assignment]
+    module_any.get_client = _manager
     try:
         yield
     finally:
-        work_queues.get_client = original  # type: ignore[assignment]
+        module_any.get_client = original
 
 
 def test_ensure_work_pool_and_queues_creates_pool_and_expected_queues() -> None:

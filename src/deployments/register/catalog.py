@@ -66,9 +66,7 @@ def catalog_defaults(catalog: RegistrationCatalog) -> dict[str, CatalogDeploymen
     return defaults
 
 
-def _load_deployments(
-    raw: dict[str, Any], spec_path: Path
-) -> list[CatalogDeployment]:
+def _load_deployments(raw: dict[str, Any], spec_path: Path) -> list[CatalogDeployment]:
     deployments_node = raw.get("deployments")
     if not isinstance(deployments_node, list):
         raise ValueError(f"deployments must be a list: {spec_path}")
@@ -86,9 +84,8 @@ def _load_deployments(
         )
     return deployments
 
-def _require_mapping(
-    data: dict[str, Any], key: str, spec_path: Path
-) -> dict[str, Any]:
+
+def _require_mapping(data: dict[str, Any], key: str, spec_path: Path) -> dict[str, Any]:
     value = data.get(key)
     if not isinstance(value, dict):
         raise ValueError(f"{key} must be a mapping: {spec_path}")

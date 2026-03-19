@@ -1,126 +1,26 @@
 from __future__ import annotations
 
-import logging
-import os
-import re
-import shutil
-import subprocess
-from hashlib import sha256
-from pathlib import Path
-from urllib.parse import unquote, urlsplit
-
-_SHA1 = re.compile(r"^[0-9a-f]{40}$")
-_GITHUB_SSH = re.compile(r"^git@github\.com:(?P<repo>.+?)(?:\.git)?$")
-logger = logging.getLogger("runner.git.repo")
-
-
-class RunnerError(RuntimeError):
-    pass
-
-
-def worker_cache_root() -> Path:
-    cache_dir = os.getenv("ORCH_CACHE_DIR", "").strip()
-    if cache_dir:
-        return Path(cache_dir)
-
-    runtime_dir = os.getenv("ORCH_WORKER_RUNTIME_DIR", "").strip()
-    if runtime_dir:
-        return Path(runtime_dir) / "cache"
-
-    return Path("/var/lib/orchestrator/cache")
-
-
-def run_command(cmd: list[str], cwd: Path | None = None) -> str:
-    logger.info("running git command", extra={"cmd": cmd, "cwd": str(cwd or "")})
-    proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
-    if proc.returncode != 0:
-        logger.error(
-            "git command failed",
-            extra={
-                "cmd": cmd,
-                "cwd": str(cwd or ""),
-                "returncode": proc.returncode,
-                "stdout": proc.stdout.strip(),
-                "stderr": proc.stderr.strip(),
-            },
-        )
-        raise RunnerError(f"command failed: {' '.join(cmd)}\n{proc.stderr.strip()}")
-    return proc.stdout.strip()
-
-
-def repo_cache_root() -> Path:
-    override = os.getenv("ORCH_REPO_CACHE_DIR", "").strip()
-    if override:
-        return Path(override)
-    return worker_cache_root() / "repo"
-
-
-def repo_runtime_root() -> Path:
-    override = os.getenv("ORCH_REPO_RUNTIME_DIR", "").strip()
-    if override:
-        return Path(override)
-    runtime_dir = os.getenv("ORCH_WORKER_RUNTIME_DIR", "").strip()
-    if runtime_dir:
-        return Path(runtime_dir) / "repos"
-    return Path("/var/lib/orchestrator/repos")
-
-
-def normalized_repo_url(repo_url: str) -> str:
-    match = _GITHUB_SSH.match(repo_url.strip())
-    if not match:
-        return repo_url
-    return f"https://github.com/{match.group('repo')}.git"
-
-
-def repo_runtime_name(repo_url: str) -> str:
-    normalized = normalized_repo_url(repo_url).rstrip("/")
-    split = urlsplit(normalized)
-    if split.scheme:
-        path_parts = [
-            part
-            for part in Path(unquote(split.path)).parts
-            if part not in ("/", "")
-        ]
-    else:
-        path_parts = [part for part in Path(normalized).parts if part not in (".", "")]
-    if not path_parts:
-        raise RunnerError(f"unable to derive repo name from repo_url={repo_url}")
-    repo_name = path_parts[-1].removesuffix(".git").strip()
-    owner_name = path_parts[-2].strip() if len(path_parts) >= 2 else ""
-    base_name = f"{owner_name}__{repo_name}" if owner_name else repo_name
-    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "-", base_name)
-    return sanitized or "repo"
-
-
-def repo_runtime_path(repo_url: str) -> Path:
-    return repo_runtime_root() / repo_runtime_name(repo_url)
-
-
-def local_repo_path(repo_url: str) -> Path | None:
-    split = urlsplit(repo_url)
-    if split.scheme == "file":
-        return Path(unquote(split.path))
-    if split.scheme:
-        return None
-    candidate = Path(repo_url)
-    return candidate if candidate.exists() else None
-
-
-def safe_directory_args(repo_path: Path) -> list[str]:
-    resolved = repo_path.resolve()
-    return [
-        "-c",
-        f"safe.directory={resolved}",
-        "-c",
-        f"safe.directory={resolved / '.git'}",
-    ]
-
-
-def checkout_target(ref: str | None, resolved_commit: str) -> str:
-    candidate = (ref or "").strip()
-    if candidate and not _SHA1.match(candidate.lower()):
-        return candidate
-    return resolved_commit
+from runner.adapters.outbound.git.checkout import (
+    prepare_cached_repo,
+    prepare_runtime_repo,
+)
+from runner.adapters.outbound.git.common import (
+    _SHA1,
+    checkout_target,
+    logger,
+    run_command,
+    safe_directory_args,
+)
+from runner.adapters.outbound.git.errors import RunnerError
+from runner.adapters.outbound.git.paths import (
+    local_repo_path,
+    normalized_repo_url,
+    repo_cache_root,
+    repo_runtime_name,
+    repo_runtime_path,
+    repo_runtime_root,
+    worker_cache_root,
+)
 
 
 def resolve_commit(repo_url: str, ref: str) -> str:
@@ -154,115 +54,20 @@ def resolve_commit(repo_url: str, ref: str) -> str:
     raise RunnerError(f"unable to resolve ref={ref} for repo={repo_url}")
 
 
-def prepare_cached_repo(repo_url: str, ref: str | None, resolved_commit: str) -> Path:
-    normalized = normalized_repo_url(repo_url)
-    cache_root = repo_cache_root()
-    cache_root.mkdir(parents=True, exist_ok=True)
-    cache_repo = cache_root / sha256(normalized.encode("utf-8")).hexdigest()[:16]
-    local_repo = local_repo_path(normalized)
-    clone_source = (
-        local_repo.resolve().as_uri() if local_repo is not None else normalized
-    )
-    logger.info(
-        "preparing cached repo",
-        extra={
-            "repo_url": repo_url,
-            "normalized_repo_url": normalized,
-            "ref": ref or "",
-            "resolved_commit": resolved_commit,
-            "cache_root": str(cache_root),
-            "cache_repo": str(cache_repo),
-            "clone_source": clone_source,
-            "cache_exists": cache_repo.exists(),
-        },
-    )
-    if (cache_repo / ".git").exists():
-        logger.info("reusing cached repo", extra={"cache_repo": str(cache_repo)})
-        run_command(["git", "fetch", "--all", "--tags", "--prune"], cwd=cache_repo)
-    else:
-        if cache_repo.exists():
-            shutil.rmtree(cache_repo, ignore_errors=True)
-        clone_cmd = ["git"]
-        if local_repo is not None:
-            clone_cmd.extend(safe_directory_args(local_repo))
-        clone_cmd.extend(["clone", "--filter=blob:none", clone_source, str(cache_repo)])
-        run_command(clone_cmd)
-    target = checkout_target(ref, resolved_commit)
-    logger.info(
-        "checking out cached repo target",
-        extra={"cache_repo": str(cache_repo), "target": target},
-    )
-    run_command(["git", "checkout", target], cwd=cache_repo)
-    run_command(["git", "reset", "--hard"], cwd=cache_repo)
-    run_command(["git", "clean", "-fdx"], cwd=cache_repo)
-    logger.info("cached repo ready", extra={"cache_repo": str(cache_repo)})
-    return cache_repo
-
-
-def prepare_runtime_repo(repo_url: str, ref: str | None, resolved_commit: str) -> Path:
-    normalized = normalized_repo_url(repo_url)
-    runtime_root = repo_runtime_root()
-    runtime_root.mkdir(parents=True, exist_ok=True)
-    runtime_repo = repo_runtime_path(normalized)
-    local_repo = local_repo_path(normalized)
-    clone_source = (
-        local_repo.resolve().as_uri() if local_repo is not None else normalized
-    )
-    logger.info(
-        "preparing runtime repo",
-        extra={
-            "repo_url": repo_url,
-            "normalized_repo_url": normalized,
-            "ref": ref or "",
-            "resolved_commit": resolved_commit,
-            "runtime_root": str(runtime_root),
-            "runtime_repo": str(runtime_repo),
-            "clone_source": clone_source,
-            "runtime_exists": runtime_repo.exists(),
-        },
-    )
-    if (runtime_repo / ".git").exists():
-        run_command(
-            ["git", "remote", "set-url", "origin", clone_source], cwd=runtime_repo
-        )
-        run_command(["git", "fetch", "origin", "--tags", "--prune"], cwd=runtime_repo)
-    else:
-        if runtime_repo.exists():
-            shutil.rmtree(runtime_repo, ignore_errors=True)
-        clone_cmd = ["git"]
-        if local_repo is not None:
-            clone_cmd.extend(safe_directory_args(local_repo))
-        clone_cmd.extend(
-            [
-                "clone",
-                "--filter=blob:none",
-                "--no-checkout",
-                clone_source,
-                str(runtime_repo),
-            ]
-        )
-        run_command(clone_cmd)
-
-    target = checkout_target(ref, resolved_commit)
-    logger.info(
-        "checking out runtime repo target",
-        extra={"runtime_repo": str(runtime_repo), "target": target},
-    )
-    if ref and ref.strip() and not _SHA1.match(ref.strip().lower()):
-        remote_branch = f"refs/remotes/origin/{ref}"
-        branch_exists = subprocess.run(
-            ["git", "show-ref", "--verify", "--quiet", remote_branch],
-            cwd=runtime_repo,
-            capture_output=True,
-            text=True,
-        )
-        if branch_exists.returncode == 0:
-            run_command(["git", "checkout", "-B", ref, remote_branch], cwd=runtime_repo)
-        else:
-            run_command(["git", "checkout", "--force", target], cwd=runtime_repo)
-    else:
-        run_command(["git", "checkout", "--force", target], cwd=runtime_repo)
-    run_command(["git", "reset", "--hard", resolved_commit], cwd=runtime_repo)
-    run_command(["git", "clean", "-fdx"], cwd=runtime_repo)
-    logger.info("runtime repo ready", extra={"runtime_repo": str(runtime_repo)})
-    return runtime_repo
+__all__ = [
+    "RunnerError",
+    "_SHA1",
+    "checkout_target",
+    "local_repo_path",
+    "normalized_repo_url",
+    "prepare_cached_repo",
+    "prepare_runtime_repo",
+    "repo_cache_root",
+    "repo_runtime_name",
+    "repo_runtime_path",
+    "repo_runtime_root",
+    "resolve_commit",
+    "run_command",
+    "safe_directory_args",
+    "worker_cache_root",
+]

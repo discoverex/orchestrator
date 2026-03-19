@@ -67,6 +67,7 @@ must_step "job.build_batch_spec" build_sleep_job_spec "${LOG_DIR}/batch-job-spec
 must_step "prefect.submit_batch_flow_run" submit_prefect_run "${LOG_DIR}/batch-job-spec.json" "e2e-job/${BATCH_DEPLOYMENT_NAME}" "${LOG_DIR}/prefect-submit-batch.log"
 must_step "prefect.submit_primary_flow_run" submit_prefect_run "${LOG_DIR}/primary-job-spec.json" "e2e-job/${PRIMARY_DEPLOYMENT_NAME}" "${LOG_DIR}/prefect-submit-primary.log"
 
+# verify-prefect-priority / wait-prefect-state names are kept for contract parity.
 BATCH_FLOW_RUN_ID="$(grep -Eo '[0-9a-fA-F-]{36}' "${LOG_DIR}/prefect-submit-batch.log" | head -n1 || true)"
 PRIMARY_FLOW_RUN_ID="$(grep -Eo '[0-9a-fA-F-]{36}' "${LOG_DIR}/prefect-submit-primary.log" | head -n1 || true)"
 if [[ -z "${BATCH_FLOW_RUN_ID}" || -z "${PRIMARY_FLOW_RUN_ID}" ]]; then
