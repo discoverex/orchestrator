@@ -12,6 +12,14 @@ It demonstrates:
 - optionally creating an MLflow run through `MLFLOW_TRACKING_URI`
 - printing structured JSON to `stdout`
 
+Worker runtime parent dirs available to engine code:
+
+- `ORCH_WORKER_RUNTIME_DIR`
+- `ORCH_CACHE_DIR`
+
+The orchestrator does not guarantee child-process access to its internal
+checkpoint path or derived cache subdirectories.
+
 ## Entrypoint
 
 ```bash
@@ -30,7 +38,16 @@ Default Prefect flow name:
 
 This sample flow keeps the orchestrator-compatible worker-runtime signature:
 
-- `job_spec_json`
+- `run_mode`
+- `engine`
+- `entrypoint`
+- `repo_url`
+- `ref`
+- `config`
+- `job_name`
+- `inputs`
+- `env`
+- `outputs_prefix`
 - `resume_key`
 - `checkpoint_dir`
 
@@ -62,7 +79,7 @@ And declares them in the engine artifact manifest with MLflow tag names:
 - `artifact_scene_uri`
 - `artifact_verification_uri`
 
-## Repo-mode job spec example
+## Repo-mode parameters example
 
 Use the current repository as the `repo_url` when testing locally:
 
