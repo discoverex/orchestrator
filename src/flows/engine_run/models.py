@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flows.domain.job_spec import JobSpec, JobSpecError
+from flows.domain.run_request import RunRequest, RunRequestError
 from flows.engine_run.adapters.inbound.schema import (
     EngineArtifactManifest,
     EngineArtifactManifestEntry,
@@ -19,6 +19,6 @@ __all__ = [
     "EngineArtifactsUploadResult",
     "FlowResult",
     "FlowState",
-    "JobSpec",
-    "JobSpecError",
+    "RunRequest",
+    "RunRequestError",
 ]

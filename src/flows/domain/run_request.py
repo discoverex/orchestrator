@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Any, Literal
 
 
-class JobSpecError(RuntimeError):
+class RunRequestError(RuntimeError):
     pass
 
 
 @dataclass(frozen=True)
-class JobSpec:
+class RunRequest:
     engine: str
     entrypoint: list[str]
     run_mode: Literal["repo", "inline"] = "repo"
@@ -28,43 +28,43 @@ class JobSpec:
 
     def _validate_fields(self) -> None:
         if not self.engine.strip():
-            raise JobSpecError("engine must not be blank")
+            raise RunRequestError("engine must not be blank")
 
         if self.repo_url is not None and not self.repo_url.strip():
-            raise JobSpecError("repo_url must not be blank when provided")
+            raise RunRequestError("repo_url must not be blank when provided")
 
         if self.ref is not None and not self.ref.strip():
-            raise JobSpecError("ref must not be blank when provided")
+            raise RunRequestError("ref must not be blank when provided")
 
         if not self.entrypoint:
-            raise JobSpecError("entrypoint must not be empty")
+            raise RunRequestError("entrypoint must not be empty")
 
         if any(not str(item).strip() for item in self.entrypoint):
-            raise JobSpecError("entrypoint items must not be blank")
+            raise RunRequestError("entrypoint items must not be blank")
 
         if self.config is not None:
             raw = self.config.strip()
             if not raw:
-                raise JobSpecError("config must not be blank when provided")
-            p = Path(raw)
-            if p.is_absolute():
-                raise JobSpecError("config must be a repository-relative path")
-            if ".." in p.parts:
-                raise JobSpecError("config must not escape repository root")
+                raise RunRequestError("config must not be blank when provided")
+            path = Path(raw)
+            if path.is_absolute():
+                raise RunRequestError("config must be a repository-relative path")
+            if ".." in path.parts:
+                raise RunRequestError("config must not escape repository root")
 
         if self.job_name is not None and not self.job_name.strip():
-            raise JobSpecError("job_name must not be blank when provided")
+            raise RunRequestError("job_name must not be blank when provided")
 
     def _validate_repo_fields_for_mode(self) -> None:
         if self.run_mode == "inline":
             if self.repo_url is not None:
-                raise JobSpecError("repo_url must be omitted when run_mode=inline")
+                raise RunRequestError("repo_url must be omitted when run_mode=inline")
             if self.ref is not None:
-                raise JobSpecError("ref must be omitted when run_mode=inline")
+                raise RunRequestError("ref must be omitted when run_mode=inline")
             if self.config is not None:
-                raise JobSpecError("config must be omitted when run_mode=inline")
+                raise RunRequestError("config must be omitted when run_mode=inline")
         elif self.run_mode == "repo":
             if not self.repo_url:
-                raise JobSpecError("repo_url is required when run_mode=repo")
+                raise RunRequestError("repo_url is required when run_mode=repo")
             if not self.ref:
-                raise JobSpecError("ref is required when run_mode=repo")
+                raise RunRequestError("ref is required when run_mode=repo")

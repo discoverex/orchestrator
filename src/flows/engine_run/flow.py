@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import json
 import os
 from typing import Any
 
@@ -40,7 +39,7 @@ from flows.engine_run.task.main import (
     upload_engine_artifacts_task,
     upload_outputs_task,
 )
-from flows.job_spec import parse_job_spec_json
+from flows.adapters.inbound.schema import validate_run_request
 from runner import cleanup_workdir
 
 
@@ -49,18 +48,37 @@ def _flow_attempt() -> int:
 
 @prefect.flow(name="e2e-job", retries=3, retry_delay_seconds=30)
 def run_job_flow(
-    job_spec_json: str | dict[str, Any],
+    *,
+    run_mode: str = "repo",
+    engine: str,
+    entrypoint: list[str],
+    repo_url: str | None = None,
+    ref: str | None = None,
+    config: str | None = None,
+    job_name: str | None = None,
+    inputs: dict[str, Any] | None = None,
+    env: dict[str, str] | None = None,
+    outputs_prefix: str | None = None,
     resume_key: str | None = None,
     checkpoint_dir: str | None = None,
 ) -> FlowResult:
     logger = flow_logger()
     run_id = flow_run.get_id() or "unknown-flow-run"
-    if isinstance(job_spec_json, dict):
-        job_spec_raw = json.dumps(job_spec_json, ensure_ascii=True)
-    else:
-        job_spec_raw = job_spec_json
-    job = parse_job_spec_json(job_spec_raw)
-    log_flow_start(logger, run_id=run_id, job=job)
+    request = validate_run_request(
+        {
+            "run_mode": run_mode,
+            "engine": engine,
+            "entrypoint": entrypoint,
+            "repo_url": repo_url,
+            "ref": ref,
+            "config": config,
+            "job_name": job_name,
+            "inputs": inputs or {},
+            "env": env or {},
+            "outputs_prefix": outputs_prefix,
+        }
+    )
+    log_flow_start(logger, run_id=run_id, job=request)
     active_resume_key = resume_key or run_id
     checkpoint_path = resolve_checkpoint_path(
         checkpoint_dir=checkpoint_dir or os.getenv("ORCHESTRATOR_CHECKPOINT_DIR"),
@@ -72,7 +90,7 @@ def run_job_flow(
         flow_run_id=run_id,
         resume_key=active_resume_key,
         attempt=attempt,
-        job=job,
+        job=request,
         logger=logger,
         resolve_commit_task=resolve_commit_task,
         load_checkpoint_fn=load_checkpoint,
@@ -89,22 +107,22 @@ def run_job_flow(
         exit_code = int(state.exit_code if state.exit_code is not None else 1)
     else:
         effective_outputs_prefix = (
-            job.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/"
+            request.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/"
         )
         local_paths, exit_code = run_entrypoint_job_task(
-            repo_url=job.repo_url,
-            ref=job.ref,
+            repo_url=request.repo_url,
+            ref=request.ref,
             resolved_commit=resolved_commit,
-            entrypoint=job.entrypoint,
-            env=job.env,
-            run_mode=job.run_mode,
-            engine=job.engine,
-            config_rel_path=job.config,
-            inputs=job.inputs,
+            entrypoint=request.entrypoint,
+            env=request.env,
+            run_mode=request.run_mode,
+            engine=request.engine,
+            config_rel_path=request.config,
+            inputs=request.inputs,
             flow_run_id=run_id,
             attempt=attempt,
             outputs_prefix=effective_outputs_prefix,
-            job_name=job.job_name,
+            job_name=request.job_name,
         )
         state = record_entrypoint_state(
             logger=logger,
@@ -187,12 +205,12 @@ def run_job_flow(
         run_id=run_id,
         attempt=attempt,
         build_flow_result=build_flow_result,
-        engine=job.engine,
-        run_mode=job.run_mode,
-        job_name=job.job_name,
+        engine=request.engine,
+        run_mode=request.run_mode,
+        job_name=request.job_name,
         exit_code=exit_code,
         resolved_commit=resolved_commit,
-        outputs_prefix=job.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/",
+        outputs_prefix=request.outputs_prefix or f"jobs/{run_id}/attempt-{attempt}/",
         uploaded=uploaded,
         engine_manifest_uri=engine_manifest_uri or "",
         engine_uploaded=engine_uploaded,

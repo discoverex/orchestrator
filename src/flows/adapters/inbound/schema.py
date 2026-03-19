@@ -14,14 +14,14 @@ from pydantic import (
     model_validator,
 )
 
-from flows.domain.job_spec import JobSpec, JobSpecError
+from flows.domain.run_request import RunRequest, RunRequestError
 
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class JobSpecSchema(StrictModel):
+class RunRequestSchema(StrictModel):
     run_mode: Literal["repo", "inline"] = "repo"
     engine: str = Field(min_length=1)
     repo_url: str | None = None
@@ -87,7 +87,7 @@ class JobSpecSchema(StrictModel):
         return trimmed
 
     @model_validator(mode="after")
-    def _validate_repo_fields_for_mode(self) -> JobSpecSchema:
+    def _validate_repo_fields_for_mode(self) -> RunRequestSchema:
         if self.run_mode == "inline":
             if self.repo_url is not None:
                 raise ValueError("repo_url must be omitted when run_mode=inline")
@@ -102,8 +102,8 @@ class JobSpecSchema(StrictModel):
             raise ValueError("ref is required when run_mode=repo")
         return self
 
-    def to_domain(self) -> JobSpec:
-        return JobSpec(
+    def to_domain(self) -> RunRequest:
+        return RunRequest(
             run_mode=self.run_mode,
             engine=self.engine,
             entrypoint=self.entrypoint,
@@ -124,7 +124,7 @@ def _load_registry(path: Path) -> set[str]:
         return {str(item) for item in engines if str(item).strip()}
     if isinstance(engines, dict):
         return {str(item) for item in engines.keys() if str(item).strip()}
-    raise JobSpecError(f"invalid engine registry shape in {path}")
+    raise RunRequestError(f"invalid engine registry shape in {path}")
 
 
 def validate_engine_registry(engine: str) -> None:
@@ -135,14 +135,23 @@ def validate_engine_registry(engine: str) -> None:
         return
     allowed = _load_registry(registry_path)
     if engine not in allowed:
-        raise JobSpecError(f"engine not in registry: {engine}")
+        raise RunRequestError(f"engine not in registry: {engine}")
 
-
-def parse_job_spec_json(raw: str) -> JobSpec:
+def load_parameters_json(raw: str) -> RunRequest:
     try:
-        spec_schema = JobSpecSchema.model_validate_json(raw)
+        request_schema = RunRequestSchema.model_validate_json(raw)
     except ValidationError as exc:
-        raise JobSpecError(f"invalid job spec: {exc}") from exc
+        raise RunRequestError(f"invalid flow parameters: {exc}") from exc
 
-    validate_engine_registry(spec_schema.engine)
-    return spec_schema.to_domain()
+    validate_engine_registry(request_schema.engine)
+    return request_schema.to_domain()
+
+
+def validate_run_request(parameters: dict[str, Any]) -> RunRequest:
+    try:
+        request_schema = RunRequestSchema.model_validate(parameters)
+    except ValidationError as exc:
+        raise RunRequestError(f"invalid flow parameters: {exc}") from exc
+
+    validate_engine_registry(request_schema.engine)
+    return request_schema.to_domain()

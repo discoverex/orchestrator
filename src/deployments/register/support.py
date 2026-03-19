@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -37,22 +36,18 @@ class RegistrationTarget:
     entrypoint: str
 
 
-def build_base_parameters() -> dict[str, str]:
+def build_base_parameters() -> dict[str, object]:
     return {
-        "job_spec_json": json.dumps(
-            {
-                "engine": "shell",
-                "repo_url": "https://github.com/example/repo.git",
-                "ref": "main",
-                "entrypoint": ["/bin/sh", "-lc", "echo hello"],
-                "config": None,
-                "job_name": None,
-                "inputs": {},
-                "env": {},
-                "outputs_prefix": None,
-            },
-            ensure_ascii=True,
-        )
+        "run_mode": "repo",
+        "engine": "shell",
+        "repo_url": "https://github.com/example/repo.git",
+        "ref": "main",
+        "entrypoint": ["/bin/sh", "-lc", "echo hello"],
+        "config": None,
+        "job_name": None,
+        "inputs": {},
+        "env": {},
+        "outputs_prefix": None,
     }
 
 
