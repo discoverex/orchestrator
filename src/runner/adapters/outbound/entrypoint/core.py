@@ -8,7 +8,6 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from tempfile import mkdtemp
 
 from runner.adapters.outbound.entrypoint.runtime import (
     apply_runtime_env,
@@ -17,9 +16,7 @@ from runner.adapters.outbound.entrypoint.runtime import (
 )
 from runner.adapters.outbound.git.repo import (
     RunnerError,
-    checkout_target,
-    prepare_cached_repo,
-    run_command,
+    prepare_runtime_repo,
 )
 from runner.adapters.outbound.mlflow.proxy import maybe_start_mlflow_proxy
 from runner.domain.models import RunArtifacts
@@ -43,11 +40,11 @@ def run_entrypoint(
     outputs_prefix: str,
     job_name: str | None = None,
 ) -> RunArtifacts:
-    workdir = Path(mkdtemp(prefix="orchestrator-run-"))
+    workdir: Path | None = None
     logger.info(
         "starting entrypoint run",
         extra={
-            "workdir": str(workdir),
+            "workdir": "",
             "run_mode": run_mode,
             "engine": engine,
             "repo_url": repo_url or "",
@@ -63,20 +60,21 @@ def run_entrypoint(
             raise RunnerError(
                 "repo_url/ref/resolved_commit are required when run_mode=repo"
             )
+        workdir = prepare_runtime_repo(repo_url, ref, resolved_commit)
         logger.info(
-            "preparing repo-backed workdir",
+            "prepared repo-backed workdir",
             extra={"workdir": str(workdir), "repo_url": repo_url, "ref": ref},
         )
-        cached_repo = prepare_cached_repo(repo_url, ref, resolved_commit)
-        run_command(["git", "clone", "--no-checkout", str(cached_repo), str(workdir)])
-        run_command(
-            ["git", "checkout", checkout_target(ref, resolved_commit)], cwd=workdir
-        )
     elif run_mode == "inline":
+        import tempfile
+
+        workdir = Path(tempfile.mkdtemp(prefix="orchestrator-run-"))
         if config_rel_path:
             raise RunnerError("config is not supported when run_mode=inline")
     else:
         raise RunnerError(f"unsupported run_mode: {run_mode}")
+
+    assert workdir is not None
 
     stdout_path = workdir / "stdout.log"
     stderr_path = workdir / "stderr.log"

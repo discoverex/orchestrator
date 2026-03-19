@@ -35,6 +35,11 @@ def apply_worker_runtime_defaults(merged_env: dict[str, str]) -> None:
         repo_cache_dir = str(Path(cache_dir) / "repo")
         merged_env["ORCH_REPO_CACHE_DIR"] = repo_cache_dir
 
+    repo_runtime_dir = merged_env.get("ORCH_REPO_RUNTIME_DIR", "").strip()
+    if not repo_runtime_dir:
+        repo_runtime_dir = str(Path(runtime_root) / "repos")
+        merged_env["ORCH_REPO_RUNTIME_DIR"] = repo_runtime_dir
+
     model_cache_dir = merged_env.get("ORCH_MODEL_CACHE_DIR", "").strip()
     if not model_cache_dir:
         model_cache_dir = str(Path(cache_dir) / "models")
@@ -64,6 +69,7 @@ def env_summary(env: dict[str, str]) -> dict[str, str]:
         "ORCH_WORKER_RUNTIME_DIR",
         "ORCH_CACHE_DIR",
         "ORCH_REPO_CACHE_DIR",
+        "ORCH_REPO_RUNTIME_DIR",
         "ORCH_MODEL_CACHE_DIR",
         "MLFLOW_TRACKING_URI",
         "STORAGE_API_URL",
