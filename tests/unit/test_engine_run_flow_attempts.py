@@ -9,7 +9,7 @@ import pytest
 import flows.engine_run.flow as flow_module
 from flows.engine_run.flow import run_job_flow
 from flows.engine_run.models import ArtifactLink, EngineArtifactsUploadResult
-from flows.job_spec import JobSpec
+from flows.domain.run_request import RunRequest
 
 
 def test_flow_attempt_uses_run_context_run_count(
@@ -53,12 +53,10 @@ def test_run_job_flow_inline_executes_uploads_and_cleans_up(
     flow_runtime = cast(Any, flow_module).flow_run
     monkeypatch.setattr(flow_runtime, "get_id", lambda: "flow-inline")
     monkeypatch.setattr(flow_module, "_flow_attempt", lambda: 2)
-    import json
-
     monkeypatch.setattr(
         flow_module,
-        "parse_job_spec_json",
-        lambda raw: JobSpec(**json.loads(raw)),
+        "validate_run_request",
+        lambda payload: RunRequest(**payload),
     )
     monkeypatch.setattr(
         flow_module,
@@ -134,16 +132,14 @@ def test_run_job_flow_inline_executes_uploads_and_cleans_up(
     )
 
     out = run_job_flow.fn(
-        {
-            "run_mode": "inline",
-            "engine": "shell",
-            "entrypoint": ["/bin/sh", "-lc", "echo ok"],
-            "config": None,
-            "job_name": "inline-job",
-            "inputs": {},
-            "env": {},
-            "outputs_prefix": None,
-        },
+        run_mode="inline",
+        engine="shell",
+        entrypoint=["/bin/sh", "-lc", "echo ok"],
+        config=None,
+        job_name="inline-job",
+        inputs={},
+        env={},
+        outputs_prefix=None,
         checkpoint_dir=str(tmp_path),
     )
 

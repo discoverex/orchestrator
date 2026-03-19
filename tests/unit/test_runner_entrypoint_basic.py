@@ -89,7 +89,7 @@ def test_run_entrypoint_merges_job_and_orchestrator_env(
         cleanup_workdir(artifacts.workdir)
 
 
-def test_run_entrypoint_injects_worker_runtime_cache_defaults(
+def test_run_entrypoint_injects_only_parent_worker_runtime_dirs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
@@ -104,13 +104,14 @@ def test_run_entrypoint_injects_worker_runtime_cache_defaults(
             (
                 "printf '%s\\n' \"$ORCH_WORKER_RUNTIME_DIR\" && "
                 "printf '%s\\n' \"$ORCH_CACHE_DIR\" && "
-                "printf '%s\\n' \"$ORCH_REPO_CACHE_DIR\" && "
-                "printf '%s\\n' \"$ORCH_REPO_RUNTIME_DIR\" && "
-                "printf '%s\\n' \"$ORCH_MODEL_CACHE_DIR\" && "
-                "printf '%s\\n' \"$HF_HOME\" && "
-                "printf '%s\\n' \"$HF_HUB_CACHE\" && "
-                "printf '%s\\n' \"$TRANSFORMERS_CACHE\" && "
-                "printf '%s\\n' \"$TORCH_HOME\""
+                "printf '%s\\n' \"${ORCH_REPO_CACHE_DIR:-}\" && "
+                "printf '%s\\n' \"${ORCH_REPO_RUNTIME_DIR:-}\" && "
+                "printf '%s\\n' \"${ORCH_MODEL_CACHE_DIR:-}\" && "
+                "printf '%s\\n' \"${ORCHESTRATOR_CHECKPOINT_DIR:-}\" && "
+                "printf '%s\\n' \"${HF_HOME:-}\" && "
+                "printf '%s\\n' \"${HF_HUB_CACHE:-}\" && "
+                "printf '%s\\n' \"${TRANSFORMERS_CACHE:-}\" && "
+                "printf '%s\\n' \"${TORCH_HOME:-}\""
             ),
         ],
         run_mode="inline",
@@ -128,19 +129,20 @@ def test_run_entrypoint_injects_worker_runtime_cache_defaults(
         assert artifacts.stdout_path.read_text(encoding="utf-8").splitlines() == [
             "/var/lib/orchestrator",
             "/var/lib/orchestrator/cache",
-            "/var/lib/orchestrator/cache/repo",
-            "/var/lib/orchestrator/repos",
-            "/var/lib/orchestrator/cache/models",
-            "/var/lib/orchestrator/cache/models",
-            "/var/lib/orchestrator/cache/models/hub",
-            "/var/lib/orchestrator/cache/models/transformers",
-            "/var/lib/orchestrator/cache/models/torch",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
         ]
     finally:
         cleanup_workdir(artifacts.workdir)
 
 
-def test_run_entrypoint_uses_explicit_cache_dir_for_repo_and_model_defaults(
+def test_run_entrypoint_preserves_explicit_parent_cache_dir_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
@@ -154,9 +156,9 @@ def test_run_entrypoint_uses_explicit_cache_dir_for_repo_and_model_defaults(
             "-lc",
             (
                 "printf '%s\\n' \"$ORCH_CACHE_DIR\" && "
-                "printf '%s\\n' \"$ORCH_REPO_CACHE_DIR\" && "
-                "printf '%s\\n' \"$ORCH_REPO_RUNTIME_DIR\" && "
-                "printf '%s\\n' \"$ORCH_MODEL_CACHE_DIR\""
+                "printf '%s\\n' \"${ORCH_REPO_CACHE_DIR:-}\" && "
+                "printf '%s\\n' \"${ORCH_REPO_RUNTIME_DIR:-}\" && "
+                "printf '%s\\n' \"${ORCH_MODEL_CACHE_DIR:-}\""
             ),
         ],
         run_mode="inline",
@@ -173,9 +175,9 @@ def test_run_entrypoint_uses_explicit_cache_dir_for_repo_and_model_defaults(
         assert artifacts.exit_code == 0
         assert artifacts.stdout_path.read_text(encoding="utf-8").splitlines() == [
             "/tmp/orch-cache",
-            "/tmp/orch-cache/repo",
-            "/var/lib/orchestrator/repos",
-            "/tmp/orch-cache/models",
+            "",
+            "",
+            "",
         ]
     finally:
         cleanup_workdir(artifacts.workdir)

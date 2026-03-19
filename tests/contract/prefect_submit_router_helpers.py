@@ -9,8 +9,9 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
 
-DEFAULT_JOB_SPEC_JSON = (
-    '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git",'
+DEFAULT_PARAMETERS_JSON = (
+    '{"run_mode":"repo","engine":"shell",'
+    '"repo_url":"https://github.com/octocat/Hello-World.git",'
     '"ref":"master","entrypoint":["/bin/sh","-lc","echo test"],'
     '"config":null,"inputs":{},"env":{},"outputs_prefix":null}'
 )
@@ -49,11 +50,11 @@ def fake_args(**overrides: object) -> FakeParser:
         "colab_deployment": "e2e-job/e2e-test-colab",
         "fixed_queue": "gpu-fixed",
         "colab_queue": "gpu-colab",
-        "job_spec_json": DEFAULT_JOB_SPEC_JSON,
-        "job_spec_file": None,
+        "parameters_json": DEFAULT_PARAMETERS_JSON,
+        "parameters_file": None,
         "resume_key": None,
         "checkpoint_dir": None,
-        "parameters_json": None,
+        "parameter_overrides_json": None,
     }
     payload.update(overrides)
     return FakeParser(payload)

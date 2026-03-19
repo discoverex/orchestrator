@@ -9,7 +9,7 @@ import pytest
 import flows.engine_run.flow as flow_module
 from flows.engine_run.flow import run_job_flow
 from flows.engine_run.models import ArtifactLink, EngineArtifactsUploadResult, FlowState
-from flows.job_spec import JobSpec
+from flows.domain.run_request import RunRequest
 
 
 def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
@@ -51,12 +51,10 @@ def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
     flow_runtime = cast(Any, flow_module).flow_run
     monkeypatch.setattr(flow_runtime, "get_id", lambda: "flow-repo")
     monkeypatch.setattr(flow_module, "_flow_attempt", lambda: 1)
-    import json
-
     monkeypatch.setattr(
         flow_module,
-        "parse_job_spec_json",
-        lambda raw: JobSpec(**json.loads(raw)),
+        "validate_run_request",
+        lambda payload: RunRequest(**payload),
     )
     monkeypatch.setattr(
         flow_module,
@@ -136,17 +134,15 @@ def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
     monkeypatch.setattr(flow_module, "cleanup_workdir", lambda path: None)
 
     out = run_job_flow.fn(
-        {
-            "run_mode": "repo",
-            "engine": "shell",
-            "repo_url": "https://github.com/example/repo.git",
-            "ref": "main",
-            "entrypoint": ["/bin/sh", "-lc", "echo ok"],
-            "config": None,
-            "inputs": {},
-            "env": {},
-            "outputs_prefix": None,
-        },
+        run_mode="repo",
+        engine="shell",
+        repo_url="https://github.com/example/repo.git",
+        ref="main",
+        entrypoint=["/bin/sh", "-lc", "echo ok"],
+        config=None,
+        inputs={},
+        env={},
+        outputs_prefix=None,
         resume_key="resume-key",
         checkpoint_dir=str(tmp_path),
     )

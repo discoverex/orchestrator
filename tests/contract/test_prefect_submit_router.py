@@ -61,10 +61,12 @@ def test_router_forwards_job_name_to_flow_run_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     mod = load_router_module()
-    job_spec = (
+    parameters = (
         '{"run_mode":"inline","engine":"shell","job_name":"my-job","entrypoint":["ls"]}'
     )
-    monkeypatch.setattr(mod, "_build_parser", lambda: fake_args(job_spec_json=job_spec))
+    monkeypatch.setattr(
+        mod, "_build_parser", lambda: fake_args(parameters_json=parameters)
+    )
     monkeypatch.setattr(mod, "scheduled_count_for_queue", lambda q: 0)
     monkeypatch.setattr(mod, "running_count_for_queue", lambda q: 0)
     monkeypatch.setattr(mod, "find_deployment_id", lambda d: f"id-{d}")
@@ -92,7 +94,7 @@ def test_router_uses_new_default_deployment_names(
         "argv",
         [
             "prefect_submit_router.py",
-            "--job-spec-json",
+            "--parameters-json",
             '{"run_mode":"inline","engine":"shell","entrypoint":["ls"]}',
         ],
     )
@@ -126,7 +128,7 @@ def test_router_builds_default_fqn_from_flow_and_deployment_env(
         "argv",
         [
             "prefect_submit_router.py",
-            "--job-spec-json",
+            "--parameters-json",
             '{"run_mode":"inline","engine":"shell","entrypoint":["ls"]}',
         ],
     )
