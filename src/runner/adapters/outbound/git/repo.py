@@ -55,11 +55,45 @@ def repo_cache_root() -> Path:
     return worker_cache_root() / "repo"
 
 
+def repo_runtime_root() -> Path:
+    override = os.getenv("ORCH_REPO_RUNTIME_DIR", "").strip()
+    if override:
+        return Path(override)
+    runtime_dir = os.getenv("ORCH_WORKER_RUNTIME_DIR", "").strip()
+    if runtime_dir:
+        return Path(runtime_dir) / "repos"
+    return Path("/var/lib/orchestrator/repos")
+
+
 def normalized_repo_url(repo_url: str) -> str:
     match = _GITHUB_SSH.match(repo_url.strip())
     if not match:
         return repo_url
     return f"https://github.com/{match.group('repo')}.git"
+
+
+def repo_runtime_name(repo_url: str) -> str:
+    normalized = normalized_repo_url(repo_url).rstrip("/")
+    split = urlsplit(normalized)
+    if split.scheme:
+        path_parts = [
+            part
+            for part in Path(unquote(split.path)).parts
+            if part not in ("/", "")
+        ]
+    else:
+        path_parts = [part for part in Path(normalized).parts if part not in (".", "")]
+    if not path_parts:
+        raise RunnerError(f"unable to derive repo name from repo_url={repo_url}")
+    repo_name = path_parts[-1].removesuffix(".git").strip()
+    owner_name = path_parts[-2].strip() if len(path_parts) >= 2 else ""
+    base_name = f"{owner_name}__{repo_name}" if owner_name else repo_name
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "-", base_name)
+    return sanitized or "repo"
+
+
+def repo_runtime_path(repo_url: str) -> Path:
+    return repo_runtime_root() / repo_runtime_name(repo_url)
 
 
 def local_repo_path(repo_url: str) -> Path | None:
@@ -163,3 +197,72 @@ def prepare_cached_repo(repo_url: str, ref: str | None, resolved_commit: str) ->
     run_command(["git", "clean", "-fdx"], cwd=cache_repo)
     logger.info("cached repo ready", extra={"cache_repo": str(cache_repo)})
     return cache_repo
+
+
+def prepare_runtime_repo(repo_url: str, ref: str | None, resolved_commit: str) -> Path:
+    normalized = normalized_repo_url(repo_url)
+    runtime_root = repo_runtime_root()
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    runtime_repo = repo_runtime_path(normalized)
+    local_repo = local_repo_path(normalized)
+    clone_source = (
+        local_repo.resolve().as_uri() if local_repo is not None else normalized
+    )
+    logger.info(
+        "preparing runtime repo",
+        extra={
+            "repo_url": repo_url,
+            "normalized_repo_url": normalized,
+            "ref": ref or "",
+            "resolved_commit": resolved_commit,
+            "runtime_root": str(runtime_root),
+            "runtime_repo": str(runtime_repo),
+            "clone_source": clone_source,
+            "runtime_exists": runtime_repo.exists(),
+        },
+    )
+    if (runtime_repo / ".git").exists():
+        run_command(
+            ["git", "remote", "set-url", "origin", clone_source], cwd=runtime_repo
+        )
+        run_command(["git", "fetch", "origin", "--tags", "--prune"], cwd=runtime_repo)
+    else:
+        if runtime_repo.exists():
+            shutil.rmtree(runtime_repo, ignore_errors=True)
+        clone_cmd = ["git"]
+        if local_repo is not None:
+            clone_cmd.extend(safe_directory_args(local_repo))
+        clone_cmd.extend(
+            [
+                "clone",
+                "--filter=blob:none",
+                "--no-checkout",
+                clone_source,
+                str(runtime_repo),
+            ]
+        )
+        run_command(clone_cmd)
+
+    target = checkout_target(ref, resolved_commit)
+    logger.info(
+        "checking out runtime repo target",
+        extra={"runtime_repo": str(runtime_repo), "target": target},
+    )
+    if ref and ref.strip() and not _SHA1.match(ref.strip().lower()):
+        remote_branch = f"refs/remotes/origin/{ref}"
+        branch_exists = subprocess.run(
+            ["git", "show-ref", "--verify", "--quiet", remote_branch],
+            cwd=runtime_repo,
+            capture_output=True,
+            text=True,
+        )
+        if branch_exists.returncode == 0:
+            run_command(["git", "checkout", "-B", ref, remote_branch], cwd=runtime_repo)
+        else:
+            run_command(["git", "checkout", "--force", target], cwd=runtime_repo)
+    else:
+        run_command(["git", "checkout", "--force", target], cwd=runtime_repo)
+    run_command(["git", "reset", "--hard", resolved_commit], cwd=runtime_repo)
+    run_command(["git", "clean", "-fdx"], cwd=runtime_repo)
+    logger.info("runtime repo ready", extra={"runtime_repo": str(runtime_repo)})
+    return runtime_repo

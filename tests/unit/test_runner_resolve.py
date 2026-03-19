@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from runner.adapters.outbound.git.repo import RunnerError, repo_cache_root
+from runner.adapters.outbound.git.repo import (
+    RunnerError,
+    repo_cache_root,
+    repo_runtime_path,
+    repo_runtime_root,
+)
 from runner.adapters.outbound.git.runner import resolve_commit
 
 
@@ -111,3 +116,31 @@ def test_repo_cache_root_prefers_explicit_override(
     monkeypatch.setenv("ORCH_REPO_CACHE_DIR", "/tmp/repos")
 
     assert repo_cache_root() == Path("/tmp/repos")
+
+
+def test_repo_runtime_root_defaults_under_worker_runtime_dir(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ORCH_REPO_RUNTIME_DIR", raising=False)
+    monkeypatch.setenv("ORCH_WORKER_RUNTIME_DIR", "/var/lib/orchestrator")
+
+    assert repo_runtime_root() == Path("/var/lib/orchestrator/repos")
+
+
+def test_repo_runtime_root_prefers_explicit_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ORCH_WORKER_RUNTIME_DIR", "/var/lib/orchestrator")
+    monkeypatch.setenv("ORCH_REPO_RUNTIME_DIR", "/srv/orchestrator/repos")
+
+    assert repo_runtime_root() == Path("/srv/orchestrator/repos")
+
+
+def test_repo_runtime_path_uses_repo_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ORCH_REPO_RUNTIME_DIR", "/srv/orchestrator/repos")
+
+    assert repo_runtime_path("https://github.com/discoverex/engine.git") == Path(
+        "/srv/orchestrator/repos/discoverex__engine"
+    )
