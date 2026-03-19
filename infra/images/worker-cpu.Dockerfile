@@ -39,6 +39,8 @@ COPY --chown=appuser:appuser src/common /app/src/common
 COPY --chown=appuser:appuser src/flows /app/src/flows
 COPY --chown=appuser:appuser src/runner /app/src/runner
 COPY --chown=appuser:appuser src/storage /app/src/storage
+COPY --chown=appuser:appuser src/worker_router /app/src/worker_router
+COPY --chown=appuser:appuser src/worker_artifacts /app/src/worker_artifacts
 COPY --chown=appuser:appuser infra/images/entrypoints/worker-entrypoint.sh /worker-entrypoint.sh
 RUN chmod +x /worker-entrypoint.sh
 
