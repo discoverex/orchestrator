@@ -20,7 +20,8 @@ services:
       PREFECT_BROWSER_USER_AGENT: ${PREFECT_BROWSER_USER_AGENT:-}
       STORAGE_API_URL: ${STORAGE_API_URL:-}
       HF_TOKEN: ${HF_TOKEN:-}
+      ORCH_WORKER_RUNTIME_DIR: /var/lib/orchestrator
+      ORCH_CACHE_DIR: /var/lib/orchestrator/cache
       ORCHESTRATOR_CHECKPOINT_DIR: /var/lib/orchestrator/checkpoints
-      ORCH_REPO_CACHE_DIR: /var/lib/orchestrator/repo_cache
     volumes:
       - ${WORKER_RUNTIME_DIR:-../../../../../runtime/worker}:/var/lib/orchestrator

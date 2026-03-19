@@ -18,6 +18,18 @@ class RunnerError(RuntimeError):
     pass
 
 
+def worker_cache_root() -> Path:
+    cache_dir = os.getenv("ORCH_CACHE_DIR", "").strip()
+    if cache_dir:
+        return Path(cache_dir)
+
+    runtime_dir = os.getenv("ORCH_WORKER_RUNTIME_DIR", "").strip()
+    if runtime_dir:
+        return Path(runtime_dir) / "cache"
+
+    return Path("/var/lib/orchestrator/cache")
+
+
 def run_command(cmd: list[str], cwd: Path | None = None) -> str:
     logger.info("running git command", extra={"cmd": cmd, "cwd": str(cwd or "")})
     proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
@@ -37,7 +49,10 @@ def run_command(cmd: list[str], cwd: Path | None = None) -> str:
 
 
 def repo_cache_root() -> Path:
-    return Path(os.getenv("ORCH_REPO_CACHE_DIR", "/var/lib/orchestrator/repo_cache"))
+    override = os.getenv("ORCH_REPO_CACHE_DIR", "").strip()
+    if override:
+        return Path(override)
+    return worker_cache_root() / "repo"
 
 
 def normalized_repo_url(repo_url: str) -> str:

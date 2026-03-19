@@ -59,6 +59,9 @@ def test_populate_colab_env_maps_cf_access_headers(
     snapshot = runtime.populate_colab_env(config)
 
     assert snapshot["prefect_work_queue"] == "gpu-colab"
+    assert os.environ["ORCH_CACHE_DIR"] == str(config.cache_root)
+    assert os.environ["ORCH_REPO_CACHE_DIR"] == str(config.cache_root / "repo")
+    assert os.environ["ORCH_MODEL_CACHE_DIR"] == str(config.cache_root / "models")
     assert runtime.clean_env_value(os.environ["CF_ACCESS_CLIENT_ID"]) == "prefect-id"
     assert "CF-Access-Client-Id" in os.environ["PREFECT_CLIENT_CUSTOM_HEADERS"]
 

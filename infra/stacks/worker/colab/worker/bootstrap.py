@@ -32,7 +32,12 @@ def ensure_repo_dir(repo_dir: Path) -> None:
 
 
 def prepare_cache_dirs(cache_root: Path) -> None:
-    for path in (cache_root / "pip", cache_root / "xdg"):
+    for path in (
+        cache_root / "repo",
+        cache_root / "models",
+        cache_root / "pip",
+        cache_root / "xdg",
+    ):
         path.mkdir(parents=True, exist_ok=True)
 
 

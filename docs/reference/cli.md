@@ -72,7 +72,7 @@ Prepare runtime directories outside the repo.
 Created directories:
 
 - `storage`: `../runtime/storage/data/minio`, `../runtime/storage/data/mlflow-db`, `../runtime/storage/backup`, `../runtime/storage/logs`
-- `worker`: `../runtime/worker/checkpoints`, `../runtime/worker/repo_cache`
+- `worker`: `../runtime/worker/checkpoints`, `../runtime/worker/cache`, `../runtime/worker/logs`
 
 ### `storage`
 

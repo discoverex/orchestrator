@@ -89,6 +89,9 @@ def populate_colab_env(
         "PREFECT_WORK_POOL": "gpu-pool",
         "PREFECT_WORK_QUEUE": "gpu-colab",
         "ORCHESTRATOR_CHECKPOINT_DIR": str(config.checkpoint_dir),
+        "ORCH_CACHE_DIR": str(config.cache_root),
+        "ORCH_REPO_CACHE_DIR": str(config.cache_root / "repo"),
+        "ORCH_MODEL_CACHE_DIR": str(config.cache_root / "models"),
         "PIP_CACHE_DIR": str(config.cache_root / "pip"),
         "XDG_CACHE_HOME": str(config.cache_root / "xdg"),
     }
@@ -103,6 +106,8 @@ def populate_colab_env(
     os.environ["XDG_CACHE_HOME"] = defaults["XDG_CACHE_HOME"]
 
     config.cache_root.mkdir(parents=True, exist_ok=True)
+    (config.cache_root / "repo").mkdir(parents=True, exist_ok=True)
+    (config.cache_root / "models").mkdir(parents=True, exist_ok=True)
     (config.cache_root / "pip").mkdir(parents=True, exist_ok=True)
     (config.cache_root / "xdg").mkdir(parents=True, exist_ok=True)
 

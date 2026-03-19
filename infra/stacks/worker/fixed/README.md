@@ -70,6 +70,7 @@ Expected startup summary:
 - Default queue target is `gpu-fixed`.
 - This unit is intended to be always-on and low-touch.
 - Runtime data is expected outside repo at `../runtime/worker` by default.
+- Cache data is expected under `../runtime/worker/cache`, with repo and model caches derived under that root.
 - GitHub SSH repo URLs are normalized internally to HTTPS for resolution/cache fetches.
 - CPU smoke stack defaults to `cpu-test-pool` / `cpu-fixed-test` and keeps checkpoint data under `/tmp/orchestrator-worker-cpu-test-checkpoints` by default.
 - During engine-flow cutover, this runtime is expected to have the engine flow code available in the image or mounted runtime path used by deployment registration.

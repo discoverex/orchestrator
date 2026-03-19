@@ -12,6 +12,42 @@ from runner.adapters.outbound.git.repo import RunnerError
 logger = logging.getLogger("runner.entrypoint")
 
 
+def apply_worker_runtime_defaults(merged_env: dict[str, str]) -> None:
+    runtime_root = merged_env.get("ORCH_WORKER_RUNTIME_DIR", "").strip()
+    if not runtime_root:
+        runtime_root = "/var/lib/orchestrator"
+        merged_env["ORCH_WORKER_RUNTIME_DIR"] = runtime_root
+
+    cache_dir = merged_env.get("ORCH_CACHE_DIR", "").strip()
+    if not cache_dir:
+        repo_cache_dir = merged_env.get("ORCH_REPO_CACHE_DIR", "").strip()
+        model_cache_dir = merged_env.get("ORCH_MODEL_CACHE_DIR", "").strip()
+        if repo_cache_dir:
+            cache_dir = str(Path(repo_cache_dir).parent)
+        elif model_cache_dir:
+            cache_dir = str(Path(model_cache_dir).parent)
+        else:
+            cache_dir = str(Path(runtime_root) / "cache")
+        merged_env["ORCH_CACHE_DIR"] = cache_dir
+
+    repo_cache_dir = merged_env.get("ORCH_REPO_CACHE_DIR", "").strip()
+    if not repo_cache_dir:
+        repo_cache_dir = str(Path(cache_dir) / "repo")
+        merged_env["ORCH_REPO_CACHE_DIR"] = repo_cache_dir
+
+    model_cache_dir = merged_env.get("ORCH_MODEL_CACHE_DIR", "").strip()
+    if not model_cache_dir:
+        model_cache_dir = str(Path(cache_dir) / "models")
+        merged_env["ORCH_MODEL_CACHE_DIR"] = model_cache_dir
+
+    merged_env.setdefault("HF_HOME", model_cache_dir)
+    merged_env.setdefault("HF_HUB_CACHE", str(Path(model_cache_dir) / "hub"))
+    merged_env.setdefault(
+        "TRANSFORMERS_CACHE", str(Path(model_cache_dir) / "transformers")
+    )
+    merged_env.setdefault("TORCH_HOME", str(Path(model_cache_dir) / "torch"))
+
+
 def env_summary(env: dict[str, str]) -> dict[str, str]:
     summary: dict[str, str] = {}
     for key in (
@@ -25,6 +61,10 @@ def env_summary(env: dict[str, str]) -> dict[str, str]:
         "ORCH_JOB_CONFIG_PATH",
         "ORCH_ENGINE_ARTIFACT_DIR",
         "ORCH_ENGINE_ARTIFACT_MANIFEST_PATH",
+        "ORCH_WORKER_RUNTIME_DIR",
+        "ORCH_CACHE_DIR",
+        "ORCH_REPO_CACHE_DIR",
+        "ORCH_MODEL_CACHE_DIR",
         "MLFLOW_TRACKING_URI",
         "STORAGE_API_URL",
     ):
@@ -124,3 +164,4 @@ def apply_runtime_env(
         merged_env["ORCH_JOB_CONFIG_PATH"] = config_path
     if env:
         merged_env.update(env)
+    apply_worker_runtime_defaults(merged_env)

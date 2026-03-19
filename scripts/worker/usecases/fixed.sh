@@ -10,12 +10,14 @@ run_worker_fixed_action() {
       "${GPU_INSTALL_SCRIPT}"
       export WORKER_RUNTIME_DIR="${RUNTIME_ROOT}/worker"
       export WORKER_CHECKPOINT_DIR="${RUNTIME_ROOT}/worker/checkpoints"
-      export WORKER_REPO_CACHE_DIR="${RUNTIME_ROOT}/worker/repo_cache"
+      export WORKER_CACHE_DIR="${RUNTIME_ROOT}/worker/cache"
       # Ensure worker-managed runtime root exists before the container starts.
       runtime_init_target worker
       mkdir -p \
+        "${RUNTIME_ROOT}/worker/cache" \
         "${RUNTIME_ROOT}/worker/checkpoints" \
-        "${RUNTIME_ROOT}/worker/repo_cache"
+        "${RUNTIME_ROOT}/worker/cache/repo" \
+        "${RUNTIME_ROOT}/worker/cache/models"
       if [[ "$(id -u)" != "0" ]]; then
         echo "ERROR: worker runtime ownership must be prepared with elevated privileges." >&2
         echo "Run: sudo ./bin/cli worker fixed up" >&2
@@ -24,8 +26,10 @@ run_worker_fixed_action() {
       chown -R 10001:10001 "${RUNTIME_ROOT}/worker"
       chmod 0777 \
         "${RUNTIME_ROOT}/worker" \
+        "${RUNTIME_ROOT}/worker/cache" \
         "${RUNTIME_ROOT}/worker/checkpoints" \
-        "${RUNTIME_ROOT}/worker/repo_cache"
+        "${RUNTIME_ROOT}/worker/cache/repo" \
+        "${RUNTIME_ROOT}/worker/cache/models"
       compose_worker_fixed up -d --build "$@"
       ;;
     down) compose_worker_fixed down "$@" ;;

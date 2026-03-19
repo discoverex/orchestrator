@@ -3,7 +3,7 @@
 : "${RUNTIME_ROOT:=${ROOT_DIR}/../runtime}"
 : "${WORKER_RUNTIME_DIR:=${RUNTIME_ROOT}/worker}"
 : "${WORKER_CHECKPOINT_DIR:=${RUNTIME_ROOT}/worker/checkpoints}"
-: "${WORKER_REPO_CACHE_DIR:=${RUNTIME_ROOT}/worker/repo_cache}"
+: "${WORKER_CACHE_DIR:=${RUNTIME_ROOT}/worker/cache}"
 
 normalize_public_git_url() {
   local raw="$1"
@@ -66,9 +66,9 @@ build_engine_job_spec() {
 }
 
 bootstrap_temp_worker() {
-  mkdir -p "${WORKER_RUNTIME_DIR}" "${WORKER_CHECKPOINT_DIR}" "${WORKER_REPO_CACHE_DIR}"
-  chmod 0777 "${WORKER_RUNTIME_DIR}" "${WORKER_CHECKPOINT_DIR}" "${WORKER_REPO_CACHE_DIR}" || true
+  mkdir -p "${WORKER_RUNTIME_DIR}" "${WORKER_CHECKPOINT_DIR}" "${WORKER_CACHE_DIR}"
+  chmod 0777 "${WORKER_RUNTIME_DIR}" "${WORKER_CHECKPOINT_DIR}" "${WORKER_CACHE_DIR}" || true
   must_step "worker.remove_existing_temp" bash -lc "docker rm -f '${WORKER_CONTAINER_NAME}' >/dev/null 2>&1 || true"
-  must_step "worker.start_temp" docker run -d --rm --name "${WORKER_CONTAINER_NAME}" --network host -e PREFECT_API_URL="${PREFECT_API_URL}" -e PREFECT_CLIENT_CUSTOM_HEADERS="${PREFECT_CUSTOM_HEADERS_JSON}" -e PREFECT_WORK_POOL="${PREFECT_WORK_POOL}" -e PREFECT_WORK_QUEUE="${PREFECT_WORK_QUEUE}" -e STORAGE_API_URL="${STORAGE_API_URL}" -e CF_ACCESS_CLIENT_ID="${CF_ACCESS_CLIENT_ID}" -e CF_ACCESS_CLIENT_SECRET="${CF_ACCESS_CLIENT_SECRET}" -e ORCHESTRATOR_CHECKPOINT_DIR=/var/lib/orchestrator/checkpoints -e ORCH_REPO_CACHE_DIR=/var/lib/orchestrator/repo_cache -v "${WORKER_RUNTIME_DIR}:/var/lib/orchestrator" orchestrator-worker:local
+  must_step "worker.start_temp" docker run -d --rm --name "${WORKER_CONTAINER_NAME}" --network host -e PREFECT_API_URL="${PREFECT_API_URL}" -e PREFECT_CLIENT_CUSTOM_HEADERS="${PREFECT_CUSTOM_HEADERS_JSON}" -e PREFECT_WORK_POOL="${PREFECT_WORK_POOL}" -e PREFECT_WORK_QUEUE="${PREFECT_WORK_QUEUE}" -e STORAGE_API_URL="${STORAGE_API_URL}" -e CF_ACCESS_CLIENT_ID="${CF_ACCESS_CLIENT_ID}" -e CF_ACCESS_CLIENT_SECRET="${CF_ACCESS_CLIENT_SECRET}" -e ORCHESTRATOR_CHECKPOINT_DIR=/var/lib/orchestrator/checkpoints -e ORCH_CACHE_DIR=/var/lib/orchestrator/cache -v "${WORKER_RUNTIME_DIR}:/var/lib/orchestrator" orchestrator-worker:local
   must_step "worker.verify_temp_running" bash -lc "sleep 3 && [[ \"\$(docker inspect --format '{{.State.Running}}' '${WORKER_CONTAINER_NAME}' 2>/dev/null || true)\" == 'true' ]]"
 }

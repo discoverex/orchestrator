@@ -12,7 +12,7 @@ runtime_init_target() {
       ;;
     worker)
       mkdir -p "${RUNTIME_ROOT}/worker/checkpoints" \
-        "${RUNTIME_ROOT}/worker/repo_cache" \
+        "${RUNTIME_ROOT}/worker/cache" \
         "${RUNTIME_ROOT}/worker/logs"
       echo "runtime worker initialized: ${RUNTIME_ROOT}/worker"
       ;;
