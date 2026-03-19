@@ -30,9 +30,11 @@ def main() -> int:
     out = client.create_flow_run(
         deployment["id"],
         parameters={
-            "run_mode": "inline",
+            "run_mode": "repo",
             "engine": "fixed-dummy",
-            "entrypoint": ["/bin/sh", "-lc", "echo dummy"],
+            "repo_url": "https://github.com/example/repo.git",
+            "ref": "main",
+            "flow_entrypoint": "src/dummy_engine/prefect_flow.py:dummy_engine_flow",
             "inputs": {},
             "env": {},
             "outputs_prefix": None,

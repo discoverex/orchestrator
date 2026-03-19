@@ -58,7 +58,7 @@ def parse_and_merge_parameters(
             "engine": request.engine,
             "repo_url": request.repo_url,
             "ref": request.ref,
-            "entrypoint": request.entrypoint,
+            "flow_entrypoint": request.flow_entrypoint,
             "config": request.config,
             "job_name": request.job_name,
             "inputs": request.inputs,

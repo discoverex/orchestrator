@@ -18,6 +18,7 @@ class CatalogDeployment:
 @dataclass(frozen=True)
 class RegistrationCatalog:
     entrypoint: str
+    parameters: dict[str, object]
     deployments: list[CatalogDeployment]
 
 
@@ -35,21 +36,30 @@ def load_catalog(spec_file: str) -> RegistrationCatalog:
         if ":" in flow_entrypoint
         else f"{flow_source}:{flow_entrypoint}"
     )
+    parameters = _load_parameters(flow, spec_path)
     deployments = _load_deployments(raw, spec_path)
-    return RegistrationCatalog(entrypoint=entrypoint, deployments=deployments)
+    return RegistrationCatalog(
+        entrypoint=entrypoint,
+        parameters=parameters,
+        deployments=deployments,
+    )
+
+
+def _load_parameters(flow: dict[str, Any], spec_path: Path) -> dict[str, object]:
+    value = flow.get("parameters")
+    if value is None:
+        raise ValueError(f"flow.parameters must be provided: {spec_path}")
+    if not isinstance(value, dict):
+        raise ValueError(f"flow.parameters must be a mapping: {spec_path}")
+    return value
 
 
 def catalog_defaults(catalog: RegistrationCatalog) -> dict[str, CatalogDeployment]:
     defaults = {
-        f"{_normalized_mode(deployment.mode)}_{deployment.role}": deployment
+        f"{deployment.mode}_{deployment.role}": deployment
         for deployment in catalog.deployments
     }
-    required = {
-        "primary_fixed",
-        "primary_colab",
-        "compat_fixed",
-        "compat_colab",
-    }
+    required = {"primary_fixed", "primary_colab"}
     missing = sorted(required.difference(defaults))
     if missing:
         raise ValueError(f"deployment catalog missing roles: {', '.join(missing)}")
@@ -75,13 +85,6 @@ def _load_deployments(
             )
         )
     return deployments
-
-
-def _normalized_mode(mode: str) -> str:
-    if mode == "compatibility":
-        return "compat"
-    return mode
-
 
 def _require_mapping(
     data: dict[str, Any], key: str, spec_path: Path

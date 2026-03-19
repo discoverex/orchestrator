@@ -4,6 +4,17 @@ flow:
   name: e2e-job
   source: src/flows/worker_runtime/flow.py
   entrypoint: run_worker_job_flow
+  parameters:
+    run_mode: repo
+    engine: dummy-engine
+    repo_url: https://github.com/example/repo.git
+    ref: main
+    flow_entrypoint: src/dummy_engine/prefect_flow.py:dummy_engine_flow
+    config: null
+    job_name: null
+    inputs: {}
+    env: {}
+    outputs_prefix: null
 
 deployments:
   - name: e2e-test
@@ -17,18 +28,6 @@ deployments:
     work_pool: ${PREFECT_WORK_POOL:-gpu-pool}
     work_queue: gpu-colab
     mode: primary
-    role: colab
-  - name: e2e-test-legacy
-    full_name: e2e-job/e2e-test-legacy
-    work_pool: ${PREFECT_WORK_POOL:-gpu-pool}
-    work_queue: gpu-fixed
-    mode: compatibility
-    role: fixed
-  - name: e2e-test-colab-legacy
-    full_name: e2e-job/e2e-test-colab-legacy
-    work_pool: ${PREFECT_WORK_POOL:-gpu-pool}
-    work_queue: gpu-colab
-    mode: compatibility
     role: colab
 
 notes:

@@ -63,7 +63,7 @@ def load_flow_parameters(path: str | None = None) -> dict[str, object]:
     return {
         "run_mode": "inline",
         "engine": "fixed-dummy",
-        "entrypoint": ["/bin/sh", "-lc", "echo dummy"],
+        "flow_entrypoint": "src/dummy_engine/prefect_flow.py:dummy_engine_flow",
         "inputs": {},
         "env": {},
         "outputs_prefix": None,

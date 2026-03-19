@@ -19,8 +19,4 @@ exec uv run python -m deployments.register \
   --fixed-queue "${REGISTER_FIXED_DEPLOYMENT_QUEUE:-gpu-fixed}" \
   --colab-name "${REGISTER_COLAB_DEPLOYMENT_NAME:-discoverex-engine-run-colab}" \
   --colab-queue "${REGISTER_COLAB_DEPLOYMENT_QUEUE:-gpu-colab}" \
-  --compat-fixed-name "${REGISTER_COMPAT_FIXED_DEPLOYMENT_NAME:-engine-run}" \
-  --compat-fixed-queue "${REGISTER_COMPAT_FIXED_DEPLOYMENT_QUEUE:-gpu-fixed}" \
-  --compat-colab-name "${REGISTER_COMPAT_COLAB_DEPLOYMENT_NAME:-engine-run-colab}" \
-  --compat-colab-queue "${REGISTER_COMPAT_COLAB_DEPLOYMENT_QUEUE:-gpu-colab}" \
   "${@}"

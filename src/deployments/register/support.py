@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,8 +21,6 @@ DEFAULT_RUNTIME_ENTRYPOINT = "src/flows/worker_runtime/flow.py:run_worker_job_fl
 DEFAULT_WRAPPER_ENTRYPOINT = DEFAULT_RUNTIME_ENTRYPOINT
 DEFAULT_FIXED_DEPLOYMENT = DEFAULT_FIXED_DEPLOYMENT_NAME
 DEFAULT_COLAB_DEPLOYMENT = DEFAULT_COLAB_DEPLOYMENT_NAME
-DEFAULT_COMPAT_FIXED_DEPLOYMENT = "e2e-test-legacy"
-DEFAULT_COMPAT_COLAB_DEPLOYMENT = "e2e-test-colab-legacy"
 
 
 @dataclass(frozen=True)
@@ -36,19 +35,8 @@ class RegistrationTarget:
     entrypoint: str
 
 
-def build_base_parameters() -> dict[str, object]:
-    return {
-        "run_mode": "repo",
-        "engine": "shell",
-        "repo_url": "https://github.com/example/repo.git",
-        "ref": "main",
-        "entrypoint": ["/bin/sh", "-lc", "echo hello"],
-        "config": None,
-        "job_name": None,
-        "inputs": {},
-        "env": {},
-        "outputs_prefix": None,
-    }
+def build_base_parameters(spec_file: str) -> dict[str, object]:
+    return deepcopy(load_catalog(spec_file).parameters)
 
 
 def iter_specs(args: argparse.Namespace) -> list[DeploymentSpec]:
@@ -73,21 +61,6 @@ def iter_specs(args: argparse.Namespace) -> list[DeploymentSpec]:
             args.colab_queue or _defaults()["primary_colab"].work_queue_name,
         ),
     ]
-    if args.register_compat_aliases:
-        specs.extend(
-            [
-                DeploymentSpec(
-                    args.compat_fixed_name or _defaults()["compat_fixed"].name,
-                    args.compat_fixed_queue
-                    or _defaults()["compat_fixed"].work_queue_name,
-                ),
-                DeploymentSpec(
-                    args.compat_colab_name or _defaults()["compat_colab"].name,
-                    args.compat_colab_queue
-                    or _defaults()["compat_colab"].work_queue_name,
-                ),
-            ]
-        )
     return _dedupe_specs(specs)
 
 
@@ -102,13 +75,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Register Prefect deployments for orchestrator or engine flows."
     )
-    parser.add_argument(
-        "--single-name", default=None, help="Single deployment name (compat mode)"
-    )
+    parser.add_argument("--single-name", default=None, help="Single deployment name")
     parser.add_argument(
         "--single-queue",
         default="default",
-        help="Single deployment queue (compat mode)",
+        help="Single deployment queue",
     )
     parser.add_argument(
         "--spec-file",
@@ -132,39 +103,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--colab-queue", default=None, help="Primary colab deployment queue"
     )
-    parser.add_argument(
-        "--compat-fixed-name",
-        default=None,
-        help="Compatibility alias for the fixed deployment",
-    )
-    parser.add_argument(
-        "--compat-fixed-queue",
-        default=None,
-        help="Compatibility alias queue for the fixed deployment",
-    )
-    parser.add_argument(
-        "--compat-colab-name",
-        default=None,
-        help="Compatibility alias for the colab deployment",
-    )
-    parser.add_argument(
-        "--compat-colab-queue",
-        default=None,
-        help="Compatibility alias queue for the colab deployment",
-    )
-    parser.add_argument(
-        "--register-compat-aliases",
-        dest="register_compat_aliases",
-        action="store_true",
-        help="Register legacy engine-run aliases alongside the primary deployments",
-    )
-    parser.add_argument(
-        "--no-register-compat-aliases",
-        dest="register_compat_aliases",
-        action="store_false",
-        help="Skip legacy engine-run compatibility aliases",
-    )
-    parser.set_defaults(register_compat_aliases=True)
     parser.add_argument(
         "--flow-source",
         default=DEFAULT_FLOW_SOURCE,

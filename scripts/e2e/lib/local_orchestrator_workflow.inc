@@ -301,10 +301,12 @@ build_flow_parameters() {
     PYTHONPATH="${ROOT_DIR}/src:${ROOT_DIR}" uv run python - <<'PY' >"${parameters_path}"
 import json
 payload = {
-    "run_mode": "inline",
-    "engine": "shell",
-    "entrypoint": ["/bin/sh", "-lc", "mkdir -p \"$ORCH_ENGINE_ARTIFACT_DIR/scene\" && printf '%s\\n' '{\"scene_id\":\"local-e2e-scene\",\"version_id\":\"attempt-1\"}' > \"$ORCH_ENGINE_ARTIFACT_DIR/scene/scene.json\" && printf '%s\\n' '{\"status\":\"ok\"}' > \"$ORCH_ENGINE_ARTIFACT_DIR/scene/verification.json\" && printf '%s\\n' '{\"schema_version\":1,\"artifacts\":[{\"logical_name\":\"scene_json\",\"relative_path\":\"scene/scene.json\",\"content_type\":\"application/json\",\"mlflow_tag\":\"artifact_scene_uri\"},{\"logical_name\":\"verification_json\",\"relative_path\":\"scene/verification.json\",\"content_type\":\"application/json\",\"mlflow_tag\":\"artifact_verification_uri\"}]}' > \"$ORCH_ENGINE_ARTIFACT_MANIFEST_PATH\" && printf '%s\\n' '{\"status\":\"ok\",\"scene_id\":\"local-e2e-scene\",\"version_id\":\"attempt-1\"}'"],
-    "config": None, "job_name": "local-e2e-dummy", "inputs": {}, "env": {}, "outputs_prefix": None,
+    "run_mode": "repo",
+    "engine": "dummy-engine",
+    "repo_url": "tests/fixtures/dummy_engine_repo",
+    "ref": "main",
+    "flow_entrypoint": "src/dummy_engine/prefect_flow.py:dummy_engine_flow",
+    "config": None, "job_name": "local-e2e-dummy", "inputs": {"scene_id": "local-e2e-scene", "version_id": "attempt-1"}, "env": {}, "outputs_prefix": None,
 }
 print(json.dumps(payload, ensure_ascii=True))
 PY

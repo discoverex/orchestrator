@@ -5,8 +5,6 @@ from typing import Any, Protocol, cast
 
 from deployments.register.support import (
     DEFAULT_COLAB_DEPLOYMENT,
-    DEFAULT_COMPAT_COLAB_DEPLOYMENT,
-    DEFAULT_COMPAT_FIXED_DEPLOYMENT,
     DEFAULT_FIXED_DEPLOYMENT,
     DEFAULT_FLOW_SOURCE,
     DEFAULT_RUNTIME_ENTRYPOINT,
@@ -36,8 +34,6 @@ class DeployableFlow(Protocol):
 
 __all__ = [
     "DEFAULT_COLAB_DEPLOYMENT",
-    "DEFAULT_COMPAT_COLAB_DEPLOYMENT",
-    "DEFAULT_COMPAT_FIXED_DEPLOYMENT",
     "DEFAULT_FIXED_DEPLOYMENT",
     "DEFAULT_FLOW_SOURCE",
     "DEFAULT_RUNTIME_ENTRYPOINT",
@@ -62,7 +58,7 @@ def main() -> None:
             entrypoint=target.entrypoint,
         ),
     )
-    base_parameters = build_base_parameters()
+    base_parameters = build_base_parameters(args.spec_file)
     for spec in iter_specs(args):
         source_flow.deploy(
             name=spec.name,
