@@ -111,7 +111,8 @@ Manage the local all-in-one validation stack used for dev and E2E.
 Behavior:
 
 - uses `scripts/e2e/docker-compose.local.test.yml`
-- `build` first builds the shared base image, then builds `base-runtime`, `worker-router`, `worker`, and `register`
+- `build` first builds the shared base image, then builds `base-runtime`, `worker-router`, the local CPU worker image, and `register`
+- local `worker` uses `infra/images/worker-cpu.Dockerfile` and is tagged `orchestrator-worker-cpu:local`
 - `logs` defaults to `--tail=120`
 
 ### `register`
@@ -150,7 +151,18 @@ Behavior:
 - uses `infra/stacks/worker/fixed/.env` and `infra/stacks/worker/fixed/docker-compose.yml`
 - host `../runtime/worker` is mounted to `/var/lib/orchestrator`
 - `up` runs `scripts/ops/install_nvidia_container_toolkit.sh`, ensures runtime directories via `runtime init worker`, and requires elevated privileges to assign worker runtime ownership to UID 10001 before `docker compose up -d --build`
-- `build` builds the shared base image first
+- `build` only builds the standalone GPU worker image
+
+CPU smoke worker:
+
+```bash
+docker compose --env-file infra/stacks/worker/fixed/.env.cpu-test -f infra/stacks/worker/fixed/docker-compose.cpu-test.yml up -d --build
+```
+
+Behavior:
+
+- uses `infra/images/worker-cpu.Dockerfile`
+- tags image as `orchestrator-worker-cpu:local`
 
 Deployment registration shortcut:
 

@@ -13,9 +13,11 @@ mkdir -p "${MINIO_DATA_DIR}"
 ## 2. Build and Start Services
 
 ```bash
-docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml build base-runtime
 docker compose -p orchestrator-e2e-local -f scripts/e2e/docker-compose.local.test.yml up -d --build minio prefect worker-router worker
 ```
+
+The local `worker` service in this stack builds `infra/images/worker-cpu.Dockerfile`
+and tags it as `orchestrator-worker-cpu:local`.
 
 ## 3. Register Deployment and Run
 
