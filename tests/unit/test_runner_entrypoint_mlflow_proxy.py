@@ -9,6 +9,7 @@ from socketserver import ThreadingMixIn
 import pytest
 
 from runner.adapters.outbound.git.runner import cleanup_workdir, run_entrypoint
+from runner.adapters.outbound.mlflow.proxy import DEFAULT_MLFLOW_PROXY_PORT
 
 
 class _ThreadingHTTPServer(ThreadingMixIn, http.server.HTTPServer):
@@ -74,7 +75,7 @@ def test_run_entrypoint_proxies_remote_mlflow_with_cf_access() -> None:
     try:
         payload = json.loads(artifacts.stdout_path.read_text(encoding="utf-8").strip())
         assert artifacts.exit_code == 0
-        assert payload["uri"].startswith("http://127.0.0.1:")
+        assert payload["uri"] == f"http://127.0.0.1:{DEFAULT_MLFLOW_PROXY_PORT}"
         assert payload["uri"] != upstream
         assert payload["cf_id"] == ""
         assert payload["cf_secret"] == ""
@@ -140,7 +141,7 @@ def test_run_entrypoint_proxies_mlflow_via_worker_router() -> None:
     try:
         payload = json.loads(artifacts.stdout_path.read_text(encoding="utf-8").strip())
         assert artifacts.exit_code == 0
-        assert payload["uri"].startswith("http://127.0.0.1:")
+        assert payload["uri"] == f"http://127.0.0.1:{DEFAULT_MLFLOW_PROXY_PORT}"
         assert payload["body"] == '{"ok": true}'
         assert seen == {"cf_id": "worker-id", "cf_secret": "worker-secret"}
     finally:

@@ -20,6 +20,9 @@ class _ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True
 
 
+DEFAULT_MLFLOW_PROXY_PORT = 38080
+
+
 @dataclass
 class MLflowProxy:
     upstream_url: str
@@ -27,9 +30,12 @@ class MLflowProxy:
     cf_access_client_secret: str
     extra_headers: dict[str, str] | None = None
     bind_host: str = "127.0.0.1"
+    bind_port: int = DEFAULT_MLFLOW_PROXY_PORT
 
     def __post_init__(self) -> None:
-        self._server = _ThreadingHTTPServer((self.bind_host, 0), self._handler_class())
+        self._server = _ThreadingHTTPServer(
+            (self.bind_host, self.bind_port), self._handler_class()
+        )
         self._thread = threading.Thread(
             target=self._server.serve_forever,
             name="mlflow-cf-proxy",

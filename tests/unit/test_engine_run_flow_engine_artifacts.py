@@ -163,3 +163,83 @@ def test_upload_engine_artifacts_task_requires_manifest_on_success(
             1,
             0,
         )
+
+
+def test_upload_engine_artifacts_task_prefers_remote_mlflow_tracking_uri(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tasks_module = importlib.import_module("flows.engine_run.task.main")
+    support_module = importlib.import_module("flows.engine_run.task.support")
+    artifact_dir = tmp_path / "engine-artifacts"
+    artifact_dir.mkdir()
+    (artifact_dir / "scene.json").write_text("{}", encoding="utf-8")
+    manifest_path = tmp_path / "engine-artifacts.manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "artifacts": [
+                    {
+                        "logical_name": "scene",
+                        "relative_path": "scene.json",
+                        "mlflow_tag": "artifact_scene_uri",
+                    }
+                ],
+            },
+            ensure_ascii=True,
+        ),
+        encoding="utf-8",
+    )
+    stdout_path = tmp_path / "stdout.log"
+    stdout_path.write_text('{"mlflow_run_id":"mlflow-123"}\n', encoding="utf-8")
+
+    def _fake_http_json(
+        method: str, url: str, payload: dict[str, object]
+    ) -> dict[str, object] | list[dict[str, object]]:
+        assert method == "POST"
+        if url.endswith("/v1/presign/batch"):
+            return [
+                {
+                    "kind": "custom",
+                    "object_uri": "s3://bucket/jobs/f1/attempt-1/engine/scene.json",
+                    "url": "https://storage.example/engine/scene.json",
+                }
+            ]
+        if url.endswith("/v1/presign/put"):
+            return {
+                "kind": "custom",
+                "object_uri": "s3://bucket/jobs/f1/attempt-1/engine-artifacts.json",
+                "url": "https://storage.example/engine-artifacts.json",
+            }
+        raise AssertionError(url)
+
+    def _fake_upload(_url: str, _payload: bytes) -> None:
+        return
+
+    def _fake_mlflow_post(path: str, payload: dict[str, object]) -> dict[str, object]:
+        assert support_module.mlflow_tracking_uri() == "https://mlflow.discoverex.qzz.io"
+        assert path == "/api/2.0/mlflow/runs/set-tag"
+        assert payload["run_id"] == "mlflow-123"
+        return {}
+
+    monkeypatch.setattr(tasks_module, "http_json", _fake_http_json)
+    monkeypatch.setattr(tasks_module, "upload_file", _fake_upload)
+    monkeypatch.setattr(tasks_module, "_mlflow_post", _fake_mlflow_post)
+    monkeypatch.setenv("STORAGE_API_URL", "https://storage.example")
+    monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:38080")
+    monkeypatch.setenv(
+        "ORCH_REMOTE_MLFLOW_TRACKING_URI", "https://mlflow.discoverex.qzz.io"
+    )
+
+    out = tasks_module.upload_engine_artifacts_task.fn(
+        {
+            "stdout": str(stdout_path),
+            "engine_artifact_dir": str(artifact_dir),
+            "engine_artifact_manifest": str(manifest_path),
+        },
+        "f1",
+        1,
+        0,
+    )
+
+    assert out.mlflow_tags_written is True

@@ -11,6 +11,7 @@ from flows.engine_run.models import EngineArtifactsUploadResult
 from flows.engine_run.task.support import (
     extract_run_id_from_stdout,
     load_engine_artifact_manifest,
+    mlflow_tracking_uri,
     resolve_engine_artifact_path,
     set_mlflow_tag,
 )
@@ -125,7 +126,7 @@ def upload_engine_artifacts(
 
     if not mlflow_tags_written:
         run_id = extract_run_id_from_stdout(Path(local_paths["stdout"]))
-        tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "").strip()
+        tracking_uri = mlflow_tracking_uri()
         if run_id and tracking_uri:
             set_mlflow_tag(
                 run_id,

@@ -52,8 +52,15 @@ def mlflow_headers() -> dict[str, str]:
     return headers
 
 
+def mlflow_tracking_uri() -> str:
+    remote_tracking_uri = os.getenv("ORCH_REMOTE_MLFLOW_TRACKING_URI", "").strip()
+    if remote_tracking_uri:
+        return remote_tracking_uri.rstrip("/")
+    return os.getenv("MLFLOW_TRACKING_URI", "").strip().rstrip("/")
+
+
 def mlflow_post(path: str, payload: dict[str, object]) -> dict[str, Any]:
-    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "").strip().rstrip("/")
+    tracking_uri = mlflow_tracking_uri()
     if not tracking_uri:
         raise RuntimeError("missing required environment variable: MLFLOW_TRACKING_URI")
     body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
