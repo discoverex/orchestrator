@@ -5,7 +5,12 @@ from .commands.mlflow import (
     cmd_create_and_verify_mlflow_tags,
     cmd_verify_engine_mlflow_run,
 )
-from .commands.prefect import cmd_poll_prefect_completion, cmd_verify_prune_removed
+from .commands.prefect import (
+    cmd_poll_prefect_completion,
+    cmd_verify_prefect_priority,
+    cmd_verify_prune_removed,
+    cmd_wait_prefect_state,
+)
 from .commands.storage import (
     cmd_uri_host,
     cmd_verify_flush_output,
@@ -22,6 +27,8 @@ def main() -> int:
     dispatch = {
         "write-summary-local": cmd_write_summary_local,
         "poll-prefect-completion": cmd_poll_prefect_completion,
+        "wait-prefect-state": cmd_wait_prefect_state,
+        "verify-prefect-priority": cmd_verify_prefect_priority,
         "verify-storage-objects": cmd_verify_storage_objects,
         "create-and-verify-mlflow-tags": cmd_create_and_verify_mlflow_tags,
         "verify-engine-mlflow-run": cmd_verify_engine_mlflow_run,

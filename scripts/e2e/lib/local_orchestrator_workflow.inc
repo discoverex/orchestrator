@@ -76,6 +76,92 @@ raise SystemExit(3)
 PY
 }
 
+wait_prefect_state_local() {
+  local flow_run_id="$1"
+  local states="$2"
+  local timeout_sec="$3"
+  compose_local exec -T \
+    -e PREFECT_API_URL=http://127.0.0.1:4200/api \
+    -e FLOW_RUN_ID="${flow_run_id}" \
+    -e TARGET_STATES="${states}" \
+    -e TIMEOUT_SEC="${timeout_sec}" \
+    prefect python - <<'PY'
+import json
+import os
+import time
+from urllib import request
+
+api_url = os.environ["PREFECT_API_URL"].rstrip("/")
+flow_run_id = os.environ["FLOW_RUN_ID"]
+target_states = {item.strip().upper() for item in os.environ["TARGET_STATES"].split(",") if item.strip()}
+timeout_sec = int(os.environ["TIMEOUT_SEC"])
+deadline = time.time() + timeout_sec
+terminal_fail = {"FAILED", "CRASHED", "CANCELLED"}
+
+while time.time() < deadline:
+    with request.urlopen(f"{api_url}/flow_runs/{flow_run_id}", timeout=10) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    state_type = str(payload.get("state_type") or "").upper()
+    if state_type in target_states:
+        print(state_type)
+        raise SystemExit(0)
+    if state_type in terminal_fail:
+        print(state_type)
+        raise SystemExit(2)
+    time.sleep(2)
+
+print("TIMEOUT")
+raise SystemExit(3)
+PY
+}
+
+verify_prefect_priority_local() {
+  local higher_flow_run_id="$1"
+  local lower_flow_run_id="$2"
+  local timeout_sec="$3"
+  compose_local exec -T \
+    -e PREFECT_API_URL=http://127.0.0.1:4200/api \
+    -e HIGHER_FLOW_RUN_ID="${higher_flow_run_id}" \
+    -e LOWER_FLOW_RUN_ID="${lower_flow_run_id}" \
+    -e TIMEOUT_SEC="${timeout_sec}" \
+    prefect python - <<'PY'
+import json
+import os
+import time
+from urllib import request
+
+api_url = os.environ["PREFECT_API_URL"].rstrip("/")
+higher_flow_run_id = os.environ["HIGHER_FLOW_RUN_ID"]
+lower_flow_run_id = os.environ["LOWER_FLOW_RUN_ID"]
+timeout_sec = int(os.environ["TIMEOUT_SEC"])
+deadline = time.time() + timeout_sec
+running_states = {"RUNNING", "COMPLETED"}
+fail_states = {"FAILED", "CRASHED", "CANCELLED"}
+
+def read_state(flow_run_id: str) -> str:
+    with request.urlopen(f"{api_url}/flow_runs/{flow_run_id}", timeout=10) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    return str(payload.get("state_type") or "").upper()
+
+while time.time() < deadline:
+    higher_state = read_state(higher_flow_run_id)
+    lower_state = read_state(lower_flow_run_id)
+    if higher_state in fail_states:
+        raise SystemExit(f"higher-priority flow run failed early: {higher_state}")
+    if lower_state in fail_states:
+        raise SystemExit(f"lower-priority flow run failed early: {lower_state}")
+    if lower_state in running_states and higher_state not in running_states:
+        raise SystemExit("lower-priority flow run advanced before higher-priority flow run")
+    if higher_state in running_states and lower_state not in running_states:
+        print("priority-ok")
+        raise SystemExit(0)
+    time.sleep(2)
+
+print("TIMEOUT")
+raise SystemExit(3)
+PY
+}
+
 verify_storage_objects() {
   local extra_args=()
   if [[ "${MODE}" == "core" ]]; then
@@ -252,7 +338,43 @@ PY
 
 submit_prefect_run() {
   local job_spec_path="$1"
+  local deployment_name="${2:-${TARGET_DEPLOYMENT_NAME}}"
+  local log_path="${3:-${LOG_DIR}/prefect-submit.log}"
   local job_spec_b64
   job_spec_b64="$(base64 -w0 <"${job_spec_path}")"
-  docker compose -p "${LOCAL_PROJECT_NAME}" -f "${LOCAL_COMPOSE_FILE}" exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api -e JOB_SPEC_JSON_B64="${job_spec_b64}" prefect sh -lc 'JOB_SPEC_JSON="$(printf %s "$JOB_SPEC_JSON_B64" | base64 -d)" && prefect deployment run "'"${TARGET_DEPLOYMENT_NAME}"'" -p "job_spec_json=$JOB_SPEC_JSON"' | tee "${LOG_DIR}/prefect-submit.log"
+  docker compose -p "${LOCAL_PROJECT_NAME}" -f "${LOCAL_COMPOSE_FILE}" exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api -e JOB_SPEC_JSON_B64="${job_spec_b64}" prefect sh -lc 'JOB_SPEC_JSON="$(printf %s "$JOB_SPEC_JSON_B64" | base64 -d)" && prefect deployment run "'"${deployment_name}"'" -p "job_spec_json=$JOB_SPEC_JSON"' | tee "${log_path}"
+}
+
+build_sleep_job_spec() {
+  local job_spec_path="$1"
+  local job_name="$2"
+  local sleep_sec="$3"
+  PYTHONPATH="${ROOT_DIR}/src:${ROOT_DIR}" uv run python - "${job_name}" "${sleep_sec}" <<'PY' >"${job_spec_path}"
+import json
+import sys
+
+job_name = sys.argv[1]
+sleep_sec = int(sys.argv[2])
+payload = {
+    "run_mode": "inline",
+    "engine": "shell",
+    "entrypoint": [
+        "/bin/sh",
+        "-lc",
+        "set -eu\n"
+        f"sleep {sleep_sec}\n"
+        "mkdir -p \"$ORCH_ENGINE_ARTIFACT_DIR/scene\"\n"
+        "printf '%s\\n' '{\"scene_id\":\"priority-e2e-scene\",\"version_id\":\"attempt-1\"}' > \"$ORCH_ENGINE_ARTIFACT_DIR/scene/scene.json\"\n"
+        "printf '%s\\n' '{\"status\":\"ok\"}' > \"$ORCH_ENGINE_ARTIFACT_DIR/scene/verification.json\"\n"
+        "printf '%s\\n' '{\"schema_version\":1,\"artifacts\":[{\"logical_name\":\"scene_json\",\"relative_path\":\"scene/scene.json\",\"content_type\":\"application/json\",\"mlflow_tag\":\"artifact_scene_uri\"},{\"logical_name\":\"verification_json\",\"relative_path\":\"scene/verification.json\",\"content_type\":\"application/json\",\"mlflow_tag\":\"artifact_verification_uri\"}]}' > \"$ORCH_ENGINE_ARTIFACT_MANIFEST_PATH\"\n"
+        "printf '%s\\n' '{\"status\":\"ok\",\"scene_id\":\"priority-e2e-scene\",\"version_id\":\"attempt-1\"}'",
+    ],
+    "config": None,
+    "job_name": job_name,
+    "inputs": {},
+    "env": {},
+    "outputs_prefix": None,
+}
+print(json.dumps(payload, ensure_ascii=True))
+PY
 }

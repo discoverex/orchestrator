@@ -21,6 +21,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--flow-run-id", required=True)
     p.add_argument("--timeout-sec", type=int, default=300)
 
+    # wait-prefect-state
+    p = subparsers.add_parser("wait-prefect-state")
+    p.add_argument("--prefect-api-url", required=True)
+    p.add_argument("--flow-run-id", required=True)
+    p.add_argument("--states", required=True)
+    p.add_argument(
+        "--fail-states",
+        default="FAILED,CRASHED,CANCELLED",
+    )
+    p.add_argument("--timeout-sec", type=int, default=300)
+
+    # verify-prefect-priority
+    p = subparsers.add_parser("verify-prefect-priority")
+    p.add_argument("--prefect-api-url", required=True)
+    p.add_argument("--higher-flow-run-id", required=True)
+    p.add_argument("--lower-flow-run-id", required=True)
+    p.add_argument("--timeout-sec", type=int, default=300)
+
     # verify-storage-objects
     p = subparsers.add_parser("verify-storage-objects")
     p.add_argument("--storage-api-url", required=True)
