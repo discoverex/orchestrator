@@ -2,12 +2,10 @@
 
 This profile registers Prefect deployments through a one-shot control-plane container.
 Default mode registers the common worker-runtime flow and creates two primary
-deployments plus two compatibility aliases:
+deployments:
 
 - fixed: `e2e-job/e2e-test` on queue `gpu-fixed`
 - colab: `e2e-job/e2e-test-colab` on queue `gpu-colab`
-- compat fixed alias: `e2e-job/e2e-test-legacy`
-- compat colab alias: `e2e-job/e2e-test-legacy-colab`
 
 ## 1) Configure
 
@@ -34,6 +32,6 @@ prefect deployment ls
 
 - This container is intended for one-shot registration, not a long-running worker.
 - On low-memory hosts (~1 GB RAM), registration is usually feasible, but avoid running heavy worker workloads on the same node.
-- Set `REGISTER_DEPLOYMENT_MODE=single` if you need backward-compatible single deployment registration.
+- Set `REGISTER_DEPLOYMENT_MODE=single` if you want to register one named deployment.
 - Default canonical entrypoint is `src/flows/worker_runtime/flow.py:run_worker_job_flow`.
 - Override `REGISTER_FLOW_SOURCE` and `REGISTER_FLOW_ENTRYPOINT` to register an engine-owned flow such as `dummy-engine-job/discoverex-engine-run`.

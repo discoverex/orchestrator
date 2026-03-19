@@ -36,20 +36,10 @@ Default Prefect flow name:
 
 - `dummy-engine-job`
 
-This sample flow keeps the orchestrator-compatible worker-runtime signature:
+This sample flow is intended to be loaded by the orchestrator runner as a
+Prefect subflow:
 
-- `run_mode`
-- `engine`
-- `entrypoint`
-- `repo_url`
-- `ref`
-- `config`
-- `job_name`
-- `inputs`
-- `env`
-- `outputs_prefix`
-- `resume_key`
-- `checkpoint_dir`
+- `src/dummy_engine/prefect_flow.py:dummy_engine_flow`
 
 and delegates execution to the common worker runtime flow.
 
@@ -89,7 +79,7 @@ Use the current repository as the `repo_url` when testing locally:
   "engine": "dummy-engine",
   "repo_url": "/path/to/orchestrator",
   "ref": "main",
-  "entrypoint": ["python", "tests/fixtures/dummy_engine_repo/src/dummy_engine/main.py"],
+  "flow_entrypoint": "src/dummy_engine/prefect_flow.py:dummy_engine_flow",
   "job_name": "dummy-engine-smoke",
   "inputs": {
     "scene_id": "dummy-scene",
@@ -103,4 +93,4 @@ Use the current repository as the `repo_url` when testing locally:
 ```
 
 For a real external engine repo, copy this example into that repository and
-replace the `repo_url`, `ref`, flow implementation, and entrypoint as needed.
+replace the `repo_url`, `ref`, and `flow_entrypoint` as needed.

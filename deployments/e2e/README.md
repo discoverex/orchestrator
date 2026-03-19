@@ -18,5 +18,5 @@ Current status:
 
 Document scope:
 
-- keep only flow and deployment naming, queue selection, and compatibility aliases here
+- keep only flow and deployment naming and queue selection here
 - keep runtime-specific env vars, auth, and storage endpoints in compose or env files
