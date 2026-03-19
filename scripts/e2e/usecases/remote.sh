@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-DUMMY_JOB_SPEC_FILE="${ROOT_DIR}/scripts/e2e/fixed_dummy_inline_job.json"
+DUMMY_PARAMETERS_FILE="${ROOT_DIR}/scripts/e2e/fixed_dummy_inline_job.json"
 
 e2e_remote_has_arg() {
   local needle="$1"
@@ -27,11 +27,11 @@ _exec_e2e_remote_script() {
   fi
 
   if [[ "${mode}" == "dummy" ]]; then
-    if [[ ! -f "${DUMMY_JOB_SPEC_FILE}" ]]; then
-      echo "missing dummy job spec file: ${DUMMY_JOB_SPEC_FILE}" >&2
+    if [[ ! -f "${DUMMY_PARAMETERS_FILE}" ]]; then
+      echo "missing dummy parameters file: ${DUMMY_PARAMETERS_FILE}" >&2
       return 1
     fi
-    set -- --mode dummy --job-spec-file "${DUMMY_JOB_SPEC_FILE}" "$@"
+    set -- --mode dummy --parameters-file "${DUMMY_PARAMETERS_FILE}" "$@"
   else
     set -- --mode engine "$@"
   fi

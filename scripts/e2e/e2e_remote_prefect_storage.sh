@@ -31,7 +31,7 @@ PRUNE_TTL_HOURS="${PRUNE_TTL_HOURS:-72}"
 RUN_MODE="${RUN_MODE:-engine}"
 KEEP_ON_FAIL="false"; REGISTER_ONLY="false"; BOOTSTRAP_WORKER="false"
 WORKER_CONTAINER_NAME="orchestrator-e2e-temp-worker"
-FLOW_RUN_ID=""; JOB_SPEC_JSON=""; JOB_SPEC_FILE=""
+FLOW_RUN_ID=""; FLOW_PARAMETERS_JSON=""; FLOW_PARAMETERS_FILE=""
 ENGINE_REPO_URL="${ENGINE_REPO_URL:-$(git -C "${ENGINE_DIR}" remote get-url origin)}"
 ENGINE_REPO_REF="${ENGINE_REPO_REF:-$(git -C "${ENGINE_DIR}" branch --show-current)}"
 ENGINE_BACKGROUND_ASSET_REF="${ENGINE_BACKGROUND_ASSET_REF:-bg://dummy}"
@@ -62,8 +62,8 @@ while [[ $# -gt 0 ]]; do
     --artifact-bucket) ARTIFACT_BUCKET="${2:-}"; shift 2 ;;
     --timeout-sec) TIMEOUT_SEC="${2:-}"; shift 2 ;;
     --mode) RUN_MODE="${2:-}"; shift 2 ;;
-    --job-spec-json) JOB_SPEC_JSON="${2:-}"; shift 2 ;;
-    --job-spec-file) JOB_SPEC_FILE="${2:-}"; shift 2 ;;
+    --parameters-json) FLOW_PARAMETERS_JSON="${2:-}"; shift 2 ;;
+    --parameters-file) FLOW_PARAMETERS_FILE="${2:-}"; shift 2 ;;
     --deployment-name) TARGET_DEPLOYMENT_NAME="${2:-}"; shift 2 ;;
     --prune-mode) PRUNE_MODE="${2:-}"; shift 2 ;;
     --prune-ttl-hours) PRUNE_TTL_HOURS="${2:-}"; shift 2 ;;
@@ -127,7 +127,7 @@ fi
 must_step "preflight.tools" bash -lc "command -v docker >/dev/null && command -v curl >/dev/null && command -v uv >/dev/null"
 must_step "preflight.storage_api_health" curl -fsS -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID:-}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET:-}" "${STORAGE_API_URL%/}/healthz"
 # must_step "preflight.minio_health" curl -fsS "http://127.0.0.1:${MINIO_API_PORT}/minio/health/live"
-must_step "engine.build_job_spec" build_engine_job_spec
+must_step "engine.build_flow_parameters" build_flow_parameters
 must_step "build.base_register_worker_images" docker compose -f "${LOCAL_TEST_COMPOSE}" build base-runtime register worker
 must_step "prefect.ensure_work_pool" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e WORK_POOL='${PREFECT_WORK_POOL}' prefecthq/prefect:3-latest sh -lc 'prefect work-pool inspect \"\$WORK_POOL\" >/dev/null 2>&1 || prefect work-pool create \"\$WORK_POOL\" --type process'"
 must_step "register.apply_deployment" bash -lc "run_register_compose() { if [[ -f '${REGISTER_ENV}' ]]; then docker compose --env-file '${REGISTER_ENV}' -f '${REGISTER_COMPOSE}' \"\$@\"; else docker compose -f '${REGISTER_COMPOSE}' \"\$@\"; fi; }; run_register_compose run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e PREFECT_WORK_POOL='${PREFECT_WORK_POOL}' -e PREFECT_WORK_QUEUE='${PREFECT_WORK_QUEUE}' -e REGISTER_FLOW_SOURCE='${REGISTER_FLOW_SOURCE}' -e REGISTER_FLOW_ENTRYPOINT='${REGISTER_FLOW_ENTRYPOINT}' -e REGISTER_FIXED_DEPLOYMENT_NAME='${REGISTER_FIXED_DEPLOYMENT_NAME}' -e REGISTER_COLAB_DEPLOYMENT_NAME='${REGISTER_COLAB_DEPLOYMENT_NAME}' register"
@@ -144,8 +144,7 @@ else
   record_step "worker.bootstrap_temp" "pass" "skipped (production worker expected)"
 fi
 
-JOB_SPEC_JSON_B64="$(base64 -w0 <"${LOG_DIR}/job-spec.json")"
-must_step "prefect.submit_flow_run" bash -lc "docker run --rm -e PREFECT_API_URL='${PREFECT_API_URL}' -e PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' -e JOB_SPEC_JSON_B64='${JOB_SPEC_JSON_B64}' prefecthq/prefect:3-latest sh -lc 'JOB_SPEC_JSON=\"\$(printf %s \"\$JOB_SPEC_JSON_B64\" | base64 -d)\" && prefect deployment run \"${TARGET_DEPLOYMENT_NAME}\" -p \"job_spec_json=\$JOB_SPEC_JSON\"' > '${LOG_DIR}/prefect-submit.log'"
+must_step "prefect.submit_flow_run" bash -lc "PYTHONPATH='${ROOT_DIR}/src:${ROOT_DIR}' PREFECT_API_URL='${PREFECT_API_URL}' PREFECT_CLIENT_CUSTOM_HEADERS='${PREFECT_CUSTOM_HEADERS_JSON}' CF_ACCESS_CLIENT_ID='${CF_ACCESS_CLIENT_ID}' CF_ACCESS_CLIENT_SECRET='${CF_ACCESS_CLIENT_SECRET}' uv run python '${ROOT_DIR}/scripts/ops/prefect_submit_router.py' --strict-priority true --fixed-deployment '${TARGET_DEPLOYMENT_NAME}' --colab-deployment '${TARGET_DEPLOYMENT_NAME}' --fixed-queue '${PREFECT_WORK_QUEUE}' --colab-queue '${PREFECT_WORK_QUEUE}' --parameters-file '${LOG_DIR}/flow-parameters.json' > '${LOG_DIR}/prefect-submit.log'"
 FLOW_RUN_ID="$(grep -Eo '[0-9a-fA-F-]{36}' "${LOG_DIR}/prefect-submit.log" | head -n1 || true)"
 if [[ -z "${FLOW_RUN_ID}" ]]; then
   record_step "prefect.extract_flow_run_id" "fail" "unable to parse flow run id"

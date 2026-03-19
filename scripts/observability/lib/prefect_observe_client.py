@@ -72,10 +72,10 @@ class PrefectObserveClient:
         self,
         deployment_id: str,
         *,
-        job_spec_raw: str,
+        parameters: dict[str, Any],
         flow_run_name: str | None = None,
     ) -> dict[str, Any]:
-        payload: dict[str, Any] = {"parameters": {"job_spec_json": job_spec_raw}}
+        payload: dict[str, Any] = {"parameters": parameters}
         if flow_run_name:
             payload["name"] = flow_run_name
         out = self.request_json(

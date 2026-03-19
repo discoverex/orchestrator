@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any
 
-from flows.job_spec import JobSpecError, parse_job_spec_json
+from flows.adapters.inbound.schema import RunRequestError, load_parameters_json
 
 
 def parse_bool(value: str) -> bool:
@@ -47,22 +47,34 @@ def select_deployment(
     return RouteDecision(preferred, "preferred-selected")
 
 
-def parse_and_merge_job_spec(
-    job_spec_raw: str, parameters_json: str | None
+def parse_and_merge_parameters(
+    parameters_raw: str, overrides_json: str | None
 ) -> dict[str, Any]:
     try:
-        job_spec = asdict(parse_job_spec_json(job_spec_raw))
-    except JobSpecError as exc:
+        parameters = json.loads(parameters_raw)
+        request = load_parameters_json(parameters_raw)
+        parameters = {
+            "run_mode": request.run_mode,
+            "engine": request.engine,
+            "repo_url": request.repo_url,
+            "ref": request.ref,
+            "entrypoint": request.entrypoint,
+            "config": request.config,
+            "job_name": request.job_name,
+            "inputs": request.inputs,
+            "env": request.env,
+            "outputs_prefix": request.outputs_prefix,
+        }
+    except (RunRequestError, json.JSONDecodeError) as exc:
         raise SystemExit(str(exc)) from exc
-    if not parameters_json:
-        return {"job_spec": job_spec, "job_spec_raw": job_spec_raw}
-    extra = json.loads(parameters_json)
+    if not overrides_json:
+        return parameters
+    extra = json.loads(overrides_json)
     if not isinstance(extra, dict):
         raise SystemExit("--parameters-json must be a JSON object")
-    job_spec.update(extra)
-    merged_raw = json.dumps(job_spec, ensure_ascii=True)
+    parameters.update(extra)
     try:
-        parse_job_spec_json(merged_raw)
-    except JobSpecError as exc:
-        raise SystemExit(f"invalid merged job spec: {exc}") from exc
-    return {"job_spec": job_spec, "job_spec_raw": merged_raw}
+        load_parameters_json(json.dumps(parameters, ensure_ascii=True))
+    except RunRequestError as exc:
+        raise SystemExit(f"invalid merged parameters: {exc}") from exc
+    return parameters

@@ -11,12 +11,12 @@ from scripts.observability.lib.prefect_observe_client import (
 )
 
 
-def load_job_spec(path: str) -> str:
+def load_flow_parameters(path: str) -> dict[str, Any]:
     raw = Path(path).read_text(encoding="utf-8")
     parsed = json.loads(raw)
     if not isinstance(parsed, dict):
-        raise ObserveError("job spec file must contain a JSON object")
-    return json.dumps(parsed, ensure_ascii=True)
+        raise ObserveError("parameters file must contain a JSON object")
+    return parsed
 
 
 def summarize_deployment(row: dict[str, Any]) -> dict[str, Any]:

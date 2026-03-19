@@ -49,20 +49,20 @@ cleanup() {
   write_summary
 }
 
-build_engine_job_spec() {
-  if [[ -n "${JOB_SPEC_JSON}" ]]; then
-    printf '%s' "${JOB_SPEC_JSON}" >"${LOG_DIR}/job-spec.json"
+build_flow_parameters() {
+  if [[ -n "${FLOW_PARAMETERS_JSON}" ]]; then
+    printf '%s' "${FLOW_PARAMETERS_JSON}" >"${LOG_DIR}/flow-parameters.json"
     return 0
   fi
-  if [[ -n "${JOB_SPEC_FILE}" ]]; then
-    [[ ! -f "${JOB_SPEC_FILE}" ]] && { echo "job spec file not found: ${JOB_SPEC_FILE}" >&2; return 1; }
-    cp "${JOB_SPEC_FILE}" "${LOG_DIR}/job-spec.json"
+  if [[ -n "${FLOW_PARAMETERS_FILE}" ]]; then
+    [[ ! -f "${FLOW_PARAMETERS_FILE}" ]] && { echo "parameters file not found: ${FLOW_PARAMETERS_FILE}" >&2; return 1; }
+    cp "${FLOW_PARAMETERS_FILE}" "${LOG_DIR}/flow-parameters.json"
     return 0
   fi
   [[ -z "${ENGINE_MLFLOW_TRACKING_URI}" ]] && { echo "missing MLFLOW_TRACKING_URI" >&2; return 1; }
   [[ -z "${ENGINE_MLFLOW_S3_ENDPOINT_URL}" ]] && { echo "missing MLFLOW_S3_ENDPOINT_URL" >&2; return 1; }
   [[ -z "${ENGINE_AWS_ACCESS_KEY_ID}" || -z "${ENGINE_AWS_SECRET_ACCESS_KEY}" ]] && { echo "missing MinIO credentials" >&2; return 1; }
-  python3 "${ENGINE_JOB_SCRIPT}" --dry-run --execution-profile "${ENGINE_EXECUTION_PROFILE}" --command generate --repo-url "${ENGINE_REPO_URL}" --ref "${ENGINE_REPO_REF}" --background-asset-ref "${ENGINE_BACKGROUND_ASSET_REF}" --mlflow-tracking-uri "${ENGINE_MLFLOW_TRACKING_URI}" --mlflow-s3-endpoint-url "${ENGINE_MLFLOW_S3_ENDPOINT_URL}" --aws-access-key-id "${ENGINE_AWS_ACCESS_KEY_ID}" --aws-secret-access-key "${ENGINE_AWS_SECRET_ACCESS_KEY}" --artifact-bucket "${ARTIFACT_BUCKET}" --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" >"${LOG_DIR}/job-spec.json"
+  python3 "${ENGINE_JOB_SCRIPT}" --dry-run --execution-profile "${ENGINE_EXECUTION_PROFILE}" --command generate --repo-url "${ENGINE_REPO_URL}" --ref "${ENGINE_REPO_REF}" --background-asset-ref "${ENGINE_BACKGROUND_ASSET_REF}" --mlflow-tracking-uri "${ENGINE_MLFLOW_TRACKING_URI}" --mlflow-s3-endpoint-url "${ENGINE_MLFLOW_S3_ENDPOINT_URL}" --aws-access-key-id "${ENGINE_AWS_ACCESS_KEY_ID}" --aws-secret-access-key "${ENGINE_AWS_SECRET_ACCESS_KEY}" --artifact-bucket "${ARTIFACT_BUCKET}" --cf-access-client-id "${CF_ACCESS_CLIENT_ID:-}" --cf-access-client-secret "${CF_ACCESS_CLIENT_SECRET:-}" >"${LOG_DIR}/flow-parameters.json"
 }
 
 bootstrap_temp_worker() {

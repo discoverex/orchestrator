@@ -295,10 +295,10 @@ raise SystemExit(f"flow run still present after prune: {state_type or 'UNKNOWN'}
 PY
 }
 
-build_engine_job_spec() {
-  local job_spec_path="${LOG_DIR}/job-spec.json"
+build_flow_parameters() {
+  local parameters_path="${LOG_DIR}/flow-parameters.json"
   if [[ "${MODE}" == "core" ]]; then
-    PYTHONPATH="${ROOT_DIR}/src:${ROOT_DIR}" uv run python - <<'PY' >"${job_spec_path}"
+    PYTHONPATH="${ROOT_DIR}/src:${ROOT_DIR}" uv run python - <<'PY' >"${parameters_path}"
 import json
 payload = {
     "run_mode": "inline",
@@ -308,7 +308,7 @@ payload = {
 }
 print(json.dumps(payload, ensure_ascii=True))
 PY
-    echo "${job_spec_path}"
+    echo "${parameters_path}"
     return
   fi
 
@@ -317,8 +317,8 @@ PY
   if [[ "${MODE}" != "core" ]]; then
     extra_args+=(--mlflow-tracking-uri "${ENGINE_MLFLOW_TRACKING_URI}" --mlflow-s3-endpoint-url "${ENGINE_MLFLOW_S3_ENDPOINT_URL}" --aws-access-key-id "${ENGINE_AWS_ACCESS_KEY_ID}" --aws-secret-access-key "${ENGINE_AWS_SECRET_ACCESS_KEY}" --artifact-bucket "${ARTIFACT_BUCKET}")
   fi
-  uv run python "${ENGINE_JOB_SCRIPT}" --dry-run --run-mode inline --entrypoint-shell-command "tmpdir=\$(mktemp -d /tmp/discoverex-engine-XXXXXX) && tar -C ${ENGINE_REPO_URL_CONTAINER} --exclude=.git --exclude=.venv --exclude=.cache --exclude=.ruff_cache -cf - . | tar -C \"\$tmpdir\" -xf - && cd \"\$tmpdir\" && PYTHONPATH=src python -m discoverex.orchestrator_contract.launcher" --execution-profile "${profile}" --command generate --background-asset-ref "${ENGINE_BACKGROUND_ASSET_REF}" "${extra_args[@]}" >"${job_spec_path}"
-  PYTHONPATH="${ROOT_DIR}/src:${ROOT_DIR}" uv run python - "${job_spec_path}" <<'PY'
+  uv run python "${ENGINE_JOB_SCRIPT}" --dry-run --run-mode inline --entrypoint-shell-command "tmpdir=\$(mktemp -d /tmp/discoverex-engine-XXXXXX) && tar -C ${ENGINE_REPO_URL_CONTAINER} --exclude=.git --exclude=.venv --exclude=.cache --exclude=.ruff_cache -cf - . | tar -C \"\$tmpdir\" -xf - && cd \"\$tmpdir\" && PYTHONPATH=src python -m discoverex.orchestrator_contract.launcher" --execution-profile "${profile}" --command generate --background-asset-ref "${ENGINE_BACKGROUND_ASSET_REF}" "${extra_args[@]}" >"${parameters_path}"
+  PYTHONPATH="${ROOT_DIR}/src:${ROOT_DIR}" uv run python - "${parameters_path}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -326,55 +326,26 @@ path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding="utf-8"))
 engine_run = payload.pop("engine_run", None)
 if not isinstance(engine_run, dict):
-    raise SystemExit("generated job spec missing engine_run payload")
+    raise SystemExit("generated parameters missing engine_run payload")
 payload["inputs"] = engine_run
 env = payload.get("env", {})
 env["MLFLOW_TRACKING_PROXY_URL"] = "http://worker-router:8200/mlflow"
 payload["env"] = env
 path.write_text(json.dumps(payload, ensure_ascii=True), encoding="utf-8")
 PY
-  echo "${job_spec_path}"
+  echo "${parameters_path}"
 }
 
 submit_prefect_run() {
-  local job_spec_path="$1"
-  local deployment_name="${2:-${TARGET_DEPLOYMENT_NAME}}"
-  local log_path="${3:-${LOG_DIR}/prefect-submit.log}"
-  local job_spec_b64
-  job_spec_b64="$(base64 -w0 <"${job_spec_path}")"
-  docker compose -p "${LOCAL_PROJECT_NAME}" -f "${LOCAL_COMPOSE_FILE}" exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api -e JOB_SPEC_JSON_B64="${job_spec_b64}" prefect sh -lc 'JOB_SPEC_JSON="$(printf %s "$JOB_SPEC_JSON_B64" | base64 -d)" && prefect deployment run "'"${deployment_name}"'" -p "job_spec_json=$JOB_SPEC_JSON"' | tee "${log_path}"
-}
-
-build_sleep_job_spec() {
-  local job_spec_path="$1"
-  local job_name="$2"
-  local sleep_sec="$3"
-  PYTHONPATH="${ROOT_DIR}/src:${ROOT_DIR}" uv run python - "${job_name}" "${sleep_sec}" <<'PY' >"${job_spec_path}"
-import json
-import sys
-
-job_name = sys.argv[1]
-sleep_sec = int(sys.argv[2])
-payload = {
-    "run_mode": "inline",
-    "engine": "shell",
-    "entrypoint": [
-        "/bin/sh",
-        "-lc",
-        "set -eu\n"
-        f"sleep {sleep_sec}\n"
-        "mkdir -p \"$ORCH_ENGINE_ARTIFACT_DIR/scene\"\n"
-        "printf '%s\\n' '{\"scene_id\":\"priority-e2e-scene\",\"version_id\":\"attempt-1\"}' > \"$ORCH_ENGINE_ARTIFACT_DIR/scene/scene.json\"\n"
-        "printf '%s\\n' '{\"status\":\"ok\"}' > \"$ORCH_ENGINE_ARTIFACT_DIR/scene/verification.json\"\n"
-        "printf '%s\\n' '{\"schema_version\":1,\"artifacts\":[{\"logical_name\":\"scene_json\",\"relative_path\":\"scene/scene.json\",\"content_type\":\"application/json\",\"mlflow_tag\":\"artifact_scene_uri\"},{\"logical_name\":\"verification_json\",\"relative_path\":\"scene/verification.json\",\"content_type\":\"application/json\",\"mlflow_tag\":\"artifact_verification_uri\"}]}' > \"$ORCH_ENGINE_ARTIFACT_MANIFEST_PATH\"\n"
-        "printf '%s\\n' '{\"status\":\"ok\",\"scene_id\":\"priority-e2e-scene\",\"version_id\":\"attempt-1\"}'",
-    ],
-    "config": None,
-    "job_name": job_name,
-    "inputs": {},
-    "env": {},
-    "outputs_prefix": None,
-}
-print(json.dumps(payload, ensure_ascii=True))
-PY
+  local parameters_path="$1"
+  PYTHONPATH="${ROOT_DIR}/src:${ROOT_DIR}" \
+    PREFECT_API_URL="http://127.0.0.1:24200/api" \
+    uv run python "${ROOT_DIR}/scripts/ops/prefect_submit_router.py" \
+    --strict-priority true \
+    --fixed-deployment "${TARGET_DEPLOYMENT_NAME}" \
+    --colab-deployment "${TARGET_DEPLOYMENT_NAME}" \
+    --fixed-queue "gpu-fixed" \
+    --colab-queue "gpu-fixed" \
+    --parameters-file "${parameters_path}" \
+    | tee "${LOG_DIR}/prefect-submit.log"
 }

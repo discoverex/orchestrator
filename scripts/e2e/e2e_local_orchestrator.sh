@@ -71,9 +71,9 @@ run_step "register.apply_deployment" compose_local run --rm register
 must_step "register.verify_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment inspect '${TARGET_DEPLOYMENT_NAME}' >/dev/null"
 
 if [[ "${MODE}" == "mlflow" ]]; then
-  cp scripts/e2e/fixed_dummy_inline_job.json "${LOG_DIR}/job-spec.json"
+  cp scripts/e2e/fixed_dummy_inline_job.json "${LOG_DIR}/flow-parameters.json"
   # Override MLFLOW_TRACKING_URI to the internal one for the worker-router
-  PYTHONPATH="${ROOT_DIR}/src:${ROOT_DIR}" uv run python - "${LOG_DIR}/job-spec.json" <<'PY'
+  PYTHONPATH="${ROOT_DIR}/src:${ROOT_DIR}" uv run python - "${LOG_DIR}/flow-parameters.json" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -85,10 +85,10 @@ payload["env"] = env
 path.write_text(json.dumps(payload, ensure_ascii=True), encoding="utf-8")
 PY
 else
-  must_step "engine.build_job_spec" build_engine_job_spec
+  must_step "engine.build_flow_parameters" build_flow_parameters
 fi
 
-must_step "prefect.submit_flow_run" submit_prefect_run "${LOG_DIR}/job-spec.json"
+must_step "prefect.submit_flow_run" submit_prefect_run "${LOG_DIR}/flow-parameters.json"
 
 
 FLOW_RUN_ID="$(grep -Eo '[0-9a-fA-F-]{36}' "${LOG_DIR}/prefect-submit.log" | head -n1 || true)"

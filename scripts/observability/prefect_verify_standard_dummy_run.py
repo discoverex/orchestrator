@@ -27,8 +27,17 @@ def main() -> int:
     client = build_client(args.env_file)
     deployment = client.find_deployment(args.deployment_name)
 
-    job_spec_raw = '{"run_mode": "inline", "engine": "fixed-dummy"}'
-    out = client.create_flow_run(deployment["id"], job_spec_raw=job_spec_raw)
+    out = client.create_flow_run(
+        deployment["id"],
+        parameters={
+            "run_mode": "inline",
+            "engine": "fixed-dummy",
+            "entrypoint": ["/bin/sh", "-lc", "echo dummy"],
+            "inputs": {},
+            "env": {},
+            "outputs_prefix": None,
+        },
+    )
     flow_run_id = out["id"]
 
     row = poll_flow_run(client, flow_run_id)

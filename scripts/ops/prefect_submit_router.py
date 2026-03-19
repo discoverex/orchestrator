@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,7 +14,6 @@ from common.prefect.deployment_targets import (
     default_fixed_deployment_fqn,
     deployment_fqn,
 )
-from flows.job_spec import parse_job_spec_json
 from scripts.ops.prefect_submit_router_client import (
     create_flow_run,
     env,
@@ -25,6 +23,7 @@ from scripts.ops.prefect_submit_router_client import (
 )
 from scripts.ops.prefect_submit_router_policy import (
     QueueDepth,
+    parse_and_merge_parameters,
     select_deployment,
 )
 
@@ -81,11 +80,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--colab-deployment", default=None)
     parser.add_argument("--fixed-queue", default=env("ROUTER_FIXED_QUEUE", "gpu-fixed"))
     parser.add_argument("--colab-queue", default=env("ROUTER_COLAB_QUEUE", "gpu-colab"))
-    parser.add_argument("--job-spec-json", default=None)
-    parser.add_argument("--job-spec-file", default=None)
+    parser.add_argument("--parameters-json", default=None)
+    parser.add_argument("--parameters-file", default=None)
     parser.add_argument("--resume-key", default=None)
     parser.add_argument("--checkpoint-dir", default=None)
-    parser.add_argument("--parameters-json", default=None)
+    parser.add_argument("--parameter-overrides-json", default=None)
     return parser
 
 
@@ -131,25 +130,21 @@ def main() -> int:
     selected = decision.selected_deployment
     decision_reason = decision.reason
 
-    job_spec_raw = (
-        Path(args.job_spec_file).read_text(encoding="utf-8")
-        if args.job_spec_file
-        else str(args.job_spec_json)
+    parameters_raw = (
+        Path(args.parameters_file).read_text(encoding="utf-8")
+        if args.parameters_file
+        else str(args.parameters_json)
     )
-    job_spec = dataclasses.asdict(parse_job_spec_json(job_spec_raw))
-    if args.parameters_json:
-        job_spec.update(json.loads(args.parameters_json))
-        job_spec_raw = json.dumps(job_spec, ensure_ascii=True)
+    parameters = parse_and_merge_parameters(
+        parameters_raw,
+        args.parameter_overrides_json,
+    )
 
     dep_id = find_deployment_id(selected)
     created = create_flow_run(
         dep_id,
-        {
-            "job_spec_json": job_spec_raw,
-            "resume_key": args.resume_key,
-            "checkpoint_dir": args.checkpoint_dir,
-        },
-        flow_run_name=job_spec.get("job_name"),
+        {**parameters, "resume_key": args.resume_key, "checkpoint_dir": args.checkpoint_dir},
+        flow_run_name=str(parameters.get("job_name") or "") or None,
     )
 
     print(

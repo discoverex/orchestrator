@@ -55,7 +55,16 @@ def build_client(env_file: str | None = None) -> PrefectObserveClient:
     return PrefectObserveClient(api_url=api_url, headers=headers)
 
 
-def load_job_spec(path: str | None = None) -> str:
+def load_flow_parameters(path: str | None = None) -> dict[str, object]:
     if path:
-        return Path(path).read_text(encoding="utf-8")
-    return '{"run_mode": "inline", "engine": "fixed-dummy"}'
+        import json
+
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    return {
+        "run_mode": "inline",
+        "engine": "fixed-dummy",
+        "entrypoint": ["/bin/sh", "-lc", "echo dummy"],
+        "inputs": {},
+        "env": {},
+        "outputs_prefix": None,
+    }
