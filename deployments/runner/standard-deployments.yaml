@@ -1,0 +1,35 @@
+version: 1
+
+flow:
+  name: e2e-job
+  source: src/flows/worker_runtime/flow.py
+  entrypoint: run_worker_job_flow
+  parameters:
+    run_mode: repo
+    engine: runner-runtime
+    repo_url: https://github.com/example/repo.git
+    ref: main
+    flow_entrypoint: src/app/prefect_flow.py:run
+    config: null
+    job_name: null
+    inputs: {}
+    env: {}
+    outputs_prefix: null
+
+deployments:
+  - name: runner-runtime
+    full_name: e2e-job/runner-runtime
+    work_pool: ${PREFECT_WORK_POOL:-gpu-pool}
+    work_queue: gpu-fixed
+    mode: primary
+    role: fixed
+  - name: runner-runtime-colab
+    full_name: e2e-job/runner-runtime-colab
+    work_pool: ${PREFECT_WORK_POOL:-gpu-pool}
+    work_queue: gpu-colab
+    mode: primary
+    role: colab
+
+notes:
+  - This is the reusable operational runner deployment spec.
+  - Submit concrete repo_url, ref, flow_entrypoint, inputs, and env at flow-run creation time.

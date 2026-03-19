@@ -11,7 +11,7 @@ run_local_stack() {
     logs) compose_local logs --tail=120 "$@" ;;
     build)
       build_base_runtime
-      compose_local build base-runtime worker-router worker register "$@"
+      compose_local build base-runtime worker-router worker "$@"
       ;;
     *)
       echo "unknown local action: ${action}" >&2

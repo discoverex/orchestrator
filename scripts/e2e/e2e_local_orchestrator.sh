@@ -66,8 +66,7 @@ must_step "health.wait_gateway" wait_health orchestrator-e2e-local-worker-router
 [[ "${MODE}" == "mlflow" ]] && must_step "health.wait_mlflow" wait_health orchestrator-e2e-local-mlflow 90
 must_step "prefect.ensure_work_pool" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect work-pool create ${PREFECT_WORK_POOL} --type process >/dev/null 2>&1 || true"
 
-run_step "build.register_image" compose_local build register
-run_step "register.apply_deployment" compose_local run --rm register
+run_step "register.apply_deployment" uv run python scripts/register/prefect_apply.py
 must_step "register.verify_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment inspect '${TARGET_DEPLOYMENT_NAME}' >/dev/null"
 
 if [[ "${MODE}" == "mlflow" ]]; then

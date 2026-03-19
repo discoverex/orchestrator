@@ -5,10 +5,8 @@ run_register_action() {
   shift
 
   case "${action}" in
-    run) compose_register run --rm register "$@" ;;
-    build)
-      build_base_runtime
-      compose_register build base-runtime register "$@"
+    apply)
+      uv run python "${ROOT_DIR}/scripts/register/prefect_apply.py" "$@"
       ;;
     *)
       echo "unknown register action: ${action}" >&2

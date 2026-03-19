@@ -8,7 +8,7 @@ source "${ROOT_DIR}/scripts/register/usecases/run.sh"
 usage() {
   cat <<'EOF'
 Usage:
-  cli register <run|build> [args...]
+  cli register apply [args...]
 EOF
 }
 
@@ -19,7 +19,7 @@ case "${action}" in
   help|-h|--help)
     usage
     ;;
-  run|build)
+  apply)
     run_register_action "${action}" "$@"
     ;;
   *)

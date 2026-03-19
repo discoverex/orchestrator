@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 
 run_worker_register_gpu() {
-  compose_register run --rm register "$@"
+  uv run python "${ROOT_DIR}/scripts/register/prefect_apply.py" "$@"
 }

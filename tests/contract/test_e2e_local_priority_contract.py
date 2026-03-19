@@ -21,7 +21,8 @@ def test_priority_e2e_script_registers_two_single_queue_deployments() -> None:
         encoding="utf-8"
     )
 
-    assert "REGISTER_DEPLOYMENT_MODE=single" in content
+    assert "--single-name" in content
+    assert "--single-queue" in content
     assert 'PREFECT_WORK_QUEUE="${PRIMARY_QUEUE}"' in content
     assert 'PREFECT_WORK_QUEUE="${BATCH_QUEUE}"' in content
     assert "verify-prefect-priority" in content

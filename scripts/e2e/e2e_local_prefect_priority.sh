@@ -55,10 +55,9 @@ must_step "health.wait_minio" wait_health orchestrator-e2e-local-minio 90
 must_step "health.wait_prefect" wait_health orchestrator-e2e-local-prefect 90
 must_step "health.wait_gateway" wait_health orchestrator-e2e-local-worker-router 90
 
-run_step "build.register_image" compose_local build register
-must_step "prefect.ensure_work_queues" compose_local run --rm --entrypoint python register -m common.prefect.work_queues --pool "${PREFECT_WORK_POOL}" --primary-queue "${PRIMARY_QUEUE}" --batch-queue "${BATCH_QUEUE}"
-must_step "register.primary_deployment" compose_local run --rm -e REGISTER_DEPLOYMENT_MODE=single -e REGISTER_DEPLOYMENT_NAME="${PRIMARY_DEPLOYMENT_NAME}" -e PREFECT_WORK_QUEUE="${PRIMARY_QUEUE}" register
-must_step "register.batch_deployment" compose_local run --rm -e REGISTER_DEPLOYMENT_MODE=single -e REGISTER_DEPLOYMENT_NAME="${BATCH_DEPLOYMENT_NAME}" -e PREFECT_WORK_QUEUE="${BATCH_QUEUE}" register
+must_step "prefect.ensure_work_queues" uv run python -m common.prefect.work_queues --pool "${PREFECT_WORK_POOL}" --primary-queue "${PRIMARY_QUEUE}" --batch-queue "${BATCH_QUEUE}"
+must_step "register.primary_deployment" env PREFECT_WORK_QUEUE="${PRIMARY_QUEUE}" uv run python scripts/register/prefect_apply.py --single-name "${PRIMARY_DEPLOYMENT_NAME}" --single-queue "${PRIMARY_QUEUE}"
+must_step "register.batch_deployment" env PREFECT_WORK_QUEUE="${BATCH_QUEUE}" uv run python scripts/register/prefect_apply.py --single-name "${BATCH_DEPLOYMENT_NAME}" --single-queue "${BATCH_QUEUE}"
 must_step "register.verify_primary_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment inspect 'e2e-job/${PRIMARY_DEPLOYMENT_NAME}' >/dev/null"
 must_step "register.verify_batch_deployment" bash -lc "docker compose -p '${LOCAL_PROJECT_NAME}' -f '${LOCAL_COMPOSE_FILE}' exec -T -e PREFECT_API_URL=http://127.0.0.1:4200/api prefect prefect deployment inspect 'e2e-job/${BATCH_DEPLOYMENT_NAME}' >/dev/null"
 
