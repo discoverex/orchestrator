@@ -4,14 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "${ROOT_DIR}/scripts/lib/bootstrap.sh"
 source "${ROOT_DIR}/scripts/worker/usecases/fixed.sh"
-source "${ROOT_DIR}/scripts/worker/usecases/register_gpu.sh"
 source "${ROOT_DIR}/scripts/worker/usecases/submit.sh"
 
 usage() {
   cat <<'EOF'
 Usage:
   cli worker fixed <up|down|ps|logs|build> [args...]
-  cli worker register-gpu [args...]
   cli worker submit [router args...]
 EOF
 }
@@ -36,9 +34,6 @@ case "${action}" in
         exit 2
         ;;
     esac
-    ;;
-  register-gpu)
-    run_worker_register_gpu "$@"
     ;;
   submit)
     run_worker_submit "$@"

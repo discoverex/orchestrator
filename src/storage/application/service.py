@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from storage.domain.models.object_ref import ObjectRef
+
 from ..ports.object_store import ObjectStorePort
 from .models import ExplorerHeadResult, ExplorerListResult, PresignResult
 
@@ -72,6 +74,27 @@ class StorageApplicationService:
             )
             for e in entries
         ]
+
+    def upload_bytes(
+        self,
+        *,
+        flow_run_id: str,
+        attempt: int,
+        filename: str,
+        data: bytes,
+        content_type: str = "application/octet-stream",
+    ) -> ObjectRef:
+        object_uri = self.build_object_uri(
+            flow_run_id=flow_run_id,
+            attempt=attempt,
+            filename=filename,
+        )
+        self.object_store.upload_bytes(
+            data,
+            object_uri,
+            content_type=content_type,
+        )
+        return ObjectRef(uri=object_uri)
 
     def head_object(self, object_uri: str) -> ExplorerHeadResult:
         stat = self.object_store.stat(object_uri)

@@ -53,3 +53,8 @@ class HeadRequest(StrictModel):
 class HeadResponse(StrictModel):
     exists: bool
     size: int | None = None
+
+
+class UploadFileResponse(StrictModel):
+    object_uri: str
+    size: int

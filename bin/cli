@@ -15,7 +15,6 @@ Domains:
   observability  Prefect diagnostics and smoke checks
   ops        Remote operational helpers
   prefect    Prefect stack lifecycle and maintenance
-  register   Deployment registration helpers
   runtime    Runtime directory initialization
   storage    Storage stack lifecycle
   worker     Worker lifecycle and submission helpers
@@ -55,9 +54,6 @@ case "${domain}" in
     ;;
   prefect)
     exec "${ROOT_DIR}/scripts/prefect/cli.sh" "$@"
-    ;;
-  register)
-    exec "${ROOT_DIR}/scripts/register/cli.sh" "$@"
     ;;
   worker)
     exec "${ROOT_DIR}/scripts/worker/cli.sh" "$@"

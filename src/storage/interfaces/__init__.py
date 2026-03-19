@@ -9,6 +9,7 @@ from storage.interfaces.http_models import (
     HeadResponse,
     PresignRequest,
     PresignResponse,
+    UploadFileResponse,
 )
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     "HeadResponse",
     "PresignRequest",
     "PresignResponse",
+    "UploadFileResponse",
     "authorize",
     "authorize_dependency",
     "build_artifact_router",

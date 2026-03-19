@@ -12,6 +12,7 @@ from storage.interfaces.http_models import (
     HeadResponse,
     PresignRequest,
     PresignResponse,
+    UploadFileResponse,
 )
 
 StorageAuthorizer = Callable[[Request, str | None, str | None], None]
@@ -112,5 +113,28 @@ def build_artifact_router(
         return HeadResponse(
             exists=result.exists, size=(result.stat.size if result.stat else None)
         )
+
+    @router.put("/v1/upload/file", response_model=UploadFileResponse)
+    async def upload_file(
+        request: Request,
+        x_orch_flow_run_id: str = Header(min_length=1),
+        x_orch_attempt: int = Header(ge=1),
+        x_orch_filename: str = Header(min_length=1),
+        cf_access_client_id: str | None = Header(default=None),
+        cf_access_client_secret: str | None = Header(default=None),
+    ) -> UploadFileResponse:
+        authorize_request(request, cf_access_client_id, cf_access_client_secret)
+        payload = await request.body()
+        uploaded = storage_app.upload_bytes(
+            flow_run_id=x_orch_flow_run_id,
+            attempt=x_orch_attempt,
+            filename=x_orch_filename,
+            data=payload,
+            content_type=request.headers.get(
+                "Content-Type",
+                "application/octet-stream",
+            ),
+        )
+        return UploadFileResponse(object_uri=uploaded.uri, size=len(payload))
 
     return router
