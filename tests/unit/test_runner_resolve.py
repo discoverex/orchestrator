@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from runner.adapters.outbound.git.repo import RunnerError
+from runner.adapters.outbound.git.repo import RunnerError, repo_cache_root
 from runner.adapters.outbound.git.runner import resolve_commit
 
 
@@ -93,3 +93,21 @@ def test_resolve_commit_handles_github_ssh_url(
     )
 
     assert resolve_commit(repo_url, "main") == "c" * 40
+
+
+def test_repo_cache_root_defaults_under_shared_cache_dir(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ORCH_REPO_CACHE_DIR", raising=False)
+    monkeypatch.setenv("ORCH_CACHE_DIR", "/tmp/orch-cache")
+
+    assert repo_cache_root() == Path("/tmp/orch-cache/repo")
+
+
+def test_repo_cache_root_prefers_explicit_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ORCH_CACHE_DIR", "/tmp/orch-cache")
+    monkeypatch.setenv("ORCH_REPO_CACHE_DIR", "/tmp/repos")
+
+    assert repo_cache_root() == Path("/tmp/repos")

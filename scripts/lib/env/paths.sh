@@ -5,7 +5,7 @@ RUNTIME_ROOT="${RUNTIME_ROOT:-${RUNTIME_ROOT_DEFAULT}}"
 
 WORKER_RUNTIME_DIR="${RUNTIME_ROOT}/worker"
 WORKER_CHECKPOINT_DIR="${RUNTIME_ROOT}/worker/checkpoints"
-WORKER_REPO_CACHE_DIR="${RUNTIME_ROOT}/worker/repo_cache"
+WORKER_CACHE_DIR="${RUNTIME_ROOT}/worker/cache"
 
 LOCAL_COMPOSE="${ROOT_DIR}/scripts/e2e/docker-compose.local.test.yml"
 STORAGE_ENV="${ROOT_DIR}/infra/stacks/storage-node/.env"

@@ -40,15 +40,22 @@ def test_bootstrap_env_sets_pip_and_xdg_cache(tmp_path: Path) -> None:
     assert env["XDG_CACHE_HOME"].endswith("/cache/xdg")
 
 
-def test_prepare_cache_dirs_creates_pip_and_xdg_only(tmp_path: Path) -> None:
+def test_prepare_cache_dirs_creates_shared_cache_subdirs(tmp_path: Path) -> None:
     bootstrap = _load_module("worker.bootstrap")
     cache_root = tmp_path / "cache"
 
     bootstrap.prepare_cache_dirs(cache_root)
 
+    assert (cache_root / "repo").is_dir()
+    assert (cache_root / "models").is_dir()
     assert (cache_root / "pip").is_dir()
     assert (cache_root / "xdg").is_dir()
-    assert sorted(path.name for path in cache_root.iterdir()) == ["pip", "xdg"]
+    assert sorted(path.name for path in cache_root.iterdir()) == [
+        "models",
+        "pip",
+        "repo",
+        "xdg",
+    ]
 
 
 def test_bootstrap_runtime_installs_runtime_requirements(

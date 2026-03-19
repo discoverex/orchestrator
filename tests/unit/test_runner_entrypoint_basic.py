@@ -87,7 +87,7 @@ def test_run_entrypoint_merges_job_and_orchestrator_env(
         cleanup_workdir(artifacts.workdir)
 
 
-def test_run_entrypoint_injects_worker_runtime_model_cache_defaults(
+def test_run_entrypoint_injects_worker_runtime_cache_defaults(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
@@ -101,6 +101,8 @@ def test_run_entrypoint_injects_worker_runtime_model_cache_defaults(
             "-lc",
             (
                 "printf '%s\\n' \"$ORCH_WORKER_RUNTIME_DIR\" && "
+                "printf '%s\\n' \"$ORCH_CACHE_DIR\" && "
+                "printf '%s\\n' \"$ORCH_REPO_CACHE_DIR\" && "
                 "printf '%s\\n' \"$ORCH_MODEL_CACHE_DIR\" && "
                 "printf '%s\\n' \"$HF_HOME\" && "
                 "printf '%s\\n' \"$HF_HUB_CACHE\" && "
@@ -122,11 +124,52 @@ def test_run_entrypoint_injects_worker_runtime_model_cache_defaults(
         assert artifacts.exit_code == 0
         assert artifacts.stdout_path.read_text(encoding="utf-8").splitlines() == [
             "/var/lib/orchestrator",
-            "/var/lib/orchestrator/model_cache",
-            "/var/lib/orchestrator/model_cache",
-            "/var/lib/orchestrator/model_cache/hub",
-            "/var/lib/orchestrator/model_cache/transformers",
-            "/var/lib/orchestrator/model_cache/torch",
+            "/var/lib/orchestrator/cache",
+            "/var/lib/orchestrator/cache/repo",
+            "/var/lib/orchestrator/cache/models",
+            "/var/lib/orchestrator/cache/models",
+            "/var/lib/orchestrator/cache/models/hub",
+            "/var/lib/orchestrator/cache/models/transformers",
+            "/var/lib/orchestrator/cache/models/torch",
+        ]
+    finally:
+        cleanup_workdir(artifacts.workdir)
+
+
+def test_run_entrypoint_uses_explicit_cache_dir_for_repo_and_model_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
+    monkeypatch.delenv("ORCH_WORKER_RUNTIME_DIR", raising=False)
+    artifacts = run_entrypoint(
+        repo_url=None,
+        ref=None,
+        resolved_commit=None,
+        entrypoint=[
+            "/bin/sh",
+            "-lc",
+            (
+                "printf '%s\\n' \"$ORCH_CACHE_DIR\" && "
+                "printf '%s\\n' \"$ORCH_REPO_CACHE_DIR\" && "
+                "printf '%s\\n' \"$ORCH_MODEL_CACHE_DIR\""
+            ),
+        ],
+        run_mode="inline",
+        env={"ORCH_CACHE_DIR": "/tmp/orch-cache"},
+        engine="discoverex",
+        config_rel_path=None,
+        inputs={},
+        flow_run_id="flow-inline",
+        attempt=1,
+        outputs_prefix="jobs/flow-inline/attempt-1/",
+        job_name="inline-cache-root-check",
+    )
+    try:
+        assert artifacts.exit_code == 0
+        assert artifacts.stdout_path.read_text(encoding="utf-8").splitlines() == [
+            "/tmp/orch-cache",
+            "/tmp/orch-cache/repo",
+            "/tmp/orch-cache/models",
         ]
     finally:
         cleanup_workdir(artifacts.workdir)

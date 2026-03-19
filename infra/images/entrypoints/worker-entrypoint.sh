@@ -19,18 +19,21 @@ PRIMARY_QUEUE="${PREFECT_WORK_QUEUE:-gpu-fixed}"
 BATCH_QUEUE="${PREFECT_BATCH_WORK_QUEUE:-${PRIMARY_QUEUE}-batch}"
 WORK_QUEUES="${PREFECT_WORK_QUEUES:-${PRIMARY_QUEUE},${BATCH_QUEUE}}"
 WORKER_LIMIT="${PREFECT_WORKER_LIMIT:-1}"
-CHECKPOINT_DIR="${ORCHESTRATOR_CHECKPOINT_DIR:-/var/lib/orchestrator/checkpoints}"
-REPO_CACHE_DIR="${ORCH_REPO_CACHE_DIR:-/var/lib/orchestrator/repo_cache}"
 WORKER_RUNTIME_DIR="${ORCH_WORKER_RUNTIME_DIR:-/var/lib/orchestrator}"
-MODEL_CACHE_DIR="${ORCH_MODEL_CACHE_DIR:-${WORKER_RUNTIME_DIR}/model_cache}"
+CACHE_DIR="${ORCH_CACHE_DIR:-${WORKER_RUNTIME_DIR}/cache}"
+CHECKPOINT_DIR="${ORCHESTRATOR_CHECKPOINT_DIR:-/var/lib/orchestrator/checkpoints}"
+REPO_CACHE_DIR="${ORCH_REPO_CACHE_DIR:-${CACHE_DIR}/repo}"
+MODEL_CACHE_DIR="${ORCH_MODEL_CACHE_DIR:-${CACHE_DIR}/models}"
 SUMMARY="$(
   /opt/venv/bin/python -m common.prefect.client_env summary --default-queue "gpu-fixed"
 )"
 
 export ORCH_WORKER_RUNTIME_DIR="${WORKER_RUNTIME_DIR}"
+export ORCH_CACHE_DIR="${CACHE_DIR}"
+export ORCH_REPO_CACHE_DIR="${REPO_CACHE_DIR}"
 export ORCH_MODEL_CACHE_DIR="${MODEL_CACHE_DIR}"
 
-mkdir -p "${CHECKPOINT_DIR}" "${REPO_CACHE_DIR}" "${MODEL_CACHE_DIR}"
+mkdir -p "${CHECKPOINT_DIR}" "${CACHE_DIR}" "${REPO_CACHE_DIR}" "${MODEL_CACHE_DIR}"
 
 /opt/venv/bin/python -m common.prefect.work_queues \
   --pool "${POOL}" \
