@@ -1,32 +1,24 @@
-FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04 AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /bin/uv
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    UV_PROJECT_ENVIRONMENT=/opt/venv \
-    UV_PYTHON_INSTALL_DIR=/opt/uv/python
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project --managed-python --python 3.11 --link-mode copy
+    uv sync --frozen --no-dev --no-install-project
 
 
-FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
+FROM python:3.11-slim-bookworm
 
 COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /usr/local/bin/uv
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONUNBUFFERED=1 \
+ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/src \
     PATH=/opt/venv/bin:$PATH \
-    UV_PROJECT_ENVIRONMENT=/opt/venv \
-    UV_PYTHON_INSTALL_DIR=/opt/uv/python
+    UV_PROJECT_ENVIRONMENT=/opt/venv
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -41,7 +33,6 @@ RUN apt-get update \
 RUN useradd -m -u 10001 appuser
 
 WORKDIR /app
-COPY --from=builder /opt/uv/python /opt/uv/python
 COPY --from=builder /opt/venv /opt/venv
 
 COPY --chown=appuser:appuser src/common /app/src/common

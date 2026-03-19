@@ -32,8 +32,7 @@ run_worker_fixed_action() {
     ps) compose_worker_fixed ps "$@" ;;
     logs) compose_worker_fixed logs --tail=120 "$@" ;;
     build)
-      build_base_runtime
-      compose_worker_fixed build base-runtime worker "$@"
+      compose_worker_fixed build worker "$@"
       ;;
     *)
       echo "unknown worker fixed action: ${action}" >&2
