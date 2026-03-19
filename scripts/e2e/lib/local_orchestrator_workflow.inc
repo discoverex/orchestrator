@@ -171,7 +171,7 @@ verify_storage_objects() {
     --network "${LOCAL_PROJECT_NAME}_default" \
     -v "${ROOT_DIR}:/workspace" \
     -w /workspace \
-    orchestrator-base:local \
+    orchestrator-worker-cpu:local \
     /bin/sh -lc "\
       PYTHONPATH=/workspace /opt/venv/bin/python scripts/e2e/shell_python_helpers.py verify-storage-objects \
       --flow-run-id '${FLOW_RUN_ID}' \
@@ -244,7 +244,7 @@ verify_prefect_flush() {
     --network "${LOCAL_PROJECT_NAME}_default" \
     -v "${ROOT_DIR}:/workspace" \
     -w /workspace \
-    orchestrator-base:local \
+    orchestrator-worker-cpu:local \
     /bin/sh -lc "\
       PREFECT_API_URL=http://prefect:4200/api \
       FLUSH_TARGET_URL=http://worker-router:8200/artifact \
@@ -264,7 +264,7 @@ verify_prefect_prune() {
     --network "${LOCAL_PROJECT_NAME}_default" \
     -v "${ROOT_DIR}:/workspace" \
     -w /workspace \
-    orchestrator-base:local \
+    orchestrator-worker-cpu:local \
     /bin/sh -lc "\
       PREFECT_API_URL=http://prefect:4200/api \
       PYTHONPATH=src:/workspace /opt/venv/bin/python scripts/ops/prefect_prune_completed.py --apply --ttl-hours 0 --page-size 200 --max-runs 1000 \

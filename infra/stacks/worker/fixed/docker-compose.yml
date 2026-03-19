@@ -1,11 +1,4 @@
 services:
-  base-runtime:
-    build:
-      context: ../../../..
-      dockerfile: infra/images/base.Dockerfile
-    image: orchestrator-base:local
-    command: ["true"]
-
   worker:
     build:
       context: ../../../..

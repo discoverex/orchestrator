@@ -69,8 +69,8 @@ services:
   worker:
     build:
       context: ../..
-      dockerfile: infra/images/worker.Dockerfile
-    image: orchestrator-worker:local
+      dockerfile: infra/images/worker-cpu.Dockerfile
+    image: orchestrator-worker-cpu:local
     container_name: orchestrator-e2e-local-worker
     environment:
       PREFECT_API_URL: http://prefect:4200/api

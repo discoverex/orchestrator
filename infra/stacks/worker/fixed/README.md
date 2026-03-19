@@ -16,6 +16,9 @@ cp infra/stacks/worker/fixed/.env.example infra/stacks/worker/fixed/.env
 docker compose --env-file infra/stacks/worker/fixed/.env -f infra/stacks/worker/fixed/docker-compose.yml up -d --build
 ```
 
+The worker image builds directly from `infra/images/worker.Dockerfile` on top of
+`nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04`; no separate base-runtime image is required.
+
 CPU-only smoke worker on this machine:
 
 ```bash
@@ -23,6 +26,9 @@ cp infra/stacks/worker/fixed/.env.cpu-test.example infra/stacks/worker/fixed/.en
 # edit infra/stacks/worker/fixed/.env.cpu-test
 docker compose --env-file infra/stacks/worker/fixed/.env.cpu-test -f infra/stacks/worker/fixed/docker-compose.cpu-test.yml up -d --build
 ```
+
+The CPU smoke stack builds `infra/images/worker-cpu.Dockerfile` and tags it as
+`orchestrator-worker-cpu:local`.
 
 Required worker env:
 
