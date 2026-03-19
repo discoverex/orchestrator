@@ -4,18 +4,19 @@ This is a minimal worker-compatible dummy engine example.
 
 It demonstrates:
 
-- exposing a deployable Prefect flow callable
-- reading worker-injected environment variables
-- parsing `ORCH_JOB_INPUTS_JSON`
-- writing durable output files under `ORCH_ENGINE_ARTIFACT_DIR`
-- writing `ORCH_ENGINE_ARTIFACT_MANIFEST_PATH`
+- exposing an engine-owned Prefect flow callable
+- reading worker-provided mount and proxy environment variables
+- preparing durable files under the shared worker runtime mount
 - optionally creating an MLflow run through `MLFLOW_TRACKING_URI`
-- printing structured JSON to `stdout`
+- letting the worker sweep and upload staged artifacts automatically
 
-Worker runtime parent dirs available to engine code:
+Worker runtime contract available to engine code:
 
 - `ORCH_WORKER_RUNTIME_DIR`
 - `ORCH_CACHE_DIR`
+- `PREFECT_API_URL`
+- `MLFLOW_TRACKING_URI`
+- `STORAGE_API_URL`
 
 The orchestrator does not guarantee child-process access to its internal
 checkpoint path or derived cache subdirectories.
@@ -36,25 +37,32 @@ Default Prefect flow name:
 
 - `dummy-engine-job`
 
-This sample flow is intended to be loaded by the orchestrator runner as a
-Prefect subflow:
+This sample flow is intended to be deployed and executed by the engine repo
+itself. The orchestrator worker only provides the shared mount contract and
+local Prefect/MLflow/artifact proxy URLs.
 
-- `src/dummy_engine/prefect_flow.py:dummy_engine_flow`
+## Artifact Staging
 
-and delegates execution to the common worker runtime flow.
+The engine can stage durable outputs under:
 
-## Register Example
+```bash
+${ORCH_WORKER_RUNTIME_DIR}/engine-artifacts/<prefect-flow-run-id>/
+```
+
+Write files anywhere under that directory, then create:
+
+```bash
+${ORCH_WORKER_RUNTIME_DIR}/engine-artifacts/<prefect-flow-run-id>/_UPLOAD_READY
+```
+
+The worker-side uploader will sweep that directory and upload the staged files
+plus a generated `engine-artifacts.json` manifest.
+
+## Deployment Example
 
 ```bash
 PREFECT_API_URL=https://prefect-api.discoverex.qzz.io/api \
 tests/fixtures/dummy_engine_repo/scripts/register_dummy_engine_flow.sh
-```
-
-You can also register it through the existing register stack by setting:
-
-```bash
-REGISTER_FLOW_SOURCE=/app
-REGISTER_FLOW_ENTRYPOINT=tests/fixtures/dummy_engine_repo/src/dummy_engine/prefect_flow.py:dummy_engine_flow
 ```
 
 ## Behavior
@@ -69,28 +77,6 @@ And declares them in the engine artifact manifest with MLflow tag names:
 - `artifact_scene_uri`
 - `artifact_verification_uri`
 
-## Repo-mode parameters example
-
-Use the current repository as the `repo_url` when testing locally:
-
-```json
-{
-  "run_mode": "repo",
-  "engine": "dummy-engine",
-  "repo_url": "/path/to/orchestrator",
-  "ref": "main",
-  "flow_entrypoint": "src/dummy_engine/prefect_flow.py:dummy_engine_flow",
-  "job_name": "dummy-engine-smoke",
-  "inputs": {
-    "scene_id": "dummy-scene",
-    "version_id": "v1"
-  },
-  "env": {
-    "MLFLOW_TRACKING_URI": "https://storage-api.discoverex.qzz.io/mlflow"
-  },
-  "outputs_prefix": null
-}
-```
-
-For a real external engine repo, copy this example into that repository and
-replace the `repo_url`, `ref`, and `flow_entrypoint` as needed.
+For a real engine repo, define the deployment in that repository, then use the
+worker-local mount and proxy envs at runtime instead of orchestrator-managed
+runner parameters.

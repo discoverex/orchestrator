@@ -6,6 +6,8 @@ from starlette.requests import Request
 from worker_router.app import (
     _authorize_storage_request,
     _mlflow_upstream,
+    _prefect_upstream,
+    _router_is_local_only,
     _storage_host_mode,
 )
 
@@ -57,3 +59,20 @@ def test_mlflow_upstream_includes_internal_auth_header(
 
     assert upstream.base_url == "http://mlflow:5000"
     assert upstream.headers == {"Authorization": "Bearer token"}
+
+
+def test_prefect_upstream_reads_remote_prefect_api_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PREFECT_UPSTREAM_URL", "https://prefect.example/api/")
+
+    upstream = _prefect_upstream()
+
+    assert upstream.base_url == "https://prefect.example/api"
+    assert upstream.headers == {}
+
+
+def test_router_is_local_only_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("WORKER_ROUTER_LOCAL_ONLY", raising=False)
+
+    assert _router_is_local_only() is True

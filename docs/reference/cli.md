@@ -21,7 +21,6 @@ Top-level help:
 - Compose-backed domains use fixed stack files:
   - local: `scripts/e2e/docker-compose.local.test.yml`
   - storage: `infra/stacks/storage-node/docker-compose.yml`
-  - register: `infra/stacks/register/docker-compose.yml`
   - worker fixed: `infra/stacks/worker/fixed/docker-compose.yml`
   - prefect: `infra/stacks/prefect-server/docker-compose.yml`
 
@@ -32,9 +31,7 @@ Top-level help:
 ./bin/cli runtime init [storage|worker|all]
 ./bin/cli storage <up|down|ps|logs|build> [args...]
 ./bin/cli local <up|down|ps|logs|build> [args...]
-./bin/cli register <run|build> [args...]
 ./bin/cli worker fixed <up|down|ps|logs|build> [args...]
-./bin/cli worker register-gpu [args...]
 ./bin/cli worker submit [router args...]
 ./bin/cli observability <workers|fixed-dummy-smoke> [args...]
 ./bin/cli prefect <up|down|ps|logs|build|flush|prune|install|workers> [--remote] [args...]
@@ -115,26 +112,9 @@ Behavior:
 - local `worker` uses `infra/images/worker-cpu.Dockerfile` and is tagged `orchestrator-worker-cpu:local`
 - `logs` defaults to `--tail=120`
 
-### `register`
-
-Build or run the deployment registration container.
-
-```bash
-./bin/cli register build
-./bin/cli register run
-```
-
-Behavior:
-
-- uses `infra/stacks/register/.env` and `infra/stacks/register/docker-compose.yml`
-- `run` executes `docker compose run --rm register`
-- `build` builds the shared base image first
-- default registration spec is `deployments/e2e/e2e-deployments.yaml`
-- default registration entrypoint is `src/flows/worker_runtime/flow.py:run_worker_job_flow`
-
 ### `worker`
 
-Worker-related commands are split into fixed worker lifecycle, deployment registration, and routed submission.
+Worker-related commands are split into fixed worker lifecycle and routed submission.
 
 Fixed worker:
 
@@ -164,21 +144,11 @@ Behavior:
 - uses `infra/images/worker-cpu.Dockerfile`
 - tags image as `orchestrator-worker-cpu:local`
 
-Deployment registration shortcut:
-
-```bash
-./bin/cli worker register-gpu
-```
-
-Behavior:
-
-- currently routes to the same one-shot register container as `./bin/cli register run`
-
 Routed submission:
 
 ```bash
-./bin/cli worker submit --job-spec-json '{"engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","entrypoint":["/bin/sh","-lc","echo hello"]}'
-./bin/cli worker submit --job-spec-file /tmp/job.json
+./bin/cli worker submit --parameters-json '{"engine":"discoverex-generate","job_name":"smoke"}'
+./bin/cli worker submit --parameters-file /tmp/run-parameters.json
 ```
 
 Important options:
@@ -191,8 +161,6 @@ Important options:
 - `--colab-deployment NAME`
 - `--fixed-queue NAME`
 - `--colab-queue NAME`
-- `--job-spec-json JSON`
-- `--job-spec-file PATH`
 - `--resume-key KEY`
 - `--checkpoint-dir PATH`
 - `--parameters-json JSON`
@@ -202,6 +170,7 @@ Behavior:
 - implemented by `scripts/ops/prefect_submit_router.py`
 - selects a deployment based on fixed/colab queue depth policy
 - creates a Prefect flow run and prints JSON result including selected deployment and flow run id
+- deployment registration is owned by the engine repository; this repository no longer exposes a `register` CLI domain
 
 ### `observability`
 

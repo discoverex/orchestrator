@@ -31,7 +31,11 @@ def test_mlflow_proxy_normalizes_network_error(
     monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "worker-id")
     monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "worker-secret")
     monkeypatch.setenv("MLFLOW_BACKEND_URL", "http://mlflow:5000")
-    monkeypatch.setattr(worker_router_app_module.request, "urlopen", _fake_urlopen)
+    monkeypatch.setattr(
+        worker_router_app_module._proxy_mod.request,
+        "urlopen",
+        _fake_urlopen,
+    )
 
     client = _client(monkeypatch)
     res = client.get(
@@ -45,3 +49,25 @@ def test_mlflow_proxy_normalizes_network_error(
     payload = res.json()
     assert payload["upstream"] == "mlflow"
     assert payload["detail"] == "dns failed"
+
+
+def test_prefect_proxy_normalizes_network_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _fake_urlopen(_req: object, timeout: object = None) -> object:
+        _ = timeout
+        raise error.URLError("prefect dns failed")
+
+    monkeypatch.setenv("PREFECT_UPSTREAM_URL", "https://prefect.example/api")
+    monkeypatch.setattr(
+        worker_router_app_module._proxy_mod.request,
+        "urlopen",
+        _fake_urlopen,
+    )
+
+    client = _client(monkeypatch)
+    res = client.get("/prefect/api/flow_runs/filter")
+    assert res.status_code == 502
+    payload = res.json()
+    assert payload["upstream"] == "prefect"
+    assert payload["detail"] == "prefect dns failed"

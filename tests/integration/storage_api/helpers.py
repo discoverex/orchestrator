@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from storage.application.models import ExplorerHeadResult, PresignResult
-from storage.domain.models.object_ref import ObjectListEntry, ObjectStat
+from storage.domain.models.object_ref import ObjectListEntry, ObjectRef, ObjectStat
 from worker_router.app import create_app
 
 worker_router_app_module = importlib.import_module("worker_router.app")
@@ -61,6 +61,20 @@ class DummyStorageApp:
             exists=True,
             stat=ObjectStat(uri=object_uri, size=len(self.objects[object_uri])),
         )
+
+    def upload_bytes(
+        self,
+        *,
+        flow_run_id: str,
+        attempt: int,
+        filename: str,
+        data: bytes,
+        content_type: str = "application/octet-stream",
+    ) -> ObjectRef:
+        _ = content_type
+        object_uri = self._object_uri(flow_run_id, attempt, filename)
+        self.objects[object_uri] = data
+        return ObjectRef(uri=object_uri)
 
     def list_buckets(self) -> list[str]:
         return [self.bucket]
@@ -115,6 +129,7 @@ def cf_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
         worker_router_app_module, "build_storage_app_from_env", lambda: storage_app
     )
     monkeypatch.setenv("GATEWAY_REQUIRE_CF_ACCESS", "true")
+    monkeypatch.setenv("WORKER_ROUTER_LOCAL_ONLY", "false")
     monkeypatch.setenv("STORAGE_API_HOST", "storage-api.discoverex.qzz.io")
     monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
     monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
