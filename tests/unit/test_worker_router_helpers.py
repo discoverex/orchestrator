@@ -64,12 +64,18 @@ def test_mlflow_upstream_includes_internal_auth_header(
 def test_prefect_upstream_reads_remote_prefect_api_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("PREFECT_CLIENT_CUSTOM_HEADERS", raising=False)
     monkeypatch.setenv("PREFECT_UPSTREAM_URL", "https://prefect.example/api/")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_ID", "cf-id")
+    monkeypatch.setenv("CF_ACCESS_CLIENT_SECRET", "cf-secret")
 
     upstream = _prefect_upstream()
 
     assert upstream.base_url == "https://prefect.example/api"
-    assert upstream.headers == {}
+    assert upstream.headers == {
+        "CF-Access-Client-Id": "cf-id",
+        "CF-Access-Client-Secret": "cf-secret",
+    }
 
 
 def test_router_is_local_only_by_default(monkeypatch: pytest.MonkeyPatch) -> None:

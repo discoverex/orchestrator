@@ -8,6 +8,8 @@ from urllib import error, request
 
 from fastapi import Request, Response
 
+from common.prefect.client_env import build_prefect_client_headers
+
 logger = logging.getLogger("worker_router")
 
 
@@ -34,8 +36,22 @@ def prefect_upstream() -> UpstreamConfig:
     return UpstreamConfig(
         name="prefect",
         base_url=os.getenv("PREFECT_UPSTREAM_URL", "").rstrip("/"),
-        headers={},
+        headers=build_prefect_client_headers(dict(os.environ)),
     )
+
+
+def _is_expected_prefect_csrf_probe(
+    upstream: UpstreamConfig,
+    path: str,
+    status_code: int,
+    payload: bytes,
+) -> bool:
+    if upstream.name != "prefect" or status_code != 422:
+        return False
+    normalized_path = path.lstrip("/")
+    if normalized_path != "api/csrf-token":
+        return False
+    return b"CSRF protection is disabled." in payload
 
 
 async def proxy_request(
@@ -91,16 +107,27 @@ async def proxy_request(
     except error.HTTPError as exc:
         payload = exc.read()
         preview = payload.decode("utf-8", errors="replace")[:200].replace("\n", "\\n")
-        logger.warning(
-            "proxy_http_error "
-            "upstream=%s method=%s path=%s status=%s request_id=%s preview=%s",
-            upstream.name,
-            request_in.method,
-            request_in.url.path,
-            exc.code,
-            request_id,
-            preview,
-        )
+        if _is_expected_prefect_csrf_probe(upstream, path, exc.code, payload):
+            logger.info(
+                "proxy_expected_http upstream=%s method=%s path=%s "
+                "status=%s request_id=%s",
+                upstream.name,
+                request_in.method,
+                request_in.url.path,
+                exc.code,
+                request_id,
+            )
+        else:
+            logger.warning(
+                "proxy_http_error "
+                "upstream=%s method=%s path=%s status=%s request_id=%s preview=%s",
+                upstream.name,
+                request_in.method,
+                request_in.url.path,
+                exc.code,
+                request_id,
+                preview,
+            )
         return Response(
             content=payload,
             status_code=exc.code,
