@@ -12,7 +12,7 @@ class RunRequestError(RuntimeError):
 @dataclass(frozen=True)
 class RunRequest:
     engine: str
-    entrypoint: list[str]
+    flow_entrypoint: str
     run_mode: Literal["repo", "inline"] = "repo"
     repo_url: str | None = None
     ref: str | None = None
@@ -36,11 +36,8 @@ class RunRequest:
         if self.ref is not None and not self.ref.strip():
             raise RunRequestError("ref must not be blank when provided")
 
-        if not self.entrypoint:
-            raise RunRequestError("entrypoint must not be empty")
-
-        if any(not str(item).strip() for item in self.entrypoint):
-            raise RunRequestError("entrypoint items must not be blank")
+        if not self.flow_entrypoint.strip():
+            raise RunRequestError("flow_entrypoint must not be blank")
 
         if self.config is not None:
             raw = self.config.strip()

@@ -9,7 +9,7 @@ class CodeRef:
     repo_url: str
     ref: str
     resolved_commit: str
-    entrypoint: list[str]
+    flow_entrypoint: str
 
 
 @dataclass(frozen=True)

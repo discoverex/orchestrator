@@ -9,7 +9,7 @@ class CodeRef(StrictModel):
     repo_url: str
     ref: str
     resolved_commit: str
-    entrypoint: list[str]
+    flow_entrypoint: str
 
 
 class RunArtifacts(StrictModel):

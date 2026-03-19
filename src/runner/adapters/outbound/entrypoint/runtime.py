@@ -87,11 +87,7 @@ def prepare_per_repo_venv(workdir: Path, merged_env: dict[str, str]) -> None:
         )
         return
 
-    sync_cmd = (
-        [uv_bin, "sync", "--frozen"]
-        if (workdir / "uv.lock").exists()
-        else [uv_bin, "sync"]
-    )
+    sync_cmd = [uv_bin, "sync"]
     proc = subprocess.run(
         sync_cmd, cwd=workdir, env=merged_env, capture_output=True, text=True
     )

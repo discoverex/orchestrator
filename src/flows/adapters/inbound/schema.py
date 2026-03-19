@@ -26,7 +26,7 @@ class RunRequestSchema(StrictModel):
     engine: str = Field(min_length=1)
     repo_url: str | None = None
     ref: str | None = None
-    entrypoint: list[str]
+    flow_entrypoint: str
     config: str | None = None
     job_name: str | None = None
     inputs: dict[str, Any] = Field(default_factory=dict)
@@ -51,15 +51,13 @@ class RunRequestSchema(StrictModel):
             raise ValueError("must not be blank when provided")
         return trimmed
 
-    @field_validator("entrypoint")
+    @field_validator("flow_entrypoint")
     @classmethod
-    def _validate_entrypoint(cls, value: list[str]) -> list[str]:
-        if not value:
-            raise ValueError("entrypoint must not be empty")
-        normalized = [str(item) for item in value]
-        if any(not item.strip() for item in normalized):
-            raise ValueError("entrypoint items must not be blank")
-        return normalized
+    def _validate_flow_entrypoint(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("flow_entrypoint must not be blank")
+        return trimmed
 
     @field_validator("config")
     @classmethod
@@ -106,7 +104,7 @@ class RunRequestSchema(StrictModel):
         return RunRequest(
             run_mode=self.run_mode,
             engine=self.engine,
-            entrypoint=self.entrypoint,
+            flow_entrypoint=self.flow_entrypoint,
             repo_url=self.repo_url,
             ref=self.ref,
             config=self.config,
