@@ -134,7 +134,7 @@ def test_run_job_flow_inline_executes_uploads_and_cleans_up(
     out = run_job_flow.fn(
         run_mode="inline",
         engine="shell",
-        entrypoint=["/bin/sh", "-lc", "echo ok"],
+        flow_entrypoint="src/dummy_engine/prefect_flow.py:dummy_engine_flow",
         config=None,
         job_name="inline-job",
         inputs={},

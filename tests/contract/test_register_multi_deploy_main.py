@@ -31,6 +31,7 @@ def _patch_flow(fake: _FakeSourceFlow) -> Iterator[None]:
 
 def test_dual_mode_registers_fixed_and_colab(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = _FakeSourceFlow()
+    monkeypatch.setattr(register, "build_base_parameters", lambda spec_file: {})
     monkeypatch.setattr(
         register,
         "parse_args",
@@ -43,11 +44,6 @@ def test_dual_mode_registers_fixed_and_colab(monkeypatch: pytest.MonkeyPatch) ->
             fixed_queue="gpu-fixed",
             colab_name="e2e-test-colab",
             colab_queue="gpu-colab",
-            compat_fixed_name="e2e-test-legacy",
-            compat_fixed_queue="gpu-fixed",
-            compat_colab_name="e2e-test-legacy-colab",
-            compat_colab_queue="gpu-colab",
-            register_compat_aliases=True,
             flow_source="/tmp/engine",
             flow_entrypoint="flows/run.py:engine_flow",
             version=None,
@@ -55,25 +51,24 @@ def test_dual_mode_registers_fixed_and_colab(monkeypatch: pytest.MonkeyPatch) ->
     )
     with _patch_flow(fake):
         register.main()
-    assert len(fake.calls) == 4
+    assert len(fake.calls) == 2
     assert fake.calls[0]["name"] == "e2e-test"
     assert fake.calls[0]["work_pool_name"] == "gpu-pool"
     assert fake.calls[0]["work_queue_name"] == "gpu-fixed"
     assert fake.calls[1]["name"] == "e2e-test-colab"
     assert fake.calls[1]["work_queue_name"] == "gpu-colab"
-    assert fake.calls[2]["name"] == "e2e-test-legacy"
-    assert fake.calls[3]["name"] == "e2e-test-legacy-colab"
 
 
-def test_single_mode_registers_compat_deployment(
+def test_single_mode_registers_named_deployment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake = _FakeSourceFlow()
+    monkeypatch.setattr(register, "build_base_parameters", lambda spec_file: {})
     monkeypatch.setattr(
         register,
         "parse_args",
         lambda: argparse.Namespace(
-            single_name="e2e-test-legacy",
+            single_name="e2e-test",
             single_queue="default",
             spec_file="unused.yaml",
             pool="gpu-pool",
@@ -81,11 +76,6 @@ def test_single_mode_registers_compat_deployment(
             fixed_queue="unused-fixed-queue",
             colab_name="unused-colab",
             colab_queue="unused-colab-queue",
-            compat_fixed_name="compat-fixed",
-            compat_fixed_queue="compat-fixed-queue",
-            compat_colab_name="compat-colab",
-            compat_colab_queue="compat-colab-queue",
-            register_compat_aliases=True,
             flow_source=".",
             flow_entrypoint="src/flows/worker_runtime/flow.py:run_worker_job_flow",
             version="v1",
@@ -94,7 +84,7 @@ def test_single_mode_registers_compat_deployment(
     with _patch_flow(fake):
         register.main()
     assert len(fake.calls) == 1
-    assert fake.calls[0]["name"] == "e2e-test-legacy"
+    assert fake.calls[0]["name"] == "e2e-test"
     assert fake.calls[0]["work_queue_name"] == "default"
     assert fake.calls[0]["version"] == "v1"
 
@@ -104,6 +94,7 @@ def test_main_uses_explicit_source_and_entrypoint(
 ) -> None:
     fake = _FakeSourceFlow()
     captured: dict[str, str] = {}
+    monkeypatch.setattr(register, "build_base_parameters", lambda spec_file: {})
     register_any = cast(Any, register)
     original = register_any.flow.from_source
     monkeypatch.setattr(
@@ -118,11 +109,6 @@ def test_main_uses_explicit_source_and_entrypoint(
             fixed_queue="gpu-fixed",
             colab_name="e2e-test-colab",
             colab_queue="gpu-colab",
-            compat_fixed_name="e2e-test-legacy",
-            compat_fixed_queue="gpu-fixed",
-            compat_colab_name="e2e-test-legacy-colab",
-            compat_colab_queue="gpu-colab",
-            register_compat_aliases=True,
             flow_source="/srv/engine",
             flow_entrypoint="flows/runtime.py:engine_flow",
             version=None,

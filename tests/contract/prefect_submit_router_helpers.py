@@ -12,7 +12,7 @@ from typing import Any, cast
 DEFAULT_PARAMETERS_JSON = (
     '{"run_mode":"repo","engine":"shell",'
     '"repo_url":"https://github.com/octocat/Hello-World.git",'
-    '"ref":"master","entrypoint":["/bin/sh","-lc","echo test"],'
+    '"ref":"master","flow_entrypoint":"src/dummy_engine/prefect_flow.py:dummy_engine_flow",'
     '"config":null,"inputs":{},"env":{},"outputs_prefix":null}'
 )
 

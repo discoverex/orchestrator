@@ -138,7 +138,7 @@ def test_run_job_flow_retries_entrypoint_when_artifacts_are_missing(
         engine="shell",
         repo_url="https://github.com/example/repo.git",
         ref="main",
-        entrypoint=["/bin/sh", "-lc", "echo ok"],
+        flow_entrypoint="src/dummy_engine/prefect_flow.py:dummy_engine_flow",
         config=None,
         inputs={},
         env={},

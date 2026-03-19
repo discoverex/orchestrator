@@ -62,7 +62,7 @@ def test_router_forwards_job_name_to_flow_run_name(
 ) -> None:
     mod = load_router_module()
     parameters = (
-        '{"run_mode":"inline","engine":"shell","job_name":"my-job","entrypoint":["ls"]}'
+        '{"run_mode":"repo","engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","job_name":"my-job","flow_entrypoint":"src/dummy_engine/prefect_flow.py:dummy_engine_flow"}'
     )
     monkeypatch.setattr(
         mod, "_build_parser", lambda: fake_args(parameters_json=parameters)
@@ -95,7 +95,7 @@ def test_router_uses_new_default_deployment_names(
         [
             "prefect_submit_router.py",
             "--parameters-json",
-            '{"run_mode":"inline","engine":"shell","entrypoint":["ls"]}',
+            '{"run_mode":"repo","engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","flow_entrypoint":"src/dummy_engine/prefect_flow.py:dummy_engine_flow"}',
         ],
     )
     monkeypatch.setattr(mod, "scheduled_count_for_queue", lambda q: 0)
@@ -129,7 +129,7 @@ def test_router_builds_default_fqn_from_flow_and_deployment_env(
         [
             "prefect_submit_router.py",
             "--parameters-json",
-            '{"run_mode":"inline","engine":"shell","entrypoint":["ls"]}',
+            '{"run_mode":"repo","engine":"shell","repo_url":"https://github.com/octocat/Hello-World.git","ref":"master","flow_entrypoint":"src/dummy_engine/prefect_flow.py:dummy_engine_flow"}',
         ],
     )
     monkeypatch.setattr(mod, "scheduled_count_for_queue", lambda q: 0)

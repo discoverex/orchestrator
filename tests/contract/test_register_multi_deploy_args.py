@@ -20,11 +20,6 @@ def test_parse_args_uses_expected_defaults(monkeypatch: pytest.MonkeyPatch) -> N
     assert args.fixed_queue is None
     assert args.colab_name is None
     assert args.colab_queue is None
-    assert args.compat_fixed_name is None
-    assert args.compat_fixed_queue is None
-    assert args.compat_colab_name is None
-    assert args.compat_colab_queue is None
-    assert args.register_compat_aliases is True
     assert args.flow_source == register.DEFAULT_FLOW_SOURCE
     assert args.flow_entrypoint is None
     assert args.version is None
@@ -52,15 +47,6 @@ def test_parse_args_accepts_explicit_overrides(monkeypatch: pytest.MonkeyPatch) 
             "colab-a",
             "--colab-queue",
             "colab-q",
-            "--compat-fixed-name",
-            "compat-fixed",
-            "--compat-fixed-queue",
-            "compat-fixed-q",
-            "--compat-colab-name",
-            "compat-colab",
-            "--compat-colab-queue",
-            "compat-colab-q",
-            "--no-register-compat-aliases",
             "--flow-source",
             "/srv/engine",
             "--flow-entrypoint",
@@ -80,11 +66,6 @@ def test_parse_args_accepts_explicit_overrides(monkeypatch: pytest.MonkeyPatch) 
     assert args.fixed_queue == "fixed-q"
     assert args.colab_name == "colab-a"
     assert args.colab_queue == "colab-q"
-    assert args.compat_fixed_name == "compat-fixed"
-    assert args.compat_fixed_queue == "compat-fixed-q"
-    assert args.compat_colab_name == "compat-colab"
-    assert args.compat_colab_queue == "compat-colab-q"
-    assert args.register_compat_aliases is False
     assert args.flow_source == "/srv/engine"
     assert args.flow_entrypoint == "engine/flows.py:run"
     assert args.version == "v2"
