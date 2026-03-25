@@ -1,13 +1,11 @@
 # Register Node (Prefect Deployment Registration)
 
-This profile registers Prefect deployments through a one-shot control-plane container.
-Default mode registers the common worker-runtime flow and creates two primary
-deployments plus two compatibility aliases:
+이 스택은 one-shot registration container를 실행해 Prefect deployment를 등록한다.
+배포 이름의 정식 기준은 [deployments/e2e/README.md](../../../deployments/e2e/README.md)와
+[deployments/e2e/e2e-deployments.yaml](../../../deployments/e2e/e2e-deployments.yaml)이다.
 
-- fixed: `e2e-job/e2e-test` on queue `gpu-fixed`
-- colab: `e2e-job/e2e-test-colab` on queue `gpu-colab`
-- compat fixed alias: `e2e-job/e2e-test-legacy`
-- compat colab alias: `e2e-job/e2e-test-legacy-colab`
+현재 기본 등록은 common worker-runtime flow를 사용하며, canonical deployment 둘과
+코드에 남아 있는 compat alias를 함께 만들 수 있다.
 
 ## 1) Configure
 

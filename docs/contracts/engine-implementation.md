@@ -27,7 +27,7 @@ storage services.
 ## 2) Job Spec Contract
 
 The worker receives a `job_spec_json` payload and validates it against
-[src/flows/domain/job_spec.py](../../src/flows/domain/job_spec.py).
+[src/flows/job_spec.py](../../src/flows/job_spec.py).
 
 Required fields:
 

@@ -27,7 +27,7 @@ environment.
 
 Reference implementation:
 
-- [src/runner/entrypoint/core.py](../../src/runner/entrypoint/core.py)
+- [src/runner/adapters/outbound/entrypoint/core.py](../../../src/runner/adapters/outbound/entrypoint/core.py)
 
 ## 2) Repository execution model
 
@@ -121,7 +121,7 @@ The engine should therefore:
 
 Reference implementation:
 
-- [src/runner/mlflow_proxy.py](../../src/runner/mlflow_proxy.py)
+- [src/runner/adapters/outbound/mlflow/proxy.py](../../../src/runner/adapters/outbound/mlflow/proxy.py)
 
 ## 7) Host and worker prerequisites
 

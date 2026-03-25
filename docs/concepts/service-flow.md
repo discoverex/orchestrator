@@ -1,132 +1,67 @@
 # Service Flow
 
-This document describes the end-to-end request and data flow across the full
-orchestrator service set.
+이 문서는 시스템 전체의 개념적 실행 흐름만 설명한다. 배포 이름, 세부 API shape,
+운영 절차는 각각 계약 문서와 가이드를 따른다.
 
-## 1) Nodes
+## 1) 참여 노드
 
-- Prefect server node
-  - Prefect API/UI
-  - Prefect metadata DB
-  - maintenance jobs such as flush/prune
-- Worker nodes
-  - fixed docker worker on `gpu-fixed`
-  - optional colab workers on `gpu-colab`
-- Storage node
-  - worker-router
-  - MinIO
-  - MLflow
-  - MLflow metadata DB
-  - Caddy
-  - cloudflared
+- Prefect node: deployment registration, scheduling, state 관리
+- Worker node: flow 실행, repo checkout, entrypoint 실행
+- Storage node: presign/head 제어면, object persistence, MLflow routing
 
-## 2) Logical Flow
+## 2) End-to-End Flow
 
 ```text
-operator / script
-  -> Prefect API
-  -> deployment run created
-  -> worker polls work pool / queue
-  -> worker starts flow
-  -> runner resolves repo/ref or inline entrypoint
-  -> runner executes engine entrypoint
-  -> worker requests artifact presigns from storage-api
-  -> worker uploads stdout/stderr/result/manifest
-  -> engine optionally writes MLflow metadata via storage-api/mlflow
-  -> Prefect marks flow terminal state
-  -> flush exports completed run snapshots to storage
-  -> prune removes old Prefect-local rows when configured
+operator / automation
+  -> Prefect deployment run 생성
+  -> worker가 pool/queue에서 run 수신
+  -> flow가 job_spec_json 검증
+  -> runner가 repo 또는 inline entrypoint 실행
+  -> worker가 stdout/stderr/result 및 engine artifact를 정리
+  -> storage-api가 presigned URL 발급
+  -> worker가 object 업로드
+  -> engine이 필요하면 MLFLOW_TRACKING_URI로 metadata 기록
+  -> Prefect가 terminal state 기록
+  -> maintenance가 completed run snapshot을 flush/prune
 ```
 
-## 3) Detailed Run Path
+## 3) 단계별 책임
 
-### 3.1 Register
+### Register
 
-1. `register` container connects to Prefect API.
-2. By default it registers the common worker-runtime entrypoint `src/flows/worker_runtime/flow.py:run_worker_job_flow`.
-3. Primary deployments `e2e-job/e2e-test` and `e2e-job/e2e-test-colab` are the default targets for that runtime.
-4. Compatibility aliases `e2e-job/e2e-test-legacy` and `e2e-job/e2e-test-legacy-colab` may also be registered during cutover.
-5. Custom flow names, deployment names, and engine-owned entrypoints are supported during registration.
+- 등록 주체는 `register` container 또는 관련 CLI다.
+- 기본 worker-runtime entrypoint는 `src/flows/worker_runtime/flow.py:run_worker_job_flow`다.
+- canonical deployment naming과 compat alias는 [deployments/e2e/README.md](../../deployments/e2e/README.md)에서만 정의한다.
 
-### 3.2 Submit
+### Execute
 
-1. Caller submits a deployment run with `job_spec_json`.
-2. Prefect stores the flow run and places it on the configured pool/queue.
+- flow는 `job_spec_json`을 검증한다.
+- `repo` mode에서는 `ref`를 먼저 고정 commit으로 resolve한다.
+- runner는 임시 workdir에서 engine entrypoint를 실행한다.
+- worker는 `stdout.log`, `stderr.log`, `result.json`을 항상 수집한다.
 
-### 3.3 Dispatch
+### Persist
 
-1. A worker in the matching pool/queue polls Prefect.
-2. Prefect hands the worker the scheduled flow run.
-3. Worker spawns a local process for the flow.
+- worker는 storage control-plane에 presign 요청을 보낸다.
+- 반환된 signed URL을 사용해 object를 업로드한다.
+- engine이 `ORCH_ENGINE_ARTIFACT_DIR`와 manifest를 사용하면 worker가 추가 artifact도 업로드한다.
 
-### 3.4 Execute
+### Observe
 
-1. Flow validates `job_spec_json`.
-2. For `repo` mode, the worker resolves the requested `ref` to a fixed commit.
-3. The runner prepares a temp workdir.
-4. The engine entrypoint is executed with orchestrator runtime env.
-5. Worker captures `stdout.log`, `stderr.log`, and `result.json`.
+- engine은 `MLFLOW_TRACKING_URI`만 사용한다.
+- 원격 HTTP(S) MLflow와 Cloudflare Access 조합에서는 worker가 local proxy를 둘 수 있다.
+- completed run snapshot export와 retention은 Prefect maintenance 경로가 담당한다.
 
-### 3.5 Persist Artifacts
+## 4) 실패 경계
 
-1. Worker calls `POST /artifact/v1/presign/batch` on `storage-api`.
-2. storage-api returns signed object URLs under `/objects/...`.
-3. Worker uploads:
-   - `stdout.log`
-   - `stderr.log`
-   - `result.json`
-   - `artifacts.json`
-4. Worker stores resulting `s3://...` URIs in the flow result payload.
+- Prefect: deployment mismatch, queue/pool mismatch, worker polling 부재
+- Worker: repo checkout 실패, dependency 준비 실패, engine exit code 비정상
+- Storage: presign 실패, signed URL mismatch, upload 실패
+- MLflow: 접근 정책 mismatch, routing 실패, metadata write 실패
 
-### 3.6 Record MLflow Metadata
+## 5) 다음 문서
 
-If the engine uses MLflow:
-
-1. Engine writes to `MLFLOW_TRACKING_URI`.
-2. For remote HTTP(S) MLflow with Cloudflare Access, the worker injects a local proxy.
-3. worker-router proxies `/mlflow/*` to the MLflow backend.
-4. In local e2e, the generated job spec injects `MLFLOW_TRACKING_PROXY_URL=http://worker-router:8200/mlflow`.
-5. Engine records params/metrics/tags/status only.
-
-### 3.7 Flush / Prune
-
-1. Flush exports completed Prefect flow-run state snapshots to object storage.
-2. Prune removes old Prefect-local rows according to retention settings.
-3. Storage remains the long-term SSOT for durable run records and artifacts.
-
-## 4) Public Endpoints
-
-- Prefect API: `https://prefect-api.discoverex.qzz.io/api`
-- storage-api machine endpoint: `https://storage-api.discoverex.qzz.io`
-- storage human endpoint: `https://storage.discoverex.qzz.io`
-- MLflow worker endpoint: `https://storage-api.discoverex.qzz.io/mlflow`
-- MLflow UI endpoint: `https://storage.discoverex.qzz.io/mlflow`
-
-## 5) Failure Boundaries
-
-- Prefect-side failures
-  - deployment mismatch
-  - worker not polling
-  - queue/pool mismatch
-- Worker-side failures
-  - repo checkout
-  - dependency install
-  - engine process exit code
-  - DNS / network reachability
-- Storage-side failures
-  - presign failure
-  - signed object path mismatch
-  - object upload failure
-- MLflow-side failures
-  - Access policy mismatch
-  - routing mismatch
-  - metadata write failure
-
-## 6) Primary Debug Order
-
-1. Deployment registration shape
-2. Worker online state and queue match
-3. Flow-run state in Prefect
-4. Worker logs around `run_entrypoint`, `prepare_manifest`, `upload_outputs`
-5. `storage-api` `/artifact` health and signed URL shape
-6. MLflow endpoint reachability and run write/readback
+- 인증 경계: [auth-model.md](auth-model.md)
+- 실행 계약: [../contracts/execution.md](../contracts/execution.md)
+- 서비스 인터페이스: [../contracts/service-interface.md](../contracts/service-interface.md)
+- 운영 절차: [../guides/setup-prefect.md](../guides/setup-prefect.md), [../guides/setup-storage.md](../guides/setup-storage.md)
