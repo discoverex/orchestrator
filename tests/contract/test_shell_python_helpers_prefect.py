@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 
 import pytest
-
 from scripts.e2e.lib.shell_helpers.commands.prefect import (
     cmd_verify_prefect_priority,
     cmd_wait_prefect_state,

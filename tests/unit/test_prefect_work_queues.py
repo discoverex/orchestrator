@@ -15,7 +15,9 @@ def test_default_work_queue_names_adds_batch_queue() -> None:
 
 
 def test_split_work_queue_names_dedupes_and_trims() -> None:
-    assert work_queues.split_work_queue_names(" gpu-fixed, gpu-fixed-batch ,gpu-fixed ") == [
+    assert work_queues.split_work_queue_names(
+        " gpu-fixed, gpu-fixed-batch ,gpu-fixed "
+    ) == [
         "gpu-fixed",
         "gpu-fixed-batch",
     ]
@@ -56,7 +58,11 @@ class _FakeClient:
         self.created_pools.append((work_pool.name, work_pool.type))
         return object()
 
-    def read_work_queue_by_name(self, name: str, work_pool_name: str | None = None) -> Any:
+    def read_work_queue_by_name(
+        self,
+        name: str,
+        work_pool_name: str | None = None,
+    ) -> Any:
         if name not in self.queues:
             raise work_queues.ObjectNotFound("queue")
         return self.queues[name]

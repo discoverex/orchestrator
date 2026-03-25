@@ -12,16 +12,31 @@ from runner.adapters.outbound.git.repo import RunnerError
 logger = logging.getLogger("runner.entrypoint")
 
 
-def apply_worker_runtime_defaults(merged_env: dict[str, str]) -> None:
+def apply_worker_runtime_defaults(
+    merged_env: dict[str, str],
+    *,
+    explicit_env_keys: set[str] | None = None,
+) -> None:
+    explicit_env_keys = explicit_env_keys or set()
     runtime_root = merged_env.get("ORCH_WORKER_RUNTIME_DIR", "").strip()
     if not runtime_root:
         runtime_root = "/var/lib/orchestrator"
         merged_env["ORCH_WORKER_RUNTIME_DIR"] = runtime_root
 
-    cache_dir = merged_env.get("ORCH_CACHE_DIR", "").strip()
+    cache_dir = ""
+    if "ORCH_CACHE_DIR" in explicit_env_keys:
+        cache_dir = merged_env.get("ORCH_CACHE_DIR", "").strip()
     if not cache_dir:
-        repo_cache_dir = merged_env.get("ORCH_REPO_CACHE_DIR", "").strip()
-        model_cache_dir = merged_env.get("ORCH_MODEL_CACHE_DIR", "").strip()
+        repo_cache_dir = (
+            merged_env.get("ORCH_REPO_CACHE_DIR", "").strip()
+            if "ORCH_REPO_CACHE_DIR" in explicit_env_keys
+            else ""
+        )
+        model_cache_dir = (
+            merged_env.get("ORCH_MODEL_CACHE_DIR", "").strip()
+            if "ORCH_MODEL_CACHE_DIR" in explicit_env_keys
+            else ""
+        )
         if repo_cache_dir:
             cache_dir = str(Path(repo_cache_dir).parent)
         elif model_cache_dir:
@@ -30,17 +45,29 @@ def apply_worker_runtime_defaults(merged_env: dict[str, str]) -> None:
             cache_dir = str(Path(runtime_root) / "cache")
         merged_env["ORCH_CACHE_DIR"] = cache_dir
 
-    repo_cache_dir = merged_env.get("ORCH_REPO_CACHE_DIR", "").strip()
+    repo_cache_dir = (
+        merged_env.get("ORCH_REPO_CACHE_DIR", "").strip()
+        if "ORCH_REPO_CACHE_DIR" in explicit_env_keys
+        else ""
+    )
     if not repo_cache_dir:
         repo_cache_dir = str(Path(cache_dir) / "repo")
         merged_env["ORCH_REPO_CACHE_DIR"] = repo_cache_dir
 
-    repo_runtime_dir = merged_env.get("ORCH_REPO_RUNTIME_DIR", "").strip()
+    repo_runtime_dir = (
+        merged_env.get("ORCH_REPO_RUNTIME_DIR", "").strip()
+        if "ORCH_REPO_RUNTIME_DIR" in explicit_env_keys
+        else ""
+    )
     if not repo_runtime_dir:
         repo_runtime_dir = str(Path(runtime_root) / "repos")
         merged_env["ORCH_REPO_RUNTIME_DIR"] = repo_runtime_dir
 
-    model_cache_dir = merged_env.get("ORCH_MODEL_CACHE_DIR", "").strip()
+    model_cache_dir = (
+        merged_env.get("ORCH_MODEL_CACHE_DIR", "").strip()
+        if "ORCH_MODEL_CACHE_DIR" in explicit_env_keys
+        else ""
+    )
     if not model_cache_dir:
         model_cache_dir = str(Path(cache_dir) / "models")
         merged_env["ORCH_MODEL_CACHE_DIR"] = model_cache_dir
@@ -168,6 +195,7 @@ def apply_runtime_env(
         merged_env["ORCH_JOB_NAME"] = job_name
     if config_path:
         merged_env["ORCH_JOB_CONFIG_PATH"] = config_path
+    explicit_env_keys = set(env or {})
     if env:
         merged_env.update(env)
-    apply_worker_runtime_defaults(merged_env)
+    apply_worker_runtime_defaults(merged_env, explicit_env_keys=explicit_env_keys)

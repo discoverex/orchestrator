@@ -1,0 +1,207 @@
+name: Deploy Prefect Server
+
+on:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ vars.IMAGE_NAMESPACE || format('{0}/orchestrator', github.repository_owner) }}
+  REMOTE_DEPLOY_PATH: ${{ vars.REMOTE_DEPLOY_PATH || '/opt/services/orchestrator-prefect' }}
+
+concurrency:
+  group: deploy-prefect-server
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Validate required vars and secrets
+        env:
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_USERNAME: ${{ secrets.REMOTE_USERNAME }}
+          REMOTE_SSH_KEY: ${{ secrets.REMOTE_SSH_KEY }}
+          PREFECT_HOSTNAMES: ${{ vars.PREFECT_HOSTNAMES }}
+          PREFECT_PORT: ${{ vars.PREFECT_PORT }}
+          PREFECT_BIND_PORT: ${{ vars.PREFECT_BIND_PORT }}
+          PREFECT_BIND_ADDRESS: ${{ vars.PREFECT_BIND_ADDRESS }}
+          PREFECT_API_PUBLIC_URL: ${{ vars.PREFECT_API_PUBLIC_URL }}
+          PREFECT_DB_NAME: ${{ vars.PREFECT_DB_NAME }}
+          PREFECT_DB_USER: ${{ vars.PREFECT_DB_USER }}
+          PREFECT_DB_PASSWORD: ${{ secrets.PREFECT_DB_PASSWORD }}
+          PREFECT_DB_DATA_DIR: ${{ vars.PREFECT_DB_DATA_DIR }}
+          FLUSH_TARGET_URL: ${{ vars.FLUSH_TARGET_URL }}
+          FLUSH_GATEWAY_TOKEN: ${{ secrets.FLUSH_GATEWAY_TOKEN }}
+          FLUSH_CF_ACCESS_CLIENT_ID: ${{ secrets.FLUSH_CF_ACCESS_CLIENT_ID }}
+          FLUSH_CF_ACCESS_CLIENT_SECRET: ${{ secrets.FLUSH_CF_ACCESS_CLIENT_SECRET }}
+          PREFECT_MAINT_DATA_DIR: ${{ vars.PREFECT_MAINT_DATA_DIR }}
+          FLUSH_INTERVAL_SEC: ${{ vars.FLUSH_INTERVAL_SEC }}
+          PRUNE_INTERVAL_SEC: ${{ vars.PRUNE_INTERVAL_SEC }}
+          PRUNE_TTL_HOURS: ${{ vars.PRUNE_TTL_HOURS }}
+          FLUSH_PAGE_SIZE: ${{ vars.FLUSH_PAGE_SIZE }}
+          FLUSH_MAX_RUNS: ${{ vars.FLUSH_MAX_RUNS }}
+          PRUNE_PAGE_SIZE: ${{ vars.PRUNE_PAGE_SIZE }}
+          PRUNE_MAX_RUNS: ${{ vars.PRUNE_MAX_RUNS }}
+          CADDY_ACME_EMAIL: ${{ vars.CADDY_ACME_EMAIL }}
+          CADDY_DATA_DIR: ${{ vars.CADDY_DATA_DIR }}
+          CADDY_CONFIG_DIR: ${{ vars.CADDY_CONFIG_DIR }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in \
+            REMOTE_HOST \
+            REMOTE_USERNAME \
+            REMOTE_SSH_KEY \
+            PREFECT_HOSTNAMES \
+            PREFECT_PORT \
+            PREFECT_BIND_PORT \
+            PREFECT_BIND_ADDRESS \
+            PREFECT_API_PUBLIC_URL \
+            PREFECT_DB_NAME \
+            PREFECT_DB_USER \
+            PREFECT_DB_PASSWORD \
+            PREFECT_DB_DATA_DIR \
+            FLUSH_TARGET_URL \
+            FLUSH_GATEWAY_TOKEN \
+            FLUSH_CF_ACCESS_CLIENT_ID \
+            FLUSH_CF_ACCESS_CLIENT_SECRET \
+            PREFECT_MAINT_DATA_DIR \
+            FLUSH_INTERVAL_SEC \
+            PRUNE_INTERVAL_SEC \
+            PRUNE_TTL_HOURS \
+            FLUSH_PAGE_SIZE \
+            FLUSH_MAX_RUNS \
+            PRUNE_PAGE_SIZE \
+            PRUNE_MAX_RUNS \
+            CADDY_ACME_EMAIL \
+            CADDY_DATA_DIR \
+            CADDY_CONFIG_DIR; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "missing required configuration: ${name}" >&2
+              missing=1
+            fi
+          done
+          if [[ "${missing}" -ne 0 ]]; then
+            exit 1
+          fi
+
+      - name: Remote preflight
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USERNAME }}
+          key: ${{ secrets.REMOTE_SSH_KEY }}
+          port: ${{ vars.REMOTE_PORT || '22' }}
+          script: |
+            set -euo pipefail
+            mkdir -p "${{ env.REMOTE_DEPLOY_PATH }}"
+            cd "${{ env.REMOTE_DEPLOY_PATH }}"
+            pwd
+            docker --version
+            docker compose version
+
+  build-image:
+    needs: preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set image tag
+        id: image
+        run: echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/prefect-server:sha-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+      - name: Build and push prefect-server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/images/prefect-server.Dockerfile
+          push: true
+          tags: ${{ steps.image.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-prefect-server:
+    needs: build-image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            infra/stacks/prefect-server/docker-compose.yml
+            infra/stacks/prefect-server/deploy.sh
+            infra/stacks/prefect-server/Caddyfile
+          sparse-checkout-cone-mode: false
+
+      - name: Prepare deploy assets
+        run: |
+          cp infra/stacks/prefect-server/docker-compose.yml docker-compose.yml
+          cp infra/stacks/prefect-server/Caddyfile Caddyfile
+          cp infra/stacks/prefect-server/deploy.sh deploy.sh
+          cat > .env.runtime <<'EOF'
+          PREFECT_SERVER_IMAGE=${{ needs.build-image.outputs.image }}
+          PREFECT_HOSTNAMES=${{ vars.PREFECT_HOSTNAMES }}
+          PREFECT_PORT=${{ vars.PREFECT_PORT }}
+          PREFECT_BIND_PORT=${{ vars.PREFECT_BIND_PORT }}
+          PREFECT_BIND_ADDRESS=${{ vars.PREFECT_BIND_ADDRESS }}
+          PREFECT_API_PUBLIC_URL=${{ vars.PREFECT_API_PUBLIC_URL }}
+          PREFECT_DB_NAME=${{ vars.PREFECT_DB_NAME }}
+          PREFECT_DB_USER=${{ vars.PREFECT_DB_USER }}
+          PREFECT_DB_PASSWORD=${{ secrets.PREFECT_DB_PASSWORD }}
+          PREFECT_DB_DATA_DIR=${{ vars.PREFECT_DB_DATA_DIR }}
+          FLUSH_TARGET_URL=${{ vars.FLUSH_TARGET_URL }}
+          FLUSH_GATEWAY_TOKEN=${{ secrets.FLUSH_GATEWAY_TOKEN }}
+          FLUSH_CF_ACCESS_CLIENT_ID=${{ secrets.FLUSH_CF_ACCESS_CLIENT_ID }}
+          FLUSH_CF_ACCESS_CLIENT_SECRET=${{ secrets.FLUSH_CF_ACCESS_CLIENT_SECRET }}
+          PREFECT_MAINT_DATA_DIR=${{ vars.PREFECT_MAINT_DATA_DIR }}
+          FLUSH_INTERVAL_SEC=${{ vars.FLUSH_INTERVAL_SEC }}
+          PRUNE_INTERVAL_SEC=${{ vars.PRUNE_INTERVAL_SEC }}
+          PRUNE_TTL_HOURS=${{ vars.PRUNE_TTL_HOURS }}
+          FLUSH_PAGE_SIZE=${{ vars.FLUSH_PAGE_SIZE }}
+          FLUSH_MAX_RUNS=${{ vars.FLUSH_MAX_RUNS }}
+          PRUNE_PAGE_SIZE=${{ vars.PRUNE_PAGE_SIZE }}
+          PRUNE_MAX_RUNS=${{ vars.PRUNE_MAX_RUNS }}
+          CADDY_ACME_EMAIL=${{ vars.CADDY_ACME_EMAIL }}
+          CADDY_DATA_DIR=${{ vars.CADDY_DATA_DIR }}
+          CADDY_CONFIG_DIR=${{ vars.CADDY_CONFIG_DIR }}
+          EOF
+
+      - name: Upload deploy assets
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USERNAME }}
+          key: ${{ secrets.REMOTE_SSH_KEY }}
+          source: docker-compose.yml,Caddyfile,.env.runtime,deploy.sh
+          target: ${{ env.REMOTE_DEPLOY_PATH }}
+
+      - name: Deploy prefect stack
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USERNAME }}
+          key: ${{ secrets.REMOTE_SSH_KEY }}
+          port: ${{ vars.REMOTE_PORT || '22' }}
+          script: |
+            set -euo pipefail
+            export REMOTE_DEPLOY_PATH="${{ env.REMOTE_DEPLOY_PATH }}"
+            export ENV_FILE_NAME=".env.runtime"
+            export GHCR_USERNAME="${{ github.actor }}"
+            export GHCR_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            cd "${REMOTE_DEPLOY_PATH}"
+            bash ./deploy.sh

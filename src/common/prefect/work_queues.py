@@ -20,7 +20,10 @@ def default_work_queue_names(
     *,
     batch_queue: str | None = None,
 ) -> list[str]:
-    queue_names = [primary_queue, batch_queue or default_batch_queue_name(primary_queue)]
+    queue_names = [
+        primary_queue,
+        batch_queue or default_batch_queue_name(primary_queue),
+    ]
     deduped: list[str] = []
     for queue_name in queue_names:
         normalized = queue_name.strip()
