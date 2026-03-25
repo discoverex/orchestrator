@@ -1,5 +1,8 @@
 # Conceptual Topology
 
+배경과 문제 정의는 [problem-statement.md](problem-statement.md)를 따른다. 이 문서는
+현재 시스템의 노드 분리와 책임 배치를 설명한다.
+
 - **Prefect server node**:
   - Prefect API/UI + metadata DB
   - deployment registration + orchestration state

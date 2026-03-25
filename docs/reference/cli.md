@@ -38,10 +38,14 @@ Top-level help:
 ./bin/cli worker submit [router args...]
 ./bin/cli observability <workers|fixed-dummy-smoke> [args...]
 ./bin/cli prefect <up|down|ps|logs|build|flush|prune|install|workers> [--remote] [args...]
-./bin/cli e2e local [core|mlflow] [--keep-on-fail] [--timeout-sec N]
-./bin/cli e2e remote [engine|dummy] [--prefect-api-url URL] [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
+./bin/cli e2e local [core|mlflow|priority] [--keep-on-fail] [--timeout-sec N]
+./bin/cli e2e remote [engine] [--prefect-api-url URL] [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
+./bin/cli e2e remote dummy [--prefect-api-url URL] [--work-pool NAME] [--work-queue NAME] [--prune-mode dry-run|apply] [--bootstrap-worker] [--timeout-sec N]
 ./bin/cli ops <connect|postgres|dump|ci> [args...]
 ```
+
+이 문서는 실제 `bin/cli`와 각 `scripts/*/cli.sh` usage를 기준으로 유지한다.
+운영 배경이나 감사 결과는 별도 문서로 두지 않는다.
 
 ## 3) Domain reference
 
