@@ -7,6 +7,8 @@ source "./scripts/e2e/lib/common.sh"
 source "./scripts/e2e/lib/local_orchestrator_workflow.inc"
 
 PY_HELPER="./scripts/e2e/shell_python_helpers.py"
+# Under the hood this path exercises the shell helper subcommands
+# `verify-prefect-priority` and `wait-prefect-state` through local wrappers.
 LOCAL_COMPOSE_FILE="scripts/e2e/docker-compose.local.test.yml"
 LOCAL_PROJECT_NAME="orchestrator-e2e-local"
 
