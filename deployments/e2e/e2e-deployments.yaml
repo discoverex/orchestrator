@@ -1,0 +1,37 @@
+version: 1
+
+flow:
+  name: e2e-job
+  source: src/flows/worker_runtime/flow.py
+  entrypoint: run_worker_job_flow
+
+deployments:
+  - name: e2e-test
+    full_name: e2e-job/e2e-test
+    work_pool: ${PREFECT_WORK_POOL:-gpu-pool}
+    work_queue: gpu-fixed
+    mode: primary
+    role: fixed
+  - name: e2e-test-colab
+    full_name: e2e-job/e2e-test-colab
+    work_pool: ${PREFECT_WORK_POOL:-gpu-pool}
+    work_queue: gpu-colab
+    mode: primary
+    role: colab
+  - name: e2e-test-legacy
+    full_name: e2e-job/e2e-test-legacy
+    work_pool: ${PREFECT_WORK_POOL:-gpu-pool}
+    work_queue: gpu-fixed
+    mode: compatibility
+    role: fixed
+  - name: e2e-test-colab-legacy
+    full_name: e2e-job/e2e-test-colab-legacy
+    work_pool: ${PREFECT_WORK_POOL:-gpu-pool}
+    work_queue: gpu-colab
+    mode: compatibility
+    role: colab
+
+notes:
+  - This file is a declarative source of truth for canonical E2E deployment names.
+  - Runtime env values such as Prefect API URL, auth headers, and registration source root remain env-driven.
+  - register defaults read this file directly unless explicit CLI or env overrides are passed.

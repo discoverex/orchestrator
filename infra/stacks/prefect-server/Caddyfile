@@ -1,0 +1,6 @@
+{$PREFECT_HOSTNAMES} {
+  @http protocol http
+  redir @http https://{host}{uri} permanent
+  encode zstd gzip
+  reverse_proxy prefect-server:{$PREFECT_PORT}
+}

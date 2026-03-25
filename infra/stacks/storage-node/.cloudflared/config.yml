@@ -1,0 +1,9 @@
+tunnel: d701bf8c-328d-4f47-80a8-38b283f78bfe
+credentials-file: /etc/cloudflared/d701bf8c-328d-4f47-80a8-38b283f78bfe.json
+
+ingress:
+  - hostname: storage.discoverex.qzz.io
+    service: http://caddy:80
+  - hostname: storage-api.discoverex.qzz.io
+    service: http://caddy:80
+  - service: http_status:404

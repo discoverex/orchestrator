@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+.pytest_cache
+.ruff_cache
+.vscode
+artifacts
+notebooks
+.context
+*.pyc
+__pycache__
+*.log
+infra/stacks/storage-node/.env
+infra/stacks/register/.env
+infra/stacks/prefect-server/.env
+infra/stacks/*/.cloudflared/*.json

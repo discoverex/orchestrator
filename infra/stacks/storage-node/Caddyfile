@@ -1,0 +1,67 @@
+{
+  auto_https off
+  admin off
+}
+
+http://{$STORAGE_API_HOST} {
+  encode zstd gzip
+
+  handle /healthz {
+    reverse_proxy worker-router:8200
+  }
+
+  handle /artifact/* {
+    reverse_proxy worker-router:8200
+  }
+
+  handle /mlflow/* {
+    reverse_proxy worker-router:8200
+  }
+
+  handle_path /objects/* {
+    reverse_proxy minio:9000 {
+      header_up Host {upstream_hostport}
+    }
+  }
+
+  respond 404
+}
+
+http://{$STORAGE_HUMAN_HOST} {
+  encode zstd gzip
+
+  handle /healthz {
+    reverse_proxy worker-router:8200
+  }
+
+  @mlflowApi path /mlflow/api/*
+  handle @mlflowApi {
+    uri strip_prefix /mlflow
+    reverse_proxy mlflow:5000
+  }
+
+  handle /mlflow {
+    redir /mlflow/ 308
+  }
+
+  handle /mlflow/* {
+    reverse_proxy mlflow:5000
+  }
+
+  handle_path /minio/* {
+    reverse_proxy minio:9001
+  }
+
+  handle /db {
+    redir /db/ 308
+  }
+
+  handle_path /db/* {
+    reverse_proxy db-admin:80 {
+      header_up X-Script-Name /db
+      header_up X-Scheme https
+    }
+  }
+
+  respond 404
+}

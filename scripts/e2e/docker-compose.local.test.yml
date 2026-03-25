@@ -1,0 +1,136 @@
+services:
+  base-runtime:
+    build:
+      context: ../..
+      dockerfile: infra/images/base.Dockerfile
+    image: orchestrator-base:local
+    command: ["true"]
+
+  minio:
+    image: minio/minio:latest
+    container_name: orchestrator-e2e-local-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - e2e_local_minio_data:/data
+    ports:
+      - "29000:9000"
+      - "29001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  prefect:
+    image: prefecthq/prefect:3-latest
+    container_name: orchestrator-e2e-local-prefect
+    command: prefect server start --host 0.0.0.0 --port 4200
+    ports:
+      - "24200:4200"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  worker-router:
+    build:
+      context: ../..
+      dockerfile: infra/images/worker-router.Dockerfile
+    image: orchestrator-worker-router:local
+    container_name: orchestrator-e2e-local-worker-router
+    environment:
+      GATEWAY_REQUIRE_CF_ACCESS: false
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_SECURE: false
+      MINIO_AUTO_CREATE_BUCKET: true
+      MINIO_PUBLIC_BASE_URL: http://127.0.0.1:29000
+      MINIO_INTERNAL_PRESIGN_BASE_URL: http://minio:9000
+      ARTIFACT_BUCKET: orchestrator-artifacts
+      PRESIGN_TTL_DEFAULT: 900
+      PRESIGN_TTL_MAX: 3600
+      MLFLOW_BACKEND_URL: http://mlflow:5000
+    depends_on:
+      minio:
+        condition: service_healthy
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/images/worker-cpu.Dockerfile
+    image: orchestrator-worker-cpu:local
+    container_name: orchestrator-e2e-local-worker
+    environment:
+      PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_WORK_POOL: gpu-pool
+      STORAGE_API_URL: http://worker-router:8200
+      ORCHESTRATOR_CHECKPOINT_DIR: /tmp/orchestrator/checkpoints
+      ORCH_CACHE_DIR: /tmp/orchestrator/cache
+      CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-local-e2e-client}
+      CF_ACCESS_CLIENT_SECRET: ${CF_ACCESS_CLIENT_SECRET:-local-e2e-secret}
+    volumes:
+      - ${ENGINE_LOCAL_REPO_PATH_HOST:-../../engine}:/opt/engine-src:ro
+    depends_on:
+      prefect:
+        condition: service_healthy
+      worker-router:
+        condition: service_healthy
+
+  register:
+    build:
+      context: ../..
+      dockerfile: infra/images/register.Dockerfile
+    image: orchestrator-register:local
+    container_name: orchestrator-e2e-local-register
+    environment:
+      PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_WORK_POOL: gpu-pool
+      PREFECT_WORK_QUEUE: default
+      REGISTER_DEPLOYMENT_NAME: e2e-test
+      REGISTER_DEPLOYMENT_VERSION: ""
+    depends_on:
+      prefect:
+        condition: service_healthy
+  
+  mlflow:
+    build:
+      context: ../..
+      dockerfile: infra/images/mlflow.Dockerfile
+    image: orchestrator-e2e-mlflow:local
+    container_name: orchestrator-e2e-local-mlflow
+    command:
+      - mlflow
+      - server
+      - --backend-store-uri
+      - sqlite:////tmp/mlflow/mlflow.db
+      - --default-artifact-root
+      - /tmp/mlflow/artifacts
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+    volumes:
+      - e2e_local_mlflow_data:/tmp/mlflow
+    ports:
+      - "25000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  e2e_local_minio_data:
+  e2e_local_mlflow_data:

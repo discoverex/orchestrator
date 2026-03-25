@@ -1,7 +1,7 @@
 [project]
 name = "orchestrator"
 version = "0.1.0"
-description = "Prefect-based orchestration with runner and storage gateway"
+description = "Prefect-based orchestration with runner and storage API"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -14,9 +14,59 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "mypy>=1.18.0",
   "pytest>=8.3.0",
+  "pytest-cov>=7.0.0",
   "ruff>=0.12.0",
 ]
 
+[build-system]
+requires = ["hatchling>=1.24.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+  "src/common",
+  "src/deployments",
+  "src/flows",
+  "src/runner",
+  "src/storage",
+  "src/worker_router",
+]
+
+[tool.uv]
+index-url = "https://pypi.org/simple"
+
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+minversion = "8.0"
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["src", ".", "tests/fixtures/dummy_engine_repo/src"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["src", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint.extend-per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+plugins = ["pydantic.mypy"]
+mypy_path = [
+  "src",
+  "tests/fixtures/dummy_engine_repo/src",
+  "infra/stacks/worker/colab",
+]
+explicit_package_bases = true
+files = ["src", "scripts", "tests"]

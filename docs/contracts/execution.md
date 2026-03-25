@@ -1,0 +1,103 @@
+# Execution Contract (Prefect)
+
+## Flow Input
+
+- `job_spec_json: str`
+- `resume_key: str | None` (optional)
+- `checkpoint_dir: str | None` (optional)
+
+Deployment naming and canonical E2E targets are defined in:
+
+- [deployments/e2e/e2e-deployments.yaml](../../deployments/e2e/e2e-deployments.yaml)
+
+`job_spec_json` schema:
+
+- `engine: str`
+- `repo_url: str`
+- `ref: str` (branch/tag/sha)
+- `entrypoint: list[str]`
+- `config: str | None` (repo-relative path only)
+- `inputs: dict[str, Any]`
+- `env: dict[str, str]`
+- `outputs_prefix: str | None`
+
+## Version Pinning Policy
+
+- Flow starts with `resolve_commit(ref)`.
+- If `ref` is branch/tag, it is resolved once to `resolved_commit`.
+- All retries use the same `resolved_commit`.
+
+## Artifact Layout
+
+- `jobs/{flow_run_id}/attempt-{attempt}/stdout.log`
+- `jobs/{flow_run_id}/attempt-{attempt}/stderr.log`
+- `jobs/{flow_run_id}/attempt-{attempt}/result.json`
+- `jobs/{flow_run_id}/attempt-{attempt}/artifacts.json`
+
+## Storage Gateway APIs
+
+- `POST /v1/presign/put`
+- `POST /v1/presign/get`
+- `POST /v1/presign/batch`
+- `POST /v1/object/head`
+- `PUT /v1/object/proxy?token=...`
+- `GET /v1/object/proxy?token=...`
+
+All endpoints require bearer auth:
+
+- `CF-Access-Client-Id: <CF_ACCESS_CLIENT_ID>`
+- `CF-Access-Client-Secret: <CF_ACCESS_CLIENT_SECRET>`
+
+Optional additional gateway protection:
+
+- Cloudflare Access service-token headers:
+  - `CF-Access-Client-Id`
+  - `CF-Access-Client-Secret`
+
+## Flow Result Metadata
+
+- `flow_run_id`
+- `attempt`
+- `resolved_commit`
+- `outputs_prefix`
+- `stdout_uri`
+- `stderr_uri`
+- `result_uri`
+- `manifest_uri`
+- `exit_code`
+
+`Prefect flow result` is the source of truth for run metadata.
+
+Implementation-facing runtime contract:
+
+- [Engine Implementation Contract](engine-implementation.md)
+## E2E Acceptance (Register -> Worker -> Storage)
+
+The deterministic script `scripts/e2e/e2e_local_orchestrator.sh` verifies the orchestration chain in two modes:
+
+- `core`: deployment register, worker execution, object persistence in MinIO
+- `mlflow`: `core` + engine MLflow run presence
+
+Core pass criteria:
+
+1. The expected deployment target exists after register.
+   Default target is `e2e-job/e2e-test` for the common worker runtime.
+2. Submitted flow run reaches `COMPLETED`.
+3. All required objects exist:
+   - `stdout.log`
+   - `stderr.log`
+   - `result.json`
+   - `artifacts.json`
+4. `artifacts.json` metadata matches expected `flow_run_id`, `attempt`, and object URIs.
+
+Notes:
+
+- canonical registration entrypoint is `src/flows/worker_runtime/flow.py:run_worker_job_flow`
+- canonical E2E validation target is `e2e-job/e2e-test`
+- remote and local E2E scripts accept custom deployment targets when explicitly overridden
+
+MLflow pass criteria:
+
+1. Engine output exposes `scene_id` and `version_id`.
+2. A matching MLflow run exists for that `scene_id` / `version_id`.
+3. In local e2e, verification is done inside the MLflow container against `/tmp/mlflow/mlflow.db` because this local MLflow build does not return a stable `runs/search` HTTP payload for the helper.
